@@ -256,8 +256,21 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
 
   # Likelihood-based variance
   if (do.SE) {
-    vcov.vs <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.vs(x, data = data))$logelr, mod2sobs))
+    margs <- list(eps = 1e-4, d = 1e-2)
+    vcov.vs <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
     se.lik <- unname(sqrt(diag(vcov.vs)))
+    if (!all(is.finite(se.lik))) {
+      margs <- list(eps = 1e-4, d = 1e-3)
+      vcov.vs <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
+      se.lik <- unname(sqrt(diag(vcov.vs)))
+      warning("Using a smaller initial step (d=0.001) for Hessian computation.")
+    }
+    if (!all(is.finite(se.lik))) {
+      margs <- list(eps = 1e-4, d = 1e-4)
+      vcov.vs <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
+      se.lik <- unname(sqrt(diag(vcov.vs)))
+      warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
+    }
   } else se.lik <- NULL
   rm(mod1sobs, m)
   # Inefficient complete-case SEL with RoT bandwidth
@@ -345,8 +358,21 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   el.efficient <- el.opt$estimate
   LR.efficient <- emplik(g.unconditional.eff(c(1, 1), data = data, pihat = pihat, ystarhat = ystarhat))$logelr
   if (do.SE) {
-    vcov.eff <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient))
+    margs <- list(eps = 1e-4, d = 1e-2)
+    vcov.eff <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
     se.lik.eff <- sqrt(diag(vcov.eff))
+    if (!all(is.finite(se.lik.eff))) {
+      margs <- list(eps = 1e-4, d = 1e-3)
+      vcov.eff <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
+      se.lik.eff <- sqrt(diag(vcov.eff))
+      warning("Using a smaller initial step (d=0.001) for Hessian computation.")
+    }
+    if (!all(is.finite(se.lik.eff))) {
+      margs <- list(eps = 1e-4, d = 1e-4)
+      vcov.eff <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
+      se.lik.eff <- sqrt(diag(vcov.eff))
+      warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
+    }
   } else se.lik.eff <- NULL
   if (do.restr) {
     frestr.eff <- function(theta0 = 1, theta1 = 1) {
@@ -473,8 +499,21 @@ estimateOneModelDesign1 <- function(start.mod,
   restr.both  <- tryCatch(maximiseSEL(rho = rho, restricted.params = c(1, 1), sel.weights = sel.weights, ...),  error = function(e) fail())
 
   if (do.SE) {
-    vcovar <- solve(-numDeriv::hessian(function(th) smoothEmplik(rho, sel.weights, thetarho = th), x = sel$par))
+    margs <- list(eps = 1e-4, d = 1e-2)
+    vcovar <- solve(-numDeriv::hessian(function(th) smoothEmplik(rho, sel.weights, thetarho = th), x = sel$par, method.args = margs))
     se <- sqrt(diag(vcovar))
+    if (!all(is.finite(se))) {
+      margs <- list(eps = 1e-4, d = 1e-3)
+      vcovar <- solve(-numDeriv::hessian(function(th) smoothEmplik(rho, sel.weights, thetarho = th), x = sel$par, method.args = margs))
+      se <- sqrt(diag(vcovar))
+      warning("Using a smaller initial step (d=0.001) for Hessian computation.")
+    }
+    if (!all(is.finite(se))) {
+      margs <- list(eps = 1e-4, d = 1e-4)
+      vcovar <- solve(-numDeriv::hessian(function(th) smoothEmplik(rho, sel.weights, thetarho = th), x = sel$par, method.args = margs))
+      se <- sqrt(diag(vcovar))
+      warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
+    }
     colnames(vcovar) <- rownames(vcovar) <- names(se) <- names(start.point)
   } else vcovar <- se <- NULL
 
