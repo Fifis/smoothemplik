@@ -1,0 +1,13 @@
+citHeader("Please cite this material in publications as:")
+
+citEntry(
+  entry="Manual",
+  title = "smoothemplik: Smoothed Empirikal Likelihood for efficient estimation and specification testing",
+  author = as.person("Andreï V. Kostyrka"),
+  year = "2021",
+  note = "R package version 0.0.2",
+  organization = "University of Luxembourg",
+  address = "Luxembourg",
+  textVersion = "Kostyrka, Andreï V. (2021). smoothemplik: Smoothed Empirikal Likelihood for efficient estimation and specification testing. R package version 0.0.2. https://github.com/Fifis/smoothemplik",
+  url = "https://github.com/Fifis/smoothemplik"
+)
