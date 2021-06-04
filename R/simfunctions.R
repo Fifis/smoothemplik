@@ -612,7 +612,7 @@ getCoefSELContinuous <- function(seed, design = list(),
   tic0 <- Sys.time()
   mod1s.VS <- stats::lm(Z ~ X, data = data.VS)
   mod2s.VS <- unname(stats::lm(data.VS$Y ~ mod1s.VS$fitted.values)$coefficients)
-  weak.pvalue <- summary(mod1s.VS)$coefficients[2, 4] # We want the coefficient on X to be significant at least at 5% level
+  weak.pvalue <- summary(mod1s.VS)$coefficients[2, 4]
   first.stage.f <- stats::qf(1 - weak.pvalue, 1, this.design$n - 2)
   if (first.stage.f < weak.instrument.f) return(list(
     seed = seed,
