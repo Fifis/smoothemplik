@@ -4,37 +4,12 @@
 \alias{constrSmoothEmplik}
 \title{Constrained smoothed empirical likelihood}
 \usage{
-constrSmoothEmplik(
-  rho,
-  par.free = NULL,
-  par.fixed = NULL,
-  sel.weights = NULL,
-  trim = NULL,
-  minus = FALSE,
-  parallel = FALSE,
-  cores = 1,
-  bad.value = -Inf,
-  ...
-)
+constrSmoothEmplik(par.free = NULL, par.fixed = NULL, ...)
 }
 \arguments{
-\item{rho}{Passed to \code{\link{smoothEmplik}}.}
-
-\item{par.free}{A numeric vector of *only the free parameters* passed to \code{rho}. In case of constrained optimisation, must be shorter than}
+\item{par.free}{A numeric vector of *only the free parameters* passed to \code{rho}. In case of constrained optimisation, must be shorter than the number of parameters in the model.}
 
 \item{par.fixed}{A numeric vector of the same length as \code{par.free}: numeric values should be in the places where the values are to be kept fixed, and NA where the free parameters should be. Use NULL or a vector of NA's for unrestricted optimisation.}
-
-\item{sel.weights}{Passed to \code{\link{smoothEmplik}}.}
-
-\item{trim}{Passed to \code{\link{smoothEmplik}}.}
-
-\item{minus}{Passed to \code{\link{smoothEmplik}}.}
-
-\item{parallel}{Passed to \code{\link{smoothEmplik}}.}
-
-\item{cores}{Passed to \code{\link{smoothEmplik}}.}
-
-\item{bad.value}{Passed to \code{\link{smoothEmplik}}.}
 
 \item{...}{Passed to \code{\link{smoothEmplik}}.}
 }
@@ -43,6 +18,6 @@ A scalar with the constrained (or, if \code{par.fixed = NULL}, unconstrained SEL
 }
 \description{
 This function takes two vectors of parameters: free and fixed ones, so that SEL could be optimised with equality constraints.
-The fixed parameter vector must have full length, and have NA's in places where the free parameters should go
-Title
+The fixed parameter vector must have full length, and have NA's in places where the free parameters should go.
+Then, the free parameter values will be inserted in places with NA, and the entire vector passed to smoothEmplik.
 }

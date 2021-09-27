@@ -6,34 +6,56 @@
 \usage{
 smoothEmplik(
   rho,
+  theta,
+  data,
   sel.weights = NULL,
   trim = NULL,
+  weight.tolerance = NULL,
   minus = FALSE,
   parallel = FALSE,
   cores = 1,
+  memory.saving = c("none", "full", "partial"),
+  chunks = 10,
+  print.progress = FALSE,
   bad.value = -Inf,
+  attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "converged",
+    "exitcode", "probabilities"),
   ...
 )
 }
 \arguments{
-\item{rho}{Passed to \code{\link{smoothEmplikList}}.}
+\item{rho}{The moment function depending on parameters and data (and potentially other parameters). Must return a numeric vector.}
 
-\item{sel.weights}{Passed to \code{\link{smoothEmplikList}}.}
+\item{theta}{A parameter at which the moment function is evaluated.}
+
+\item{data}{A data object on which the moment function is computed.}
+
+\item{sel.weights}{Either a matrix with valid kernel smoothing weights with rows adding up to 1, or a list of kernel weights for smoothing where the sum of each element is 1 (must be returned by \code{sparseVectorToList}), or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}. If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must be a function that computes the kernel weights for the data set.}
 
 \item{trim}{A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.}
 
+\item{weight.tolerance}{Passed to \code{weightedEL} (uses the same default value).}
+
 \item{minus}{If TRUE, returns SEL times -1 (for optimisation via minimisation).}
 
-\item{parallel}{Passed to \code{\link{smoothEmplikList}}.}
+\item{parallel}{If TRUE, uses \code{parallel::mclapply} to speed up the computation.}
 
-\item{cores}{Passed to \code{\link{smoothEmplikList}}.}
+\item{cores}{The number of cores used by \code{parallel::mclapply}.}
 
-\item{bad.value}{Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values.}
+\item{memory.saving}{A string. \code{"none"} implies no memory-saving tricks, and the entire problem is processed in the computer memory at once (good for sample sizes 2000 and below; if \code{sel.weights} is not provided or is a function, the weight matrix / list is computed at once.). If \code{"full"}, then the smoothed likelihoods are computed in series, which saves memory but computes kernel weights at every step of a loop, increasing CPU time; the SEL weights, normally found in the rows of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then, the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists. If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.}
 
-\item{...}{Passed to \code{\link{smoothEmplikList}}.}
+\item{chunks}{The number of chunks into which the weight matrix is split. Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks (resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.}
+
+\item{print.progress}{If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.}
+
+\item{bad.value}{Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).}
+
+\item{attach.attributes}{If \code{"none"}, returns just the sum of expected likelihoods; otherwise, attaches certain attributes for diagnostics: \code{"ELRs"} for expected likelihoods, \code{"residuals"} for the residuals (moment function values), \code{"lam"} for the Lagrange multipliers in the EL problems, \code{"converged"} for the convergence of individual EL problems, \code{"exitcode"} for the \code{weightedEL} exit codes (0 for success), \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).}
+
+\item{...}{Passed to \code{rho}.}
 }
 \value{
-A scalar with the SEL value.
+A scalar with the SEL value and, if requested, attributes containing the diagnostic information attached to it.
 }
 \description{
 Evaluates SEL function for a given moment function at a certain parameter value.

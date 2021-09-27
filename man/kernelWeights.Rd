@@ -9,7 +9,7 @@ kernelWeights(
   xgrid = NULL,
   bw = NULL,
   gaussian = TRUE,
-  pit = FALSE,
+  PIT = FALSE,
   method = "CPP"
 )
 }
@@ -24,7 +24,7 @@ rule of thumb (via \code{bw.row()}) is applied to every dimension of \code{x}.}
 
 \item{gaussian}{If TRUE, the normal (Gaussian) product kernel with full support is used, otherwise Epanechnikov.}
 
-\item{pit}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns of \code{x} via \code{ecdf} in order to map all values
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns of \code{x} via \code{ecdf} in order to map all values
 into the [0, 1] range. May be an integer vector of indices of columns to which the PIT should be applied.}
 
 \item{method}{"R" or "CPP". If "CPP", then faster Rcpp functions are invoked, otherwise use a pure R implementation.

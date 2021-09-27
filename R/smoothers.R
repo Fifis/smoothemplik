@@ -142,7 +142,7 @@ kernelSmoothMultiR <- function(x,
 #' @param bw Kernel bandwidth. Since it is the crucial parameter in many applications, throws a warning if not supplied, and then, Silverman's
 #' rule of thumb (via \code{bw.row()}) is applied to every dimension of \code{x}.
 #' @param gaussian If TRUE, the normal (Gaussian) product kernel with full support is used, otherwise Epanechnikov.
-#' @param pit If TRUE, the Probability Integral Transform (PIT) is applied to all columns of \code{x} via \code{ecdf} in order to map all values
+#' @param PIT If TRUE, the Probability Integral Transform (PIT) is applied to all columns of \code{x} via \code{ecdf} in order to map all values
 #'   into the [0, 1] range. May be an integer vector of indices of columns to which the PIT should be applied.
 #' @param method "R" or "CPP". If "CPP", then faster Rcpp functions are invoked, otherwise use a pure R implementation.
 #'
@@ -157,17 +157,20 @@ kernelWeights <- function(x,
                           xgrid = NULL,
                           bw = NULL,
                           gaussian = TRUE,
-                          pit = FALSE,
+                          PIT = FALSE,
                           method = "CPP"
 ) {
   one.dimensional <- is.vector(x)
   if (is.null(xgrid)) xgrid <- x
   if (one.dimensional) {
+    if (PIT) {
+      x <- pit(x)
+      xgrid <- pit(x = x, xgrid = xgrid)
+    }
     if (is.null(bw)) {
       bw <- bw.rot(x)
       warning(paste0("No bandwidth supplied, using Silverman's one-dimensional rule of thumb: bw = ", round(bw, 5), "."))
     }
-    if (isTRUE(pit))
     if (length(bw) != 1) stop("The bandwidth for one-dimensional smoothing must be a scalar.")
     if (!is.vector(xgrid)) stop("The grid for one-dimensional smoothing must be a vector.")
     result <- switch(method,
@@ -178,9 +181,15 @@ kernelWeights <- function(x,
     d <- ncol(x)
     if (!is.matrix(xgrid)) stop("x and xgrid must be both matrices.")
     if (d != ncol(xgrid)) stop("x and xgrid must be have the same number of columns (i.e. the same dimension).")
+    if (PIT) {
+      for (i in 1:d) {
+        x[, i] <- pit(x[, i])
+        xgrid[, i] <- pit(x = x[, i], xgrid = xgrid[, i])
+      }
+    }
     if (is.null(bw)) {
-      bw <- apply(x, 2, bw.rot)
-      warning("No bandwidth supplied, using Silverman's one-dimensional rule of thumb in every dimension: bw = (", paste(round(bw, 5), collapse = ", "), ").")
+      bw <- bw.rot(x)
+      warning("No bandwidth supplied, using Silverman's multi-dimensional rule of thumb: bw = (", paste(round(bw, 5), collapse = ", "), ").")
     }
     if (length(bw) == 1) bw <- rep(bw, d)
     if (length(bw) != d) stop("The number of data dimensions is not the same as the number of bandwidths!")

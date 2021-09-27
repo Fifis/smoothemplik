@@ -19,5 +19,5 @@ This function saves memory (which is crucial in large samples) and allows one to
 time-consuming subsetting operations and memory-consuming matrix multiplications. We do not want to rely on extra packages for
 sparse matrix manipulation since the EL smoothing weights are usually fixed at the beginning, and need not be recomputed dynamically,
 so we recommend applying this function to the rows of a matrix. In order to avoid numerical instability, the weights are trimmed
-at \code{0.01 / length(x)}.
+at \code{0.01 / length(x)}. Using too much trimming may cause the spanning condition to fail (the moment function values can have the same sign in some neighbourhoods).
 }

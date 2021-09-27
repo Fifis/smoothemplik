@@ -2,16 +2,12 @@
 % Please edit documentation in R/selfunctions.R
 \name{maximiseSEL}
 \alias{maximiseSEL}
-\title{Title}
+\title{Optimise SEL with or without constraints}
 \usage{
 maximiseSEL(
-  rho,
   start.values = NULL,
   restricted.params = NULL,
-  sel.weights = NULL,
   verbose = FALSE,
-  parallel = FALSE,
-  cores = 1,
   optmethod = c("nlm", "BFGS", "Nelder-Mead"),
   nlm.step.max = NULL,
   maxit = 50,
@@ -19,19 +15,11 @@ maximiseSEL(
 )
 }
 \arguments{
-\item{rho}{Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.}
-
 \item{start.values}{Initial values for unrestricted parameters.}
 
 \item{restricted.params}{Fixed parameter values used for constrained optimisation, hypothesis testing, power and size calculations etc.}
 
-\item{sel.weights}{Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}}
-
 \item{verbose}{If TRUE, reports optimisation progress, otherwise remains silent.}
-
-\item{parallel}{Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.}
-
-\item{cores}{Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.}
 
 \item{optmethod}{A string indicating the optimisation method: "nlm" (the default, invoking \code{stats::nlm}) is slightly quicker, and if it fails, "BFGS" is used}
 
@@ -39,7 +27,7 @@ maximiseSEL(
 
 \item{maxit}{Maximum number of numerical optimiser steps. If it has not converged in this number of steps, fail gracefully with a meaningfull return.}
 
-\item{...}{Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.}
+\item{...}{Passed to \code{\link{constrSmoothEmplik}} or, in case all parameters are fixed, \code{\link{smoothEmplik}}.}
 }
 \value{
 A list with the following elements:
@@ -51,5 +39,5 @@ A list with the following elements:
 }
 }
 \description{
-Title
+Optimise SEL with or without constraints
 }

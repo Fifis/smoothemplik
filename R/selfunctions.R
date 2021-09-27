@@ -50,10 +50,12 @@ bw.rot <- function(x, na.rm = FALSE) {
 #' @param mu Hypothesized mean of \code{z} in the moment condition.
 #' @param SEL If FALSE, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 #' due to Owen (2001, formula 2.9), otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
-#' @param wttol Weight tolerance for counts for numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
-#' @param truncto Counts under \code{wttol} will be set to this value. In most cases, setting this to \code{0} or \code{wttol} is a viable solution of the zero-denominator problem.
+#' @param n.orig An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).
+#' @param weight.tolerance Weight tolerance for counts for numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
+#' @param truncto Counts under \code{weight.tolerance} will be set to this value. In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
 #' @param uniroot.control A list passed to the \code{uniroot}.
 #' @param return.weights Logical: if TRUE, individual EL weights are computed and returned. Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
+#' @param verbose Logical: if \code{TRUE}, prints warnings.
 #' @return A list with the following elements:
 #' \itemize{
 #' \item{logelr }{Logarithm of the empirical likelihood ratio.}
@@ -84,20 +86,22 @@ weightedEL <- function(z,
                        shift = NULL,
                        mu = 0,
                        SEL = FALSE,
-                       wttol = 0.01 / length(z),
+                       n.orig = NULL,
+                       weight.tolerance = 0.01 / length(z),
                        truncto = 0,
                        uniroot.control = list(),
-                       return.weights = FALSE
+                       return.weights = FALSE,
+                       verbose = FALSE
 ) {
-  norig <- length(z)
-  if (is.null(ct)) ct <- rep(1, norig)
-  if (is.null(shift)) shift <- rep(0, norig)
+  if (is.null(n.orig)) n.orig <- length(z)
+  if (is.null(ct)) ct <- rep(1, length(z))
+  if (is.null(shift)) shift <- rep(0, length(z))
   if (min(ct) < 0) stop("Negative weights are not welcome.")
   # If originally the weights were too small, too many points would be truncated
-  # Warn if any non-zero weights are smaller than wttol
-  if (any(0 < ct & ct < wttol)) {
-    warning(paste0("Positive counts below ", wttol, " have been replaced with ", truncto, "."))
-    ct[ct < wttol] <- truncto
+  # Warn if any non-zero weights are smaller than weight.tolerance
+  if (any(0 < ct & ct < weight.tolerance)) {
+    if (verbose) warning(paste0("Positive counts below ", weight.tolerance, " have been replaced with ", truncto, "."))
+    ct[ct < weight.tolerance] <- truncto
   }
   nonz <- which(ct > 0)
   z <- z[nonz]
@@ -105,7 +109,7 @@ weightedEL <- function(z,
   shift <- shift[nonz]
   if (SEL) ct <- ct / sum(ct) # We might have truncated some weights, so re-normalisation is needed!
   # The denominator for EL with counts is the sum of total counts, and for SEL, it is the number of observations!
-  N <- if (SEL) norig else sum(ct)
+  N <- if (SEL) n.orig else sum(ct)
   if (N <= 0) stop("Total weights must be positive.")
   if (is.matrix(z)) {
     if (ncol(z) > 1) stop("Only one-dimensional vectors or matrices are supported.") else z <- as.numeric(z)
@@ -128,7 +132,7 @@ weightedEL <- function(z,
   # which implies
   # {lambda < min_{i: z_i<0} (c_i/N - 1 - shift)/z_i
   # {lambda > max_{i: z_i>0} (c_i/N - 1 - shift)/z_i
-  if (return.weights) wts <- rep(0, norig)
+  wts <- if (return.weights) rep(0, n.orig) else NULL
   # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z)
   if (min(z) < 0 & max(z) > 0) {
     negz <- z < 0
@@ -145,7 +149,7 @@ weightedEL <- function(z,
     )
     if (!is.null(lambda)) { # Some result with or without a warning as the second element of the list
       if (class(lambda[[2]]) == "simpleWarning") {
-        print(lambda[[2]]) # The user should know that went wrong in uniroot()
+        if (verbose) print(lambda[[2]]) # The user should know that went wrong in uniroot()
         lambda <- lambda[[1]]
       }
       lam <- lambda$root
@@ -157,11 +161,11 @@ weightedEL <- function(z,
       f.root <- lambda$f.root
       exitcode <- 0
       if (abs(f.root) > sqrt(.Machine$double.eps)) {
-        warning("FOC not met: the value of d/dlambda(weighted EL) is different from 0 by more than sqrt(Mach.eps)!")
+        if (verbose) warning("FOC not met: the value of d/dlambda(weighted EL) is different from 0 by more than sqrt(Mach.eps)!")
         exitcode <- 1
       }
       if (abs(lam - maxlambda) < sqrt(.Machine$double.eps) | abs(lam - minlambda) < sqrt(.Machine$double.eps)) {
-        warning("Lambda is very close to the boundary (closer than sqrt(Mach.eps))!")
+        if (verbose) warning("Lambda is very close to the boundary (closer than sqrt(Mach.eps))!")
         exitcode <- exitcode + 2
       }
     } else {
@@ -172,7 +176,7 @@ weightedEL <- function(z,
       estim.prec <- NA
       f.root <- NA
       exitcode <- 4
-      warning("Root finder returned an error!")
+      if (verbose) warning("Root finder returned an error!")
     }
   } else {
     lam <- Inf
@@ -184,125 +188,130 @@ weightedEL <- function(z,
     estim.prec <- NA
     f.root <- NA
     exitcode <- 5
-    warning("mu is not strictly in the convex hull of z!")
+    if (verbose) warning("mu is not strictly in the convex hull of z!")
   }
 
-  return(list(logelr = logelr, lam = lam, wts = if (return.weights) wts else NULL, converged = converged, iter = iter, bracket = c(minlambda, maxlambda), estim.prec = estim.prec, f.root = f.root, exitcode = exitcode))
+  return(list(logelr = logelr, lam = lam, wts = wts, converged = converged, iter = iter, bracket = c(minlambda, maxlambda), estim.prec = estim.prec, f.root = f.root, exitcode = exitcode))
 }
-
-#' SEL for every observation
-#'
-#' @param rho The moment function depending on parameters and data (and potentially other parameters). Must return a numeric vector.
-#' @param sel.weights A matrix with valid kernel smoothing weights with rows adding up to 1, or a list of kernel weights for smoothing where the sum of each element is 1 (must be returned by \code{sparseVectorToList}).
-#' @param parallel If TRUE, uses \code{parallel::mclapply} to speed up the computation.
-#' @param cores The number of cores used by \code{parallel::mclapply}.
-#' @param grad Currently not used.
-#' @param ... Passed to \code{rho}; usually \code{theta} and \code{data}.
-#'
-#' @return A list with two values:
-#' \item{rho}{One-dimensional vector of the moment function values.}
-#' \item{empliklist}{A list with the results of one-dimension optimisation conducted by \code{\link{weightedEL}}.}
-#' @export
-smoothEmplikList <- function(rho,
-                             sel.weights = NULL,
-                             parallel = FALSE, cores = 1,
-                             grad = FALSE,
-                             ...
-) {
-  if (is.null(sel.weights)) {
-    data <- list(...)$data
-    bw <- bw.rot(data$X)
-    sel.weights <- kernelWeights(data$X, bw = bw)
-    sel.weights <- sel.weights / rowSums(sel.weights)
-    warning(paste0("smoothEmplikList: you forgot to provide SEL weights, assuming normal kernel weights with RoT bandwidth ", round(bw, 5), "!"))
-  }
-
-  # Constructing residuals
-  rho.series <- rho(...)
-
-  # Attempting to save memory
-  if (is.list(sel.weights)) {
-    if (parallel) { # Returns a list, one item for each conditioning vector point
-      empliklist <- parallel::mclapply(1:nrow(data), function(i) suppressWarnings(weightedEL(rho.series[sel.weights[[i]]$idx], ct = sel.weights[[i]]$ct, SEL = TRUE)), mc.cores = cores)
-    } else {
-      empliklist <- lapply(sel.weights, function(x) suppressWarnings(weightedEL(rho.series[x$idx], ct = x$ct, SEL = TRUE)))
-    }
-  } else { # If it is a matrix
-    if (parallel) {
-      empliklist <- parallel::mclapply(1:nrow(data), function(i) suppressWarnings(weightedEL(rho.series, ct = sel.weights[i, ], SEL = TRUE)), mc.cores = cores)
-    } else {
-      empliklist <- apply(sel.weights, MARGIN = 1, function(w) suppressWarnings(weightedEL(rho.series, ct = w, SEL = TRUE)))
-    }
-  }
-
-  return(list(rho = rho.series, empliklist = empliklist))
-}
-
-# A function that takes parameters, data, smoothing weights, bandwidth, and returns the smoothed empirical likelihood
 
 #' Smoothed Empirical Likelihood function value
 #'
 #' Evaluates SEL function for a given moment function at a certain parameter value.
 #'
-#' @param rho Passed to \code{\link{smoothEmplikList}}.
-#' @param sel.weights Passed to \code{\link{smoothEmplikList}}.
+#' @param rho The moment function depending on parameters and data (and potentially other parameters). Must return a numeric vector.
+#' @param theta A parameter at which the moment function is evaluated.
+#' @param data A data object on which the moment function is computed.
+#' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1, or a list of kernel weights for smoothing where the sum of each element is 1 (must be returned by \code{sparseVectorToList}), or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}. If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must be a function that computes the kernel weights for the data set.
 #' @param trim A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.
+#' @param weight.tolerance Passed to \code{weightedEL} (uses the same default value).
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).
-#' @param parallel Passed to \code{\link{smoothEmplikList}}.
-#' @param cores Passed to \code{\link{smoothEmplikList}}.
-#' @param bad.value Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values.
-#' @param ... Passed to \code{\link{smoothEmplikList}}.
+#' @param parallel If TRUE, uses \code{parallel::mclapply} to speed up the computation.
+#' @param cores The number of cores used by \code{parallel::mclapply}.
+#' @param memory.saving A string. \code{"none"} implies no memory-saving tricks, and the entire problem is processed in the computer memory at once (good for sample sizes 2000 and below; if \code{sel.weights} is not provided or is a function, the weight matrix / list is computed at once.). If \code{"full"}, then the smoothed likelihoods are computed in series, which saves memory but computes kernel weights at every step of a loop, increasing CPU time; the SEL weights, normally found in the rows of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then, the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists. If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.
+#' @param chunks The number of chunks into which the weight matrix is split. Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks (resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.
+#' @param print.progress If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.
+#' @param bad.value Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).
+#' @param attach.attributes If \code{"none"}, returns just the sum of expected likelihoods; otherwise, attaches certain attributes for diagnostics: \code{"ELRs"} for expected likelihoods, \code{"residuals"} for the residuals (moment function values), \code{"lam"} for the Lagrange multipliers in the EL problems, \code{"converged"} for the convergence of individual EL problems, \code{"exitcode"} for the \code{weightedEL} exit codes (0 for success), \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).
+#' @param ... Passed to \code{rho}.
 #'
-#' @return A scalar with the SEL value.
+#' @return A scalar with the SEL value and, if requested, attributes containing the diagnostic information attached to it.
 #' @export
 #'
 #' @examples
 smoothEmplik <- function(rho,
+                         theta,
+                         data,
                          sel.weights = NULL,
-                         trim = NULL,
+                         trim = NULL, weight.tolerance = NULL,
                          minus = FALSE,
                          parallel = FALSE, cores = 1,
+                         memory.saving = c("none", "full", "partial"), chunks = 10, print.progress = FALSE,
                          bad.value = -Inf,
+                         attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "converged", "exitcode", "probabilities"),
                          ...
 ) {
-  sellist <- smoothEmplikList(rho = rho, sel.weights = sel.weights, parallel = parallel, cores = cores, ...)
-  if (is.null(trim)) trim <- rep(1, length(sellist$rho))
-  logsemplik <- sum(trim * unlist(lapply(sellist$empliklist, "[[", "logelr"))) * (1 - 2 * as.numeric(minus))
-  if (any(bad <- !is.finite(logsemplik))) logsemplik[bad] <- bad.value
-  return(logsemplik)
+  # Constructing residuals
+  rho.series <- rho(theta, data, ...)
+  n <- length(rho.series)
+  if (is.null(weight.tolerance)) weight.tolerance <- 0.01 / n
+  if (any("none" %in% attach.attributes)) attach.attributes <- "none"
+  attach.probs <- ("probabilities" %in% attach.attributes) | isTRUE(attach.attributes == "all")
+
+  # Since SEL is a non-parametric method and relies on smoothing with kernel weights, using large matrices for large problems
+  # can be terribly inefficient. Instead, we split it into chunks.
+  memory.saving <- memory.saving[1]
+  empliklist <- vector("list", n)
+  if (memory.saving == "full") {
+      if (!is.function(sel.weights)) stop("smoothEmplik: sel.weights must be a function that accepts an index and a data frame and returns a numeric vector of kernel weights.")
+    if (print.progress) pb <- utils::txtProgressBar(min = 0, max = n, style = 3)
+      for (i in 1:n) {
+        w <- suppressWarnings(as.numeric(sel.weights(i, data)))
+        empliklist[[i]] <- weightedEL(rho.series, ct = w, SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs)
+        if (print.progress) {if (i %% floor(n / 50) == 0) utils::setTxtProgressBar(pb, i)}
+      }
+    if (print.progress) close(pb)
+    } else {
+      if (memory.saving == "none") {
+        chunks <- 1
+        chunk.list <- list(1:n)
+      } else if (memory.saving == "partial") {
+        if (chunks > n/2) {
+          chunks <- max(ceiling(n/1000), 2)
+          warning(paste0("Too many chunks for memory saving (fewer than 2 observations per chunk); to reduce overhead, using chunks = ", ceiling(n/1000), "."))
+        }
+        chunk.labels <- cut(1:n, breaks = chunks, labels = 1:chunks)
+        chunk.list <- split(1:n, chunk.labels)
+      } else stop("smoothEmplik: Wrong value of the memory.saving argument.")
+      if (print.progress) pb <- utils::txtProgressBar(min = 0, max = chunks, style = 3)
+      for (k in 1:chunks) {
+        inds <- chunk.list[[k]]
+        if (k == 1 & memory.saving == "none" & (is.matrix(sel.weights) | is.list(sel.weights))) {
+          w <- sel.weights
+        } else w <- suppressWarnings(sel.weights(chunk.list[[k]], data))
+
+        # If w is a sparse matrix, it can be converted into a list to save memory (helps in most cases)
+        ELiFunc <- if (is.list(w)) function(i) weightedEL(rho.series[w[[i]]$idx], ct = w[[i]]$ct, SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs) else if (is.matrix(w)) function(i) weightedEL(rho.series, ct = w[i, ], SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs) else {
+          if (memory.saving == "none") stop("smoothEmplik: sel.weights must be a list or a matrix of weights for every observation of the data set, or a function returning a matrix or a list (favouring CPU over memory).") else stop("smoothEmplik: sel.weights must be a function returning a matrix or a list (favouring memory over CPU).")
+        }
+        empliklist[inds] <- if (parallel & cores > 1) parallel::mclapply(X = seq_along(inds), FUN = ELiFunc, mc.cores = cores) else lapply(seq_along(inds), ELiFunc)
+        if (print.progress) utils::setTxtProgressBar(pb, k)
+      }
+      if (print.progress) close(pb)
+    }
+
+  if (is.null(trim)) trim <- rep(1, n)
+  log.ELR.values <- unlist(lapply(empliklist, "[[", "logelr"))
+  if (any(bad <- !is.finite(log.ELR.values))) log.ELR.values[bad] <- bad.value
+  if (minus) log.ELR.values <- -log.ELR.values
+  log.SELR <- sum(trim * log.ELR.values)
+  ret <- log.SELR
+  if (isTRUE(attach.attributes == "none")) return(ret)
+  if ("ELRs" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "ELRs") <- log.ELR.values
+  if ("residuals" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "residuals") <- rho.series
+  if ("lam" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "lam") <- unlist(lapply(empliklist, "[[", "lam"))
+  if ("converged" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "converged") <- unlist(lapply(empliklist, "[[", "converged"))
+  if ("exitcode" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "exitcode") <- unlist(lapply(empliklist, "[[", "exitcode"))
+  if (attach.probs) attr(ret, "probabilities") <- lapply(empliklist, "[[", "wts")
+  return(ret)
 }
 
 #' Constrained smoothed empirical likelihood
 #'
 #' This function takes two vectors of parameters: free and fixed ones, so that SEL could be optimised with equality constraints.
-#' The fixed parameter vector must have full length, and have NA's in places where the free parameters should go
-#; Then, the free parameter values will be inserted in places with NA, and the entire vector passed to smoothEmplik
-#' Title
+#' The fixed parameter vector must have full length, and have NA's in places where the free parameters should go.
+#' Then, the free parameter values will be inserted in places with NA, and the entire vector passed to smoothEmplik.
 #'
-#' @param rho Passed to \code{\link{smoothEmplik}}.
-#' @param par.free A numeric vector of *only the free parameters* passed to \code{rho}. In case of constrained optimisation, must be shorter than
+#' @param par.free A numeric vector of *only the free parameters* passed to \code{rho}. In case of constrained optimisation, must be shorter than the number of parameters in the model.
 #' @param par.fixed A numeric vector of the same length as \code{par.free}: numeric values should be in the places where the values are to be kept fixed, and NA where the free parameters should be. Use NULL or a vector of NA's for unrestricted optimisation.
-#' @param sel.weights Passed to \code{\link{smoothEmplik}}.
-#' @param trim Passed to \code{\link{smoothEmplik}}.
-#' @param minus Passed to \code{\link{smoothEmplik}}.
-#' @param parallel Passed to \code{\link{smoothEmplik}}.
-#' @param cores Passed to \code{\link{smoothEmplik}}.
-#' @param bad.value Passed to \code{\link{smoothEmplik}}.
 #' @param ... Passed to \code{\link{smoothEmplik}}.
 #'
 #' @return A scalar with the constrained (or, if \code{par.fixed = NULL}, unconstrained SEL.)
 #' @export
 #'
 #' @examples
-constrSmoothEmplik <- function(rho,
-                               par.free = NULL,
+constrSmoothEmplik <- function(par.free = NULL,
                                par.fixed = NULL,
-                               sel.weights = NULL, # Must be valid SEL weights with rows adding up to 1!
-                               trim = NULL,
-                               minus = FALSE, # Return minus log-likelihood for optimisers?
-                               parallel = FALSE, cores = 1, # If true and cores>1 (not on Windows), parallel::mclapply is used
-                               bad.value = -Inf, # May be useful if an optimiser does not allow specific non-finite values
-                               ... # Passed to rho
+                               ...
 ) {
   if (is.null(par.free)) { # No free parameters supplied
     theta <- par.fixed
@@ -312,64 +321,19 @@ constrSmoothEmplik <- function(rho,
     theta <- par.fixed
     theta[is.na(theta)] <- par.free
   }
-  SEL <- smoothEmplik(rho,
-    sel.weights = sel.weights, minus = minus, parallel = parallel, cores = cores, ...,
-    theta = theta, bad.value = bad.value
-  )
+  SEL <- smoothEmplik(theta = theta, ...)
   return(SEL)
 }
 
-# A function that takes parameters, data, smoothing weights, bandwidth, and returns the gradient of the smoothed empirical likelihood
-# smoothEmplikGrad <- function(par,
-#                              data, # Must always contain the X variable for construction of weights!
-#                              sel.weights = NULL, # Must be valid SEL weights with rows adding up to 1!
-#                              trim = NULL,
-#                              model = "missing", # "simple" or "missing"
-#                              miss.bw = NULL, # Bandwidth for non-parametric imputation in models with missing endogenous variables
-#                              minus = FALSE, # Return minus log-likelihood for optimisers?
-#                              parallel = FALSE, cores = 1, # If true and cores>1 (not on Windows), mclapply is used
-#                              pihat = NULL,
-#                              ystarhat = NULL) {
-#   sellist <- smoothEmplikList(par = par, data = data, sel.weights = sel.weights, model = model, miss.bw = miss.bw, minus = minus, parallel = parallel, cores = cores, pihat = pihat, ystarhat = ystarhat)
-#   if (is.null(trim)) trim <- rep(1, nrow(data))
-#   p <- length(par)
-#   ans <- rep(0, p)
-#
-#   rho.j <- sellist$rho
-#   rho.j.by.theta <- cbind(1, -data$Z)
-#   lambda.i <- unlist(lapply(sellist$empliklist, "[[", "lam"))
-#   lambda.i.by.theta <- matrix(0, ncol = p, nrow = nrow(data))
-#   sel.denom <- 1 + outer(lambda.i, rho.j)
-#   for (th in 1:p) {
-#     lambda.i.by.theta[, th] <- rowSums(sel.weights * rho.j.by.theta[, th] / sel.denom^2) / rowSums(sel.weights * rho.j^2 / sel.denom^2)
-#     ans[th] <- -sum(outer(trim, trim) * sel.weights * (outer(lambda.i.by.theta[, th], rho.j) + outer(lambda.i, rho.j.by.theta[, th])) / sel.denom)
-#   }
-#   ans <- ans * (1 - 2 * as.numeric(minus))
-#   return(ans)
-# }
-
-# smoothEmplik(c(1, 1), data = data, sel.weights = sel.weights, trim = NULL, model = "missing", pihat = pihat, ystarhat = ystarhat)
-# smoothEmplikGrad(par, data = data, sel.weights = sel.weights, trim = NULL, model = "missing", pihat = pihat, ystarhat = ystarhat)
-# library(numDeriv)
-# grad(function(x) smoothEmplik(x, data = data, sel.weights = sel.weights, trim = NULL, model = "missing", pihat = pihat, ystarhat = ystarhat), par)
-
-# Function: optimise SEL with or without constraint, starting with smart initial values for SEL using GMM
-# In order to speed up convergence and reduce maximisation time, we check a grid of points not far away from GMM initval and pick the best one
-# This function covers a wide grid of possible points
-# Receives the dataset from the external function and does the computaion
-#' Title
+#' Optimise SEL with or without constraints
 #'
-#' @param rho Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.
 #' @param start.values Initial values for unrestricted parameters.
 #' @param restricted.params Fixed parameter values used for constrained optimisation, hypothesis testing, power and size calculations etc.
-#' @param sel.weights Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}
 #' @param verbose If TRUE, reports optimisation progress, otherwise remains silent.
-#' @param parallel Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.
-#' @param cores Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.
 #' @param optmethod A string indicating the optimisation method: "nlm" (the default, invoking \code{stats::nlm}) is slightly quicker, and if it fails, "BFGS" is used
 #' @param nlm.step.max Passed to \code{nlm} if \code{optmethod == "nlm"}; in case of convergence issues, can be reduced, but if it is too small and 5 \code{nlm} iterations are done with the maximum step size, optimisation is re-done via BFGS.
 #' @param maxit Maximum number of numerical optimiser steps. If it has not converged in this number of steps, fail gracefully with a meaningfull return.
-#' @param ... Passed to \code{\link{smoothEmplik}} and \code{\link{constrSmoothEmplik}}.
+#' @param ... Passed to \code{\link{constrSmoothEmplik}} or, in case all parameters are fixed, \code{\link{smoothEmplik}}.
 #'
 #' @return A list with the following elements:
 #' \itemize{
@@ -381,13 +345,9 @@ constrSmoothEmplik <- function(rho,
 #' @export
 #'
 #' @examples
-maximiseSEL <- function(rho,
-                        start.values = NULL,
+maximiseSEL <- function(start.values = NULL,
                         restricted.params = NULL,
-                        sel.weights = NULL,
                         verbose = FALSE,
-                        parallel = FALSE,
-                        cores = 1,
                         optmethod = c("nlm", "BFGS", "Nelder-Mead"),
                         nlm.step.max = NULL,
                         maxit = 50,
@@ -397,7 +357,7 @@ maximiseSEL <- function(rho,
 
   # Case 1: If all parameters are restricted, just evaluate the SEL at the given point
   if (!is.null(restricted.params) & all(is.finite(restricted.params))) {
-    SEL <- smoothEmplik(rho = rho, sel.weights = sel.weights, parallel = parallel, cores = cores, theta = restricted.params, ...)
+    SEL <- smoothEmplik(theta = restricted.params, ...)
     diff.opt <- as.numeric(difftime(Sys.time(), tic0, units = "secs"))
     return(list(par = restricted.params, value = SEL, restricted = rep(TRUE, length(restricted.params)), code = 0, xtimes = c(initial = 0, opt = diff.opt)))
   }
@@ -409,19 +369,20 @@ maximiseSEL <- function(rho,
     restricted <- !is.na(restricted.params)
   }
 
-  if (verbose) print("Maximising SEL...")
-  SELToOptim <- function(theta, ...) constrSmoothEmplik(rho, par.free = theta, par.fixed = restricted.params, sel.weights = sel.weights, minus = TRUE, parallel = parallel, cores = cores, ...)
-  # constrSmoothEmplik(rho = rho.complete.case, par.free = start.values, par.fixed = restricted.params, sel.weights = sel.weights, minus = TRUE, parallel = parallel, cores = cores, data = data)
+  if (verbose) cat("Maximising SEL.\n")
+  opt.controls <- list(trace = as.numeric(verbose), REPORT = 1, maxit = maxit, fnscale = -1)
+  if (!is.null(list(...)$minus)) stop("Do not pass 'minus' to 'maximiseSEL'.")
+  SELToOptim <- function(theta, ...) constrSmoothEmplik(par.free = theta, par.fixed = restricted.params, minus = FALSE, ...)
   if (optmethod == "nlm") {
     if (is.null(nlm.step.max)) nlm.step.max <- sqrt(sum(start.values^2)) / 3
-    optim.SEL <- tryCatch(stats::nlm(p = start.values, f = SELToOptim, print.level = verbose * 2, stepmax = nlm.step.max, ...), error = opterror)
+    optim.SEL <- tryCatch(stats::nlm(p = start.values, f = SELToOptim, fscale = -1, print.level = verbose * 2, stepmax = nlm.step.max, ...), error = optError)
     if (optim.SEL$code %in% c(4, 5)) { # If there are optimisation issues
       warning(paste0("nlm exit code: ", optim.SEL$code, ", restarting with BFGS."))
       optmethod <- "BFGS"
-      optim.SEL <- tryCatch(stats::optim(par = start.values, fn = SELToOptim, control = list(trace = as.numeric(verbose), REPORT = 1, maxit = maxit), method = optmethod, ...), error = opterror)
+      optim.SEL <- tryCatch(stats::optim(par = start.values, fn = SELToOptim, control = opt.controls, method = optmethod, ...), error = optError)
     }
   } else {
-    optim.SEL <- tryCatch(stats::optim(par = start.values, fn = SELToOptim, control = list(trace = as.numeric(verbose), REPORT = 1, maxit = maxit), method = optmethod, ...), error = opterror)
+    optim.SEL <- tryCatch(stats::optim(par = start.values, fn = SELToOptim, control = opt.controls, method = optmethod, ...), error = optError)
   }
 
   diff.opt <- as.numeric(difftime(Sys.time(), tic0, units = "secs"))
@@ -431,8 +392,8 @@ maximiseSEL <- function(rho,
   } else {
     thetahat <- if (optmethod != "nlm") optim.SEL$par else optim.SEL$estimate
   }
-  SEL <- if (optmethod != "nlm") -optim.SEL$value else -optim.SEL$minimum
-  if (!isTRUE(abs(SEL) < 1e8)) {
+  SEL <- if (optmethod != "nlm") optim.SEL$value else optim.SEL$minimum
+  if (!isTRUE(abs(SEL) < 1e20)) {
     SEL <- NA
     thetahat <- rep(NA, length(thetahat))
   }
@@ -467,14 +428,13 @@ fail <- function() {
   return(list(par = c(NA, NA), value = NA, restricted = c(FALSE, FALSE), code = NA, iterations = NA, xtimes = c(0, 0)))
 }
 
-
 #' Convert a weight vector to list
 #'
 #' This function saves memory (which is crucial in large samples) and allows one to speed up the code by minimising the number of
 #' time-consuming subsetting operations and memory-consuming matrix multiplications. We do not want to rely on extra packages for
 #' sparse matrix manipulation since the EL smoothing weights are usually fixed at the beginning, and need not be recomputed dynamically,
 #' so we recommend applying this function to the rows of a matrix. In order to avoid numerical instability, the weights are trimmed
-#' at \code{0.01 / length(x)}.
+#' at \code{0.01 / length(x)}. Using too much trimming may cause the spanning condition to fail (the moment function values can have the same sign in some neighbourhoods).
 #'
 #' @param x A numeric vector (with many close-to-zero elements).
 #' @param trim A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.
@@ -562,4 +522,4 @@ getSELWeights <- function(X, bw) {
   sel.weights <- apply(sel.weights, 1, sparseVectorToList)
 }
 
-opterror <- function(e = NULL) return(list(code = 5))
+optError <- function(e = NULL) return(list(code = 5))

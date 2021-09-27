@@ -930,3 +930,130 @@ sampleEllipse <- function(centre, vcov, radius, angles = rep(seq(-45, 45, 15), 2
   # text(ellipse[, 1], ellipse[, 2], labels = as.character(round(angles)), cex = 0.6)
   return(ellipse)
 }
+
+generateGeneric <- function(n = 10000,
+                            ndiscrXin = 6, ncatXin = 2, ncontXin = 0, corXin = 0.3,
+                            ndiscrXex = 2, ncatXex = 0, ncontXex = 0, corXex = 0.3,
+                            corXinXex = 0.2,
+                            ncat = 10, ndiscr = 2,
+                            ndiscrZ = 1, ncatZ = 0, ncontZ = 0,
+                            corUV = 0.5,
+                            seed = 1
+) {
+  set.seed(seed)
+  # Generating weakly correlated excluded and inlcuded instruments
+  nXin <- ncontXin + ncatXin + ndiscrXin
+  nXex <- ncontXex + ncatXex + ndiscrXex
+  nZ <- ncontZ + ncatZ + ndiscrZ
+  nexog <- nXin + nXex
+  varXin <- if (nXin > 0) matrix(corXin, ncol = nXin, nrow = nXin) + diag(nXin) * (1 - corXin) else NULL
+  varXex <- if (nXex > 0) matrix(corXex, ncol = nXex, nrow = nXex) + diag(nXex) * (1 - corXex) else NULL
+  covXinXex <- if (nXin > 0 & nXex > 0) matrix(corXinXex, ncol = nXex, nrow = nXin) else NULL
+  tnull <- function(x) if (is.null(x)) NULL else t(x)
+  varX <- rbind(cbind(varXin, covXinXex), cbind(tnull(covXinXex), varXex))
+  X <- matrix(stats::rnorm(n * nexog), ncol = nexog, nrow = n)
+  if (ncol(X) > 1) {
+    eX <- eigen(varX, symmetric = TRUE)
+    X <- tnull(eX$vectors %*% diag(sqrt(eX$values)) %*% tnull(X))
+  }
+  colnames(X) <- c(if (ncontXin > 0) paste0("Xin.cont", 1:ncontXin) else NULL,
+                    if (ncatXin > 0) paste0("Xin.cat", 1:ncatXin) else NULL,
+                    if (ndiscrXin > 0) paste0("Xin.discr", 1:ndiscrXin) else NULL,
+                    if (ncontXex > 0) paste0("Xex.cont", 1:ncontXex) else NULL,
+                    if (ncatXex > 0) paste0("Xex.cat", 1:ncatXex) else NULL,
+                    if (ndiscrXex > 0) paste0("Xex.discr", 1:ndiscrXex) else NULL)
+  # Making some of the instruments categorical, with 20 values per category
+  cat.ind <- grep("cat", colnames(X))
+  if (length(cat.ind) > 0) X[, cat.ind] <- sapply(cat.ind, function(i) scale(as.numeric(cut(X[, i], breaks = c(-Inf, stats::quantile(X[, i], (1:(ncat-1))/ncat), Inf), labels = 1:ncat))))
+  # Discretising some of the instruments, 3 categories for each
+  discr.ind <- grep("discr", colnames(X))
+  if (length(discr.ind) > 0) X[, discr.ind] <- sapply(discr.ind, function(i) scale(as.numeric(cut(X[, i], breaks = c(-Inf, stats::quantile(X[, i], (1:(ndiscr-1))/ndiscr), Inf), labels = 1:ndiscr))))
+  Xin <- if (nXin > 0) X[, 1:nXin, drop = FALSE] else NULL
+  Xex <- if (nXin > 0) X[, -(1:nXin), drop = FALSE] else X
+
+  UV <- matrix(stats::rnorm(n * (nZ + 1)), ncol = nZ + 1, nrow = n)
+  covUV <- matrix(corUV, ncol = 1, nrow = nZ)
+  varUV <- rbind(cbind(diag(nZ), covUV), c(covUV, 1))
+  eUV <- eigen(varUV, symmetric = TRUE)
+  UV <- tnull(eUV$vectors %*% diag(sqrt(eUV$values)) %*% tnull(UV))
+  U <- UV[, ncol(UV), drop = FALSE]
+  V <- UV[, -ncol(UV), drop = FALSE]
+  colnames(V) <- paste0("V", 1:nZ)
+
+  sigma2X <- function(x) {
+    x <- x + 3
+    return(0.1 + 0.2*sum(abs(x)) + 0.3*sum(x^2))
+  }
+  VarU.X <- apply(X, 1,  sigma2X)
+  Usked <- U * sqrt(VarU.X) * 1.5
+  # boxplot(VarU.X ~ X[, cat.ind[1]])
+  # boxplot(VarU.X ~ X[, discr.ind[1]])
+  # Grouping instruments by endogenous variable; some are going to be more relevant than others
+  corresp.Xex.Z <- if (nZ > 1) as.integer(cut(1:nXex, breaks = nZ, labels = 1:nZ)) else rep(1, nXex)
+  Z <- do.call(cbind, lapply(1:nZ, function(i) (if (nXin > 0) rowMeans(Xin) else 0) + 1 * rowSums(Xex[, corresp.Xex.Z == i, drop = FALSE]) + 0.1 * rowSums(Xex[, corresp.Xex.Z != i, drop = FALSE]) + V[, i] * sqrt(2 + sum(corresp.Xex.Z == i))
+                             )) # The variance of the reuced-form error is proportional to the sum of the absolute values of the coefficients; the variance of the regressors is more or less the same
+  # summary(lm(Z ~ cbind(Xin, Xex)))
+  # Now making the variance of Z close to unity
+  Z <- sweep(Z, 2, apply(Z, 2, stats::sd), "/")
+  colnames(Z) <- paste0("Z", 1:nZ)
+
+  Ystar <- 1 + (if (nXin > 0) rowSums(Xin) else 0) + rowSums(Z) + Usked # Structural equation
+  # summary(lm(Ystar ~ Xin + Z))
+  # The propensity score in this design will be simple: since all regressors are symmetrically distributed around zero,
+  # it be proportional to the share of positive observations (between 0.95 if everything is negative to 0.70 if everything is positive)
+  # The skedastic function is higher on the upper end, so the missingness will appear more frequently there
+  prop.score <- function(x) 0.7 + 0.25 * mean(x >= 0)
+  piXZ <- apply(cbind(Xin, Xex, Z), 1, prop.score)
+  D <- stats::runif(n) < piXZ
+  Y <- Ystar
+  Y[!D] <- NA
+  DY <- Y
+  DY[!D] <- 0
+  alldata <- if (nXin > 0) data.frame(Xin, Xex, Z, D = as.numeric(D), pi = piXZ, Ystar, Y, DY, U, Usked, V, VarU.X) else data.frame(Xex, Z, D = as.numeric(D), pi = piXZ, Ystar, Y, DY, U, Usked, V, VarU.X)
+  return(alldata)
+}
+
+
+generateCMRData <- function(n = 10000,
+                            ndiscrX = 6, ncatX = 2, ncontX = 0, corX = 0.2,
+                            ncat = 10, ndiscr = 2,
+                            seed = 1
+) {
+  set.seed(seed)
+  # Generating weakly correlated excluded and included instruments
+  nX <- ncontX + ncatX + ndiscrX
+  varX <- matrix(corX, ncol = nX, nrow = nX) + diag(nX) * (1 - corX)
+  X <- matrix(stats::rnorm(n * nX), ncol = nX, nrow = n)
+  if (ncol(X) > 1) {
+    eX <- eigen(varX, symmetric = TRUE)
+    X <- t(eX$vectors %*% diag(sqrt(eX$values)) %*% t(X))
+  }
+  colnames(X) <- c(if (ncontX > 0) paste0("X.cont", 1:ncontX) else NULL,
+                   if (ncatX > 0) paste0("X.cat", 1:ncatX) else NULL,
+                   if (ndiscrX > 0) paste0("X.discr", 1:ndiscrX) else NULL
+                   )
+  # Making some of the instruments categorical, with 20 values per category
+  cat.ind <- grep("cat", colnames(X))
+  if (length(cat.ind) > 0) X[, cat.ind] <- sapply(cat.ind, function(i) scale(as.numeric(cut(X[, i], breaks = c(-Inf, stats::quantile(X[, i], (1:(ncat-1))/ncat), Inf), labels = 1:ncat))))
+  # Discretising some of the instruments, 3 categories for each
+  discr.ind <- grep("discr", colnames(X))
+  if (length(discr.ind) > 0) X[, discr.ind] <- sapply(discr.ind, function(i) scale(as.numeric(cut(X[, i], breaks = c(-Inf, stats::quantile(X[, i], (1:(ndiscr-1))/ndiscr), Inf), labels = 1:ndiscr))))
+
+  U <- stats::rnorm(n)
+  sigma2X <- function(x) {
+    x <- x + 3
+    return(0.1 + 0.2*sum(abs(x)) + 0.3*sum(x^2))
+  }
+  VarU.X <- apply(X, 1,  sigma2X)
+  Usked <- U * sqrt(VarU.X)
+  # boxplot(VarU.X ~ X[, cat.ind[1]])
+  # boxplot(VarU.X ~ X[, discr.ind[1]])
+
+  Ystar <- 1 + rowSums(X) + Usked # Structural equation
+  # summary(lm(Ystar ~ Xin + Z))
+  # The propensity score in this design will be simple: since all regressors are symmetrically distributed around zero,
+  # it be proportional to the share of positive observations (between 0.95 if everything is negative to 0.70 if everything is positive)
+  # The skedastic function is higher on the upper end, so the missingness will appear more frequently there
+  alldata <- data.frame(X, Ystar, U, Usked, VarU.X)
+  return(alldata)
+}
