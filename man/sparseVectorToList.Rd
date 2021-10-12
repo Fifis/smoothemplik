@@ -4,7 +4,7 @@
 \alias{sparseVectorToList}
 \title{Convert a weight vector to list}
 \usage{
-sparseVectorToList(x, trim = function(x) 0.01/length(x))
+sparseVectorToList(x, trim = NULL)
 }
 \arguments{
 \item{x}{A numeric vector (with many close-to-zero elements).}
