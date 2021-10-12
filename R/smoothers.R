@@ -410,7 +410,7 @@ Try increasing the bandwidth to get more data points in the vicinity!"))
 
 #' Density and/or kernel regression estimator with conditioning on discrete variables
 #'
-#' @param x A vector or a matrix of exogenous explanatory variables.
+#' @param x A vector or a matrix/data frame of discrete explanatory variables (exogenous). Non-integer values are fine because the data are split into bins defined by interactions of these variables.
 #' @param y Optional: a vector of dependent variable values.
 #' @param compact Logical: return unique values instead of full data with repeated observations?
 #' @param fun A function that computes a statistic of \code{y} inside every category defined by \code{x}.
@@ -424,7 +424,9 @@ kernelDiscreteDensitySmooth <- function(x,
                                         compact = FALSE,
                                         fun = mean
 ) {
-  if (!is.vector(x)) stop("x must be a numeric vector!")
+  if (is.matrix(x)) x <- as.data.frame(x)
+  if (is.data.frame(x)) x <- as.integer(interaction(x, drop = TRUE, lex.order = TRUE))
+  if (!is.vector(x)) stop("x must be a numeric vector, matrix, or a data frame!")
   n <- length(x)
   if (compact) {
     xtab <- table(x)

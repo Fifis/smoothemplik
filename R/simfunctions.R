@@ -1050,10 +1050,20 @@ generateCMRData <- function(n = 10000,
   # boxplot(VarU.X ~ X[, discr.ind[1]])
 
   Ystar <- 1 + rowSums(X) + Usked # Structural equation
+  # The propensity score in this design will be simple: since all regressors are symmetrically distributed around zero,
+  # it be proportional to the share of positive observations (between 0.95 if everything is negative to 0.70 if everything is positive)
+  # The skedastic function is higher on the upper end, so the missingness will appear more frequently there
   # summary(lm(Ystar ~ Xin + Z))
   # The propensity score in this design will be simple: since all regressors are symmetrically distributed around zero,
   # it be proportional to the share of positive observations (between 0.95 if everything is negative to 0.70 if everything is positive)
   # The skedastic function is higher on the upper end, so the missingness will appear more frequently there
-  alldata <- data.frame(X, Ystar, U, Usked, VarU.X)
+  prop.score <- function(x) 0.7 + 0.25 * mean(x >= 0)
+  piX <- apply(X, 1, prop.score)
+  D <- stats::runif(n) < piX
+  Y <- Ystar
+  Y[!D] <- NA
+  DY <- Y
+  DY[!D] <- 0
+  alldata <- data.frame(X, Ystar, D = as.numeric(D), pi = piX, Y, DY, U, Usked, VarU.X)
   return(alldata)
 }
