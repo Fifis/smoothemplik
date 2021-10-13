@@ -624,7 +624,7 @@ smoothEmplikDiscrete <- function(rho,
   }
 
   # Attempting to save memory
-  if (parallel) { # Returns a list, one item for each conditioning vector point
+  if (parallel & cores > 1) { # Returns a list, one item for each conditioning vector point
     empliklist <- parallel::mclapply(rho.list, SELi, mc.cores = cores)
   } else {
     empliklist <- lapply(rho.list, SELi)
@@ -675,14 +675,14 @@ smoothEmplikMixed <- function(rho, theta, data,
       if (all(is.na(xj))) return(list(logelr = 0, lam = 0, wts = rep(1 / length(xj), length(xj)), converged = TRUE, iter = 0, bracket = c(0, 0), estim.prec = NA, f.root = NA, exitcode = 0))
       suppressWarnings(weightedEL(z = xj, ct = wj, SEL = TRUE, weight.tolerance = weight.tolerance))
     }
-    empliklist <- if (parallel.in) parallel::mclapply(1:length(x), SEL.b.j, mc.cores = cores) else lapply(1:length(x), SEL.b.j)
+    empliklist <- if (parallel.in & cores > 1) parallel::mclapply(1:length(x), SEL.b.j, mc.cores = cores) else lapply(1:length(x), SEL.b.j)
     logsemplik <- sum(trim.list[[i]] * unlist(lapply(empliklist, "[[", "logelr")))
     if (!is.finite(logsemplik)) logsemplik <- bad.value
     attr(logsemplik, "SELR") <- unlist(lapply(empliklist, "[[", "logelr"))
     return(logsemplik)
   }
 
-  SEL <- if (parallel.out) parallel::mclapply(1:length(rho.list), SEL.block, mc.cores = cores) else lapply(1:length(rho.list), SEL.block)
+  SEL <- if (parallel.out & cores > 1) parallel::mclapply(1:length(rho.list), SEL.block, mc.cores = cores) else lapply(1:length(rho.list), SEL.block)
   SSEL <- sum(unlist(SEL)) * (1 - 2 * as.numeric(minus))
   attr(SSEL, "SELs") <- unlist(lapply(SEL, attr, which = "SELR"))
 
