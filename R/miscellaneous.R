@@ -206,7 +206,12 @@ gradParallel <- function(func, x, side = c("central", "forward", "backward"), or
   if (ncol(ff) == 1) ffl <- lapply(ffl, as.matrix) # The dimensions must be preserved
   ffs <- lapply(ffl, colSums) # A list of vectors or scalars
   jac <- unname(as.matrix(do.call(cbind, ffs)))
-  if (nrow(jac) == 1) jac <- as.numeric(jac)
+  if (nrow(jac) == 1) {
+    jac <- as.numeric(jac)
+    if (!is.null(names(x))) names(jac) <- names(x)
+  } else {
+    if (!is.null(names(x))) colnames(jac) <- names(x)
+  }
   return(jac / h)
 }
 

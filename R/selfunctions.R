@@ -163,6 +163,7 @@ weightedEL <- function(z, mu = 0,
   iter <- NA
   minlambda <- -Inf
   maxlambda <- Inf
+  int <- c(minlambda, maxlambda)
   estim.prec <- NA
   f.root <- NA
   exitcode <- 5
