@@ -6,8 +6,8 @@
 \usage{
 getCoefELDiscrete(
   seed,
-  design = list(n = 500, p = 0.6, params.struc = c(1, 1), params.reduc = c(0, 1),
-    sigma2x = c(16, 1), pix = c(0.25, 0.9)),
+  design = list(n = 500, p = 0.6, params.struc = c(1, 1), params.reduc = c(0, 1), sigma2x
+    = c(16, 1), pix = c(0.25, 0.9)),
   do.SE = TRUE,
   do.restr = TRUE,
   do.CI = TRUE

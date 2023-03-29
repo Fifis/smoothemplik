@@ -4,12 +4,14 @@
 \alias{sparseVectorToList}
 \title{Convert a weight vector to list}
 \usage{
-sparseVectorToList(x, trim = NULL)
+sparseVectorToList(x, trim = NULL, renormalise = TRUE)
 }
 \arguments{
 \item{x}{A numeric vector (with many close-to-zero elements).}
 
 \item{trim}{A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.}
+
+\item{renormalise}{Logical: renormalise the sum of weights to one after trimming?}
 }
 \value{
 A list with indices of large enough elements.

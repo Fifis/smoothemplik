@@ -8,7 +8,7 @@ rho.full.sample(
   theta,
   data,
   pi.hat = NULL,
-  helper = c("gstar", "Ystar", "Dg", "DY"),
+  helper = c("gstar", "Ystar", "Dg", "DY", "mu"),
   helper.predicted = NULL,
   pi.bw = NULL,
   helper.bw = NULL,

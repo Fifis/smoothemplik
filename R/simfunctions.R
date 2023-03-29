@@ -257,17 +257,17 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   # Likelihood-based variance
   if (do.SE) {
     margs <- list(eps = 1e-4, d = 1e-2)
-    vcov.vs <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
+    vcov.vs <- solve(-numDeriv::hessian(function(x) cemplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
     se.lik <- unname(sqrt(diag(vcov.vs)))
     if (!all(is.finite(se.lik))) {
       margs <- list(eps = 1e-4, d = 1e-3)
-      vcov.vs <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
+      vcov.vs <- solve(-numDeriv::hessian(function(x) cemplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
       se.lik <- unname(sqrt(diag(vcov.vs)))
       warning("Using a smaller initial step (d=0.001) for Hessian computation.")
     }
     if (!all(is.finite(se.lik))) {
       margs <- list(eps = 1e-4, d = 1e-4)
-      vcov.vs <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
+      vcov.vs <- solve(-numDeriv::hessian(function(x) cemplik(g.unconditional.vs(x, data = data))$logelr, x = mod2sobs, method.args = margs))
       se.lik <- unname(sqrt(diag(vcov.vs)))
       warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
     }
@@ -275,11 +275,11 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   rm(mod1sobs, m)
   # Inefficient complete-case SEL with RoT bandwidth
   el.complete <- mod2sobs
-  LR.complete <- emplik(g.unconditional.vs(c(1, 1), data = data))$logelr
+  LR.complete <- cemplik(g.unconditional.vs(c(1, 1), data = data))$logelr
 
   if (do.restr) {
   frestr <- function(theta0 = 1, theta1 = 1) {
-    r <- -emplik(g.unconditional.vs(c(theta0, theta1), data = data))$logelr
+    r <- -cemplik(g.unconditional.vs(c(theta0, theta1), data = data))$logelr
     if (r > 100) return(NA) else return(r)
   }
   proflik1 <- function(theta1) {
@@ -309,9 +309,9 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   }
   } else restr0 <- restr1 <- NULL
 
-  cat("Seed ", lead0(seed, 4), ", ineff. estim. with I(Xi = Xj) (1/6), theta1 = ", sprintf("%1.3f", el.complete[2]), "\n")
-  if (do.restr) cat("Seed ", lead0(seed, 4), ", ineff. estim. with theta1 = 1 (2/6), theta0 = ", sprintf("%1.3f", restr0$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr0$minimum, 1)), "\n",
-      "Seed ", lead0(seed, 4), ", ineff. estim. with theta0 = 1 (3/6), theta1 = ", sprintf("%1.3f", restr1$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr1$minimum, 1)), "\n", sep = "")
+  cat("Seed ", .lead0(seed, 4), ", ineff. estim. with I(Xi = Xj) (1/6), theta1 = ", sprintf("%1.3f", el.complete[2]), "\n")
+  if (do.restr) cat("Seed ", .lead0(seed, 4), ", ineff. estim. with theta1 = 1 (2/6), theta0 = ", sprintf("%1.3f", restr0$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr0$minimum, 1)), "\n",
+      "Seed ", .lead0(seed, 4), ", ineff. estim. with theta0 = 1 (3/6), theta1 = ", sprintf("%1.3f", restr1$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr1$minimum, 1)), "\n", sep = "")
   tic1 <- Sys.time()
 
   # Empirical confidence intervals
@@ -350,33 +350,33 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   # Getting a better first-stage projection is key, then
   start.efficient <- if (weak.VS) unname(stats::lm(data$Y ~ stats::lm(Z ~ X, data = data)$fitted.values)$coefficients) else unname(el.complete)
   nlm.step.max <- sqrt(sum(diag(vcov.vs)))
-  el.opt <- tryCatch(stats::nlm(function(theta) -emplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, p = start.efficient, gradtol = 1e-8, steptol = 1e-8, stepmax = nlm.step.max), error = function(e) return(list(code = 5)))
+  el.opt <- tryCatch(stats::nlm(function(theta) -cemplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, p = start.efficient, gradtol = 1e-8, steptol = 1e-8, stepmax = nlm.step.max), error = function(e) return(list(code = 5)))
   if (el.opt$code %in% c(4, 5)) {
-    el.opt <- stats::optim(fn = function(theta) -emplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, par = start.efficient, method = "BFGS", gr = NULL, control = list(reltol = 1e-8))
+    el.opt <- stats::optim(fn = function(theta) -cemplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, par = start.efficient, method = "BFGS", gr = NULL, control = list(reltol = 1e-8))
     el.opt <- list(minimum = el.opt$value, estimate = el.opt$par, gradient = NA, code = el.opt$convergence, iterations = unname(el.opt$counts[2]))
   }
   el.efficient <- el.opt$estimate
-  LR.efficient <- emplik(g.unconditional.eff(c(1, 1), data = data, pihat = pihat, ystarhat = ystarhat))$logelr
+  LR.efficient <- cemplik(g.unconditional.eff(c(1, 1), data = data, pihat = pihat, ystarhat = ystarhat))$logelr
   if (do.SE) {
     margs <- list(eps = 1e-4, d = 1e-2)
-    vcov.eff <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
+    vcov.eff <- solve(-numDeriv::hessian(function(x) cemplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
     se.lik.eff <- sqrt(diag(vcov.eff))
     if (!all(is.finite(se.lik.eff))) {
       margs <- list(eps = 1e-4, d = 1e-3)
-      vcov.eff <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
+      vcov.eff <- solve(-numDeriv::hessian(function(x) cemplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
       se.lik.eff <- sqrt(diag(vcov.eff))
       warning("Using a smaller initial step (d=0.001) for Hessian computation.")
     }
     if (!all(is.finite(se.lik.eff))) {
       margs <- list(eps = 1e-4, d = 1e-4)
-      vcov.eff <- solve(-numDeriv::hessian(function(x) emplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
+      vcov.eff <- solve(-numDeriv::hessian(function(x) cemplik(g.unconditional.eff(x, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, el.efficient, method.args = margs))
       se.lik.eff <- sqrt(diag(vcov.eff))
       warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
     }
   } else se.lik.eff <- NULL
   if (do.restr) {
     frestr.eff <- function(theta0 = 1, theta1 = 1) {
-    r <- -emplik(g.unconditional.eff(c(theta0, theta1), data = data, pihat = pihat, ystarhat = ystarhat))$logelr
+    r <- -cemplik(g.unconditional.eff(c(theta0, theta1), data = data, pihat = pihat, ystarhat = ystarhat))$logelr
     if (r > 100) return(NA) else return(r)
   }
   restr0.eff <- tryCatch(stats::nlm(f = function(x) frestr.eff(theta0 = x, theta1 = 1), p = theta0c, gradtol = 1e-8, steptol = 1e-8, stepmax = se.lik.eff[1] / 5), error = function(e) return(list(code = 5)))
@@ -390,9 +390,9 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
     restr1.eff <- list(minimum = restr1.eff$value, estimate = restr1.eff$par, gradient = NA, code = restr1.eff$convergence, iterations = unname(restr1.eff$counts[2]))
   }
   } else restr0.eff <- restr1.eff <- NULL
-  cat("Seed ", lead0(seed, 4), ", effic. estim. with I(Xi = Xj) (4/6), theta1 = ", sprintf("%1.3f", el.efficient[2]), "\n")
-  if (do.restr) cat("Seed ", lead0(seed, 4), ", effic. estim. with theta1 = 1 (5/6), theta0 = ", sprintf("%1.3f", restr0.eff$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr0.eff$minimum, 1)), "\n",
-      "Seed ", lead0(seed, 4), ", effic. estim. with theta0 = 1 (6/6), theta1 = ", sprintf("%1.3f", restr1.eff$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr1.eff$minimum, 1)), "\n", sep = "")
+  cat("Seed ", .lead0(seed, 4), ", effic. estim. with I(Xi = Xj) (4/6), theta1 = ", sprintf("%1.3f", el.efficient[2]), "\n")
+  if (do.restr) cat("Seed ", .lead0(seed, 4), ", effic. estim. with theta1 = 1 (5/6), theta0 = ", sprintf("%1.3f", restr0.eff$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr0.eff$minimum, 1)), "\n",
+      "Seed ", .lead0(seed, 4), ", effic. estim. with theta0 = 1 (6/6), theta1 = ", sprintf("%1.3f", restr1.eff$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr1.eff$minimum, 1)), "\n", sep = "")
   tic3 <- Sys.time()
 
   if (do.CI) {
@@ -490,13 +490,13 @@ estimateOneModelDesign1 <- function(start.mod,
     start.mod$coefficients <- rbind(start.mod$coefficients, do.call(rbind, extra.points))
   }
   if (!is.null(dim(start.mod$coefficients)[1])) { # If there are multiple candidate values
-    vals <- apply(start.mod$coefficients, 1, function(p) tryCatch(maximiseSEL(rho = rho, restricted.params = p, sel.weights = sel.weights, ...),  error = function(e) fail()))
+    vals <- apply(start.mod$coefficients, 1, function(p) tryCatch(maximiseSEL(rho = rho, restricted.params = p, sel.weights = sel.weights, ...),  error = .fail))
     vals <- unlist(lapply(vals, "[[", "value"))
     best.point <- which.max(vals)
     start.point <- start.mod$coefficients[best.point, ]
   } else start.point <- start.mod$coefficients
-  sel <- tryCatch(maximiseSEL(rho = rho, start.values = start.point, sel.weights = sel.weights, ...),  error = function(e) fail())
-  restr.both  <- tryCatch(maximiseSEL(rho = rho, restricted.params = c(1, 1), sel.weights = sel.weights, ...),  error = function(e) fail())
+  sel <- tryCatch(maximiseSEL(rho = rho, start.values = start.point, sel.weights = sel.weights, ...),  error = .fail)
+  restr.both  <- tryCatch(maximiseSEL(rho = rho, restricted.params = c(1, 1), sel.weights = sel.weights, ...),  error = .fail)
 
   if (do.SE) {
     margs <- list(eps = 1e-4, d = 1e-2)
@@ -625,7 +625,7 @@ getCoefSELContinuous <- function(seed, design = list(),
   ))
   # An initial model based on Newey's 1993 efficient instruments.
   mod.init <- lmEff(y = data.VS$Y, incl = NULL, endog = data.VS$Z, excl = data.VS$X, iterations = 2, coef.names = c("(Intercept)", "Z"))
-  # cat("Seed", lead0(seed, 4), "starting values:", sprintf("%1.3f", mod.init$coefficients), "\n")
+  # cat("Seed", .lead0(seed, 4), "starting values:", sprintf("%1.3f", mod.init$coefficients), "\n")
 
   models.VS <- vector("list", length(sel.bw))
   for (j in 1:length(sel.bw)) {
@@ -639,7 +639,7 @@ getCoefSELContinuous <- function(seed, design = list(),
     start.mod$coefficients <- start.point
     start.mod$coefficients <- rbind(start.mod$coefficients, mod2s.VS)
     models.VS[[j]] <- estimateOneModelDesign1(start.mod = start.mod, data = data, sel.bw = sel.bw[j], try.ellipse = tryel, ...)
-    cat("Seed ", lead0(seed, 4), ", SEL bw = ", trail0(sel.bw[j], 3),  ", ^theta_VS = ", paste(trail0(models.VS[[j]]$sel$par, 3), collapse = " "), " (", j, "/", length(sel.bw), ")", "\n", sep = "")
+    cat("Seed ", .lead0(seed, 4), ", SEL bw = ", .trail0(sel.bw[j], 3),  ", ^theta_VS = ", paste(.trail0(models.VS[[j]]$sel$par, 3), collapse = " "), " (", j, "/", length(sel.bw), ")", "\n", sep = "")
   }
 
   tic1 <- Sys.time()
@@ -672,7 +672,7 @@ getCoefSELContinuous <- function(seed, design = list(),
       } else start.mod$coefficients <- rbind(start.mod$coefficients, mod2s.VS, models.VS[[1]]$sel$par)
       models.eff[[j]] <- estimateOneModelDesign1(start.mod = start.mod, data = data, sel.bw = hyperpar.df$sel.bw[j], eff.control = list(pi.bw = hyperpar.df$pi.bw[j], helper.bw = hyperpar.df$helper.bw[j], helper = as.character(hyperpar.df$helper[j]), helper.degree = hyperpar.df$degree[j], PIT = TRUE), try.ellipse = tryel, ...)
       hyperpar.df[j, c("theta0", "theta1")] <- models.eff[[j]]$sel$par
-      cat("Seed ", lead0(seed, 4), ", SEL bw = ", trail0(hyperpar.df$sel.bw[j], 3),  ", ^theta_ef = ", paste(trail0(models.eff[[j]]$sel$par, 3), collapse = " "), " [b_pi = ", trail0(hyperpar.df$pi.bw[j], 3), ", b_mu = ", trail0(hyperpar.df$helper.bw[j], 3), ", help = ", as.character(hyperpar.df$helper[j]), ", deg = ", hyperpar.df$degree[j], "]", " (", j, "/", nrow(hyperpar.df), ") {closest: ", if (j > 2) j.where.theta.notNA[closest.model] else "", "}\n", sep = "")
+      cat("Seed ", .lead0(seed, 4), ", SEL bw = ", .trail0(hyperpar.df$sel.bw[j], 3),  ", ^theta_ef = ", paste(.trail0(models.eff[[j]]$sel$par, 3), collapse = " "), " [b_pi = ", .trail0(hyperpar.df$pi.bw[j], 3), ", b_mu = ", .trail0(hyperpar.df$helper.bw[j], 3), ", help = ", as.character(hyperpar.df$helper[j]), ", deg = ", hyperpar.df$degree[j], "]", " (", j, "/", nrow(hyperpar.df), ") {closest: ", if (j > 2) j.where.theta.notNA[closest.model] else "", "}\n", sep = "")
     }
   } else models.eff <- NULL
 
@@ -719,11 +719,11 @@ doTheRestSELContinuous <- function(SELmodel, do.SE = TRUE, do.restr = TRUE, CI.l
         this.mod <- estimateOneModelDesign1(start.mod = mod.init, data = data, sel.bw = submodel$sel.bw, do.SE = this.do.SE, do.restr = this.do.restr, CI.lev = this.CI.lev, try.ellipse = FALSE, ...)
         SELmodel$models.VS[[i]] <- this.mod
         if (print.inference) {
-          cat("Seed ", lead0(SELmodel$seed, 5), ", ^theta_VS = ", paste(trail0(this.mod$sel$par, 4), collapse = " "), "\n", sep = "")
-          if (this.do.SE) cat("Standard errors:       (", paste(trail0(sqrt(diag(this.mod$vcov)), 4), collapse = " "), ")\n", sep = "")
-          if (this.do.restr) cat("Restricted true slope: ^theta = ", paste(trail0(this.mod$restricted$`R:theta1=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[2], 1)), "\n",
-                                 "Restricted true const: ^theta = ", paste(trail0(this.mod$restricted$`R:theta0=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[3], 1)), "\n", sep = "")
-          if(!is.null(this.CI.lev)) cat("Confidence interval points:", trail0(c(this.mod$CI[length(CI.lev):1, 1], this.mod$CI[1:length(CI.lev), 2]), 4), "\n")
+          cat("Seed ", .lead0(SELmodel$seed, 5), ", ^theta_VS = ", paste(.trail0(this.mod$sel$par, 4), collapse = " "), "\n", sep = "")
+          if (this.do.SE) cat("Standard errors:       (", paste(.trail0(sqrt(diag(this.mod$vcov)), 4), collapse = " "), ")\n", sep = "")
+          if (this.do.restr) cat("Restricted true slope: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta1=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[2], 1)), "\n",
+                                 "Restricted true const: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta0=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[3], 1)), "\n", sep = "")
+          if(!is.null(this.CI.lev)) cat("Confidence interval points:", .trail0(c(this.mod$CI[length(CI.lev):1, 1], this.mod$CI[1:length(CI.lev), 2]), 4), "\n")
         }
       }
     }
@@ -742,11 +742,11 @@ doTheRestSELContinuous <- function(SELmodel, do.SE = TRUE, do.restr = TRUE, CI.l
         this.mod <- estimateOneModelDesign1(start.mod = mod.init, data = data, sel.bw = submodel$sel.bw, eff.control = this.eff.control, do.SE = this.do.SE, do.restr = this.do.restr, CI.lev = this.CI.lev, try.ellipse = FALSE, ...)
         SELmodel$models.eff[[i]] <- this.mod
         if (print.inference) {
-          cat("Seed ", lead0(SELmodel$seed, 5), ", ^theta_ef = ", paste(trail0(this.mod$sel$par, 4), collapse = " "), "\n", sep = "")
-          if (this.do.SE) cat("Standard errors:       (", paste(trail0(sqrt(diag(this.mod$vcov)), 4), collapse = " "), ")\n", sep = "")
-          if (this.do.restr) cat("Restricted true slope: ^theta = ", paste(trail0(this.mod$restricted$`R:theta1=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[2], 1)), "\n",
-                                 "Restricted true const: ^theta = ", paste(trail0(this.mod$restricted$`R:theta0=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[3], 1)), "\n", sep = "")
-          if(!is.null(this.CI.lev)) cat("Confidence interval points:", trail0(c(this.mod$CI[length(CI.lev):1, 1], this.mod$CI[1:length(CI.lev), 2]), 4), "\n")
+          cat("Seed ", .lead0(SELmodel$seed, 5), ", ^theta_ef = ", paste(.trail0(this.mod$sel$par, 4), collapse = " "), "\n", sep = "")
+          if (this.do.SE) cat("Standard errors:       (", paste(.trail0(sqrt(diag(this.mod$vcov)), 4), collapse = " "), ")\n", sep = "")
+          if (this.do.restr) cat("Restricted true slope: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta1=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[2], 1)), "\n",
+                                 "Restricted true const: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta0=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[3], 1)), "\n", sep = "")
+          if(!is.null(this.CI.lev)) cat("Confidence interval points:", .trail0(c(this.mod$CI[length(CI.lev):1, 1], this.mod$CI[1:length(CI.lev), 2]), 4), "\n")
         }
       }
     }
@@ -858,7 +858,7 @@ rho.complete.case.pi <- function(theta, data, pi.hat) {
 #' points(data$Z, Zthetahat0, col = 2)
 rho.full.sample <- function(theta, data,
                             pi.hat = NULL,
-                            helper = c("gstar", "Ystar", "Dg", "DY"),
+                            helper = c("gstar", "Ystar", "Dg", "DY", "mu"),
                             helper.predicted = NULL,
                             pi.bw = NULL,
                             helper.bw = NULL,
@@ -903,6 +903,8 @@ rho.full.sample <- function(theta, data,
       mu.hat    <- kernelSmooth(x = ZX,    y = Dg,      xgrid = NULL,       bw = helper.bw, degree = helper.degree, standardise = FALSE) / pi.hat
     }
     # warning("No Y* estimator was passed, estimated Y* with", if (is.null(helper.bw)) "RoT" else round(helper.bw, 3), "bandwidth!")
+  } else { # A helper was passed
+    if (helper == "mu") mu.hat <- helper.predicted else stop("The predicted helper should be 'mu'.")
   }
   rho <- (Dg - data$D * mu.hat) / pi.hat + mu.hat
   return(rho)

@@ -18,7 +18,7 @@ smoothEmplik(
   chunks = 10,
   print.progress = FALSE,
   bad.value = -Inf,
-  attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "converged",
+  attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "nabla", "converged",
     "exitcode", "probabilities"),
   ...
 )
@@ -42,7 +42,15 @@ smoothEmplik(
 
 \item{cores}{The number of cores used by \code{parallel::mclapply}.}
 
-\item{memory.saving}{A string. \code{"none"} implies no memory-saving tricks, and the entire problem is processed in the computer memory at once (good for sample sizes 2000 and below; if \code{sel.weights} is not provided or is a function, the weight matrix / list is computed at once.). If \code{"full"}, then the smoothed likelihoods are computed in series, which saves memory but computes kernel weights at every step of a loop, increasing CPU time; the SEL weights, normally found in the rows of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then, the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists. If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.}
+\item{memory.saving}{A string. \code{"none"} implies no memory-saving tricks,
+and the entire problem is processed in the computer memory at once (good for
+sample sizes 2000 and below; if \code{sel.weights} is not provided or is a function,
+the weight matrix / list is computed at once.). If \code{"full"}, then, the smoothed
+likelihoods are computed in series, which saves memory but computes kernel weights at
+every step of a loop, increasing CPU time; the SEL weights, normally found in the rows
+of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then,
+the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists.
+If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.}
 
 \item{chunks}{The number of chunks into which the weight matrix is split. Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks (resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.}
 
@@ -50,7 +58,15 @@ smoothEmplik(
 
 \item{bad.value}{Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).}
 
-\item{attach.attributes}{If \code{"none"}, returns just the sum of expected likelihoods; otherwise, attaches certain attributes for diagnostics: \code{"ELRs"} for expected likelihoods, \code{"residuals"} for the residuals (moment function values), \code{"lam"} for the Lagrange multipliers in the EL problems, \code{"converged"} for the convergence of individual EL problems, \code{"exitcode"} for the \code{weightedEL} exit codes (0 for success), \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).}
+\item{attach.attributes}{If \code{"none"}, returns just the sum of expected likelihoods;
+otherwise, attaches certain attributes for diagnostics:
+\code{"ELRs"} for expected likelihoods,
+\code{"residuals"} for the residuals (moment function values),
+\code{"lam"} for the Lagrange multipliers lambda in the EL problems,
+\code{"nabla"} for d/d(lambda)EL (should be close to zero because this must be true for any \code{theta}),
+\code{"converged"} for the convergence of #' individual EL problems,
+\code{"exitcode"} for the \code{weightedEL} exit codes (0 for success),
+\code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).}
 
 \item{...}{Passed to \code{rho}.}
 }

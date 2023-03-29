@@ -26,6 +26,6 @@ Moment functions with conditioning
 }
 \section{Functions}{
 \itemize{
-\item \code{rho.complete.case.pi}: Moment function depending on the propensity score.
-}}
+\item \code{rho.complete.case.pi()}: Moment function depending on the propensity score.
 
+}}

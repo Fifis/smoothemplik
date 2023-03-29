@@ -6,9 +6,9 @@
 \usage{
 weightedEL(
   z,
+  mu = 0,
   ct = NULL,
   shift = NULL,
-  mu = 0,
   SEL = FALSE,
   n.orig = NULL,
   weight.tolerance = 0.01/length(z),
@@ -21,18 +21,18 @@ weightedEL(
 \arguments{
 \item{z}{The data vector.}
 
+\item{mu}{Hypothesized mean of \code{z} in the moment condition.}
+
 \item{ct}{The count variable that indicates the multiplicity ob observations. Can be fractional. Very small counts below the tolerance threshold are zeroed.}
 
 \item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
 
-\item{mu}{Hypothesized mean of \code{z} in the moment condition.}
-
 \item{SEL}{If FALSE, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
-due to Owen (2001, formula 2.9), otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
+due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
 
 \item{n.orig}{An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).}
 
-\item{weight.tolerance}{Weight tolerance for counts for numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
 
 \item{truncto}{Counts under \code{weight.tolerance} will be set to this value. In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
 
@@ -52,13 +52,13 @@ A list with the following elements:
 \item{iter }{The number of iterations used (from \code{uniroot}).}
 \item{bracket }{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
 \item{estim.prec }{The approximate estimated precision of lambda (from \code{uniroot}).}
-\item{f.root }{The value of the function at the root (from \code{uniroot}); values \code{> sqrt(.Machine$double.eps)} indicate covergence problems.}
+\item{f.root }{The value of the function (derivative of the objective w.r.t. lambda) at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate covergence problems.}
 \item{exitcode }{An integer indicating the reason of termination.}
 \describe{
 \item{0:}{success, an interior solution for lambda found.}
 \item{1:}{the value of the derivative is \code{> sqrt(.Machine$double.eps)} (the value of the function at the returned root it not exactly zero, and this is not an issue with the tolerance).}
 \item{2:}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-\item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function is > 1e-8, and the result is close to the boundary (< 1e-8).}
+\item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function is > tolerance, and the result is close to the boundary (< tolerance).}
 \item{4:}{an error occurred while calling \code{uniroot}.}
 \item{5:}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
 }
@@ -68,8 +68,47 @@ A list with the following elements:
 Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm. Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}
 The names of the elements in the returned list are consistent with Art B. Owen's original R code.
 }
-\references{
-Owen, A. B. (2001). *Empirical likelihood*. CRC press.
+\details{
+This function provides the core functionality for univariate empirical likelihood.
+The technical details is given in \insertCite{cosma2019inference}{smoothemplik},
+although the algorithm used in that paper is slower than the one provided by this function.
 
-Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data*. Emerald Publishing Limited.
+Since we know that the EL probabilities belong to (0, 1), the interval (bracket) for \eqn{\lambda}{l} search
+can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}:
+\deqn{p_i = c_i/N \cdot (1 + \lambda z_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*z[i] + s)}
+We know that \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
+\deqn{c_i/N \cdot (1 + \lambda z_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*z[i] + s) < 1}
+\deqn{c_i/N < 1 + \lambda z_i + s}{c[i]/N < 1 + l*z_i + s}
+\deqn{c_i/N - 1 - s < \lambda z_i}{c[i]/N - 1 - s < l*z[i]}
+Two cases are possible: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
+(we do not want to divide by z_i=0). Then,
+\deqn{(c_i/N - 1 - s)/z_i > \lambda,\ \forall i: z_i<0}{(c[i]/N - 1 - s)/z[i] > l,  such i that z[i]<0}
+\deqn{(c_i/N - 1 - s)/z_i < \lambda,\ \forall i: z_i>0}{(c[i]/N - 1 - s)/z[i] < l,  such i that z[i]>0}
+or
+\deqn{\lambda < (c_i/N - 1 - s)/z_i, \forall i: z_i<0}{l < (c_i/N - 1 - shift)/z_i, \forall i: z_i<0}
+\deqn{\lambda > (c_i/N - 1 - s)/z_i, \forall i: z_i>0}{l > (c_i/N - 1 - shift)/z_i, \forall i: z_i>0}
+which implies
+\deqn{\lambda < \min_{i: z_i<0} (c_i/N - 1 - s)/z_i}{l < min_{i: z[i]<0} (c_i/N - 1 - s)/z[i]}
+\deqn{\lambda > \max_{i: z_i>0} (c_i/N - 1 - s)/z_i}{l > max_{i: z[i]>0} (c_i/N - 1 - s)/z[i]}
+
+(This derivation contains \emph{s}, which is the extra shift that extends the function to allow mixed conditional an unconditional estimation;
+Owen's formula corresponds to \eqn{c_i}{c[i]} = 1 and \emph{s} = 0.)
+}
+\examples{
+earth <- c(
+  5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
+  5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
+)
+set.seed(1)
+system.time(r1 <- replicate(100, cemplik(sample(earth, replace = TRUE), mu = 5.517)))
+set.seed(1)
+system.time(r2 <- replicate(100, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
+plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
+     bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
+     main = "Discrepancy between cemplik and weightedEL", ylab = "")
+abline(h = 0, lty = 2)
+
+}
+\references{
+\insertAllCited{}
 }

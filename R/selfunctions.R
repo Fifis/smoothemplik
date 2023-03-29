@@ -49,13 +49,40 @@ bw.rot <- function(x, na.rm = FALSE) {
 #' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
 #' @param mu Hypothesized mean of \code{z} in the moment condition.
 #' @param SEL If FALSE, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
-#' due to Owen (2001, formula 2.9), otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
+#' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
 #' @param n.orig An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).
-#' @param weight.tolerance Weight tolerance for counts for numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
+#' @param weight.tolerance Weight tolerance for counts to improve numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
 #' @param truncto Counts under \code{weight.tolerance} will be set to this value. In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
 #' @param uniroot.control A list passed to the \code{uniroot}.
 #' @param return.weights Logical: if TRUE, individual EL weights are computed and returned. Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
 #' @param verbose Logical: if \code{TRUE}, prints warnings.
+#'
+#' @details
+#' This function provides the core functionality for univariate empirical likelihood.
+#' The technical details is given in \insertCite{cosma2019inference}{smoothemplik},
+#' although the algorithm used in that paper is slower than the one provided by this function.
+#'
+#' Since we know that the EL probabilities belong to (0, 1), the interval (bracket) for \eqn{\lambda}{l} search
+#' can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}:
+#' \deqn{p_i = c_i/N \cdot (1 + \lambda z_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*z[i] + s)}
+#' We know that \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
+#' \deqn{c_i/N \cdot (1 + \lambda z_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*z[i] + s) < 1}
+#' \deqn{c_i/N < 1 + \lambda z_i + s}{c[i]/N < 1 + l*z_i + s}
+#' \deqn{c_i/N - 1 - s < \lambda z_i}{c[i]/N - 1 - s < l*z[i]}
+#' Two cases are possible: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
+#' (we do not want to divide by z_i=0). Then,
+#' \deqn{(c_i/N - 1 - s)/z_i > \lambda,\ \forall i: z_i<0}{(c[i]/N - 1 - s)/z[i] > l,  such i that z[i]<0}
+#' \deqn{(c_i/N - 1 - s)/z_i < \lambda,\ \forall i: z_i>0}{(c[i]/N - 1 - s)/z[i] < l,  such i that z[i]>0}
+#' or
+#' \deqn{\lambda < (c_i/N - 1 - s)/z_i, \forall i: z_i<0}{l < (c_i/N - 1 - shift)/z_i, \forall i: z_i<0}
+#' \deqn{\lambda > (c_i/N - 1 - s)/z_i, \forall i: z_i>0}{l > (c_i/N - 1 - shift)/z_i, \forall i: z_i>0}
+#' which implies
+#' \deqn{\lambda < \min_{i: z_i<0} (c_i/N - 1 - s)/z_i}{l < min_{i: z[i]<0} (c_i/N - 1 - s)/z[i]}
+#' \deqn{\lambda > \max_{i: z_i>0} (c_i/N - 1 - s)/z_i}{l > max_{i: z[i]>0} (c_i/N - 1 - s)/z[i]}
+#'
+#' (This derivation contains \emph{s}, which is the extra shift that extends the function to allow mixed conditional an unconditional estimation;
+#' Owen's formula corresponds to \eqn{c_i}{c[i]} = 1 and \emph{s} = 0.)
+#'
 #' @return A list with the following elements:
 #' \itemize{
 #' \item{logelr }{Logarithm of the empirical likelihood ratio.}
@@ -65,26 +92,38 @@ bw.rot <- function(x, na.rm = FALSE) {
 #' \item{iter }{The number of iterations used (from \code{uniroot}).}
 #' \item{bracket }{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
 #' \item{estim.prec }{The approximate estimated precision of lambda (from \code{uniroot}).}
-#' \item{f.root }{The value of the function at the root (from \code{uniroot}); values \code{> sqrt(.Machine$double.eps)} indicate covergence problems.}
+#' \item{f.root }{The value of the function (derivative of the objective w.r.t. lambda) at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate covergence problems.}
 #' \item{exitcode }{An integer indicating the reason of termination.}
 #' \describe{
 #' \item{0:}{success, an interior solution for lambda found.}
 #' \item{1:}{the value of the derivative is \code{> sqrt(.Machine$double.eps)} (the value of the function at the returned root it not exactly zero, and this is not an issue with the tolerance).}
 #' \item{2:}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-#' \item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function is > 1e-8, and the result is close to the boundary (< 1e-8).}
+#' \item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function is > tolerance, and the result is close to the boundary (< tolerance).}
 #' \item{4:}{an error occurred while calling \code{uniroot}.}
 #' \item{5:}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
 #' }
 #' }
 #' @references
-#' Owen, A. B. (2001). *Empirical likelihood*. CRC press.
+#' \insertAllCited{}
 #'
-#' Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data*. Emerald Publishing Limited.
+#' @examples
+#' earth <- c(
+#'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
+#'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
+#' )
+#' set.seed(1)
+#' system.time(r1 <- replicate(100, cemplik(sample(earth, replace = TRUE), mu = 5.517)))
+#' set.seed(1)
+#' system.time(r2 <- replicate(100, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
+#' plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
+#'      bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
+#'      main = "Discrepancy between cemplik and weightedEL", ylab = "")
+#' abline(h = 0, lty = 2)
+#'
 #' @export
-weightedEL <- function(z,
+weightedEL <- function(z, mu = 0,
                        ct = NULL,
                        shift = NULL,
-                       mu = 0,
                        SEL = FALSE,
                        n.orig = NULL,
                        weight.tolerance = 0.01 / length(z),
@@ -115,83 +154,63 @@ weightedEL <- function(z,
     if (ncol(z) > 1) stop("Only one-dimensional vectors or matrices are supported.") else z <- as.numeric(z)
   }
   z <- z - mu
-
-  # Simple derivation:
-  # p_i = c_i/N * 1/(1 + lambda*z_i + shift)
-  # We know that p_i<1 \forall i, so
-  # c_i/N * 1/(1 + lambda*z_i + shift) < 1
-  # c_i/N < 1 + lambda*z_i + shift
-  # c_i/N - 1 - shift < lambda*z_i
-  # Two cases are possible: either z_i<0, or z_i>0 (we do not want to divide by z_i=0).
-  # Denote negz those i for which z_i<0. Then
-  # {(c_i/N - 1 - shift)/z_i > lambda, \forall i: z_i<0
-  # {(c_i/N - 1 - shift)/z_i < lambda, \forall i: z_i>0,
-  # or
-  # {lambda < (c_i/N - 1 - shift)/z_i, \forall i: z_i<0
-  # {lambda > (c_i/N - 1 - shift)/z_i, \forall i: z_i>0,
-  # which implies
-  # {lambda < min_{i: z_i<0} (c_i/N - 1 - shift)/z_i
-  # {lambda > max_{i: z_i>0} (c_i/N - 1 - shift)/z_i
   wts <- if (return.weights) rep(0, n.orig) else NULL
+
+  # The default output to be overwritten if optimisation succeeds
+  lam <- Inf
+  logelr <- -Inf
+  converged <- FALSE
+  iter <- NA
+  minlambda <- -Inf
+  maxlambda <- Inf
+  estim.prec <- NA
+  f.root <- NA
+  exitcode <- 5
+
   # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z)
   if (min(z) < 0 & max(z) > 0) {
     negz <- z < 0
     comp <- (ct / N - 1 - shift) / z
     minlambda <- max(comp[!negz])
     maxlambda <- min(comp[negz])
-    con <- list(tol = 1e-20, maxiter = 200, trace = 0)
+    int <- c(minlambda, maxlambda)
+    con <- list(tol = .Machine$double.eps, maxiter = 200, trace = 0)
     con[names(uniroot.control)] <- uniroot.control
 
     dllik <- function(lambda) return(sum(ct * z / (1 + lambda * z + shift)))
-    lambda <- tryCatch(stats::uniroot(dllik, interval = c(minlambda, maxlambda), tol = con$tol, maxiter = con$maxiter, trace = con$trace), # If there is a warning, we still return the object
-      warning = function(w) return(list(stats::uniroot(dllik, interval = c(minlambda, maxlambda), tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
+    lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), # If there is a warning, we still return the object
+      warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
       error = function(e) return(NULL)
     )
     if (!is.null(lambda)) { # Some result with or without a warning as the second element of the list
-      if (class(lambda[[2]]) == "simpleWarning") {
+      if ("warning" %in% class(lambda[[2]])) {
         if (verbose) print(lambda[[2]]) # The user should know that went wrong in uniroot()
         lambda <- lambda[[1]]
       }
       lam <- lambda$root
       if (return.weights) wts[nonz] <- (ct / N) / (1 + z * lam + shift)
       logelr <- -sum(ct * log(1 + z * lam + shift))
-      converged <- if (class(lambda[[2]]) == "simpleWarning") FALSE else TRUE
+      converged <- if ("warning" %in% class(lambda[[2]])) FALSE else TRUE
       iter <- lambda$iter
       estim.prec <- lambda$estim.prec
       f.root <- lambda$f.root
       exitcode <- 0
-      if (abs(f.root) > sqrt(.Machine$double.eps)) {
-        if (verbose) warning("FOC not met: the value of d/dlambda(weighted EL) is different from 0 by more than sqrt(Mach.eps)!")
-        exitcode <- 1
-      }
-      if (abs(lam - maxlambda) < sqrt(.Machine$double.eps) | abs(lam - minlambda) < sqrt(.Machine$double.eps)) {
-        if (verbose) warning("Lambda is very close to the boundary (closer than sqrt(Mach.eps))!")
-        exitcode <- exitcode + 2
-      }
+      tol <- sqrt(.Machine$double.eps)
+      if (abs(f.root) > tol) exitcode <- 1
+      if (abs(lam - maxlambda) < tol | abs(lam - minlambda) < tol) exitcode <- exitcode + 2
     } else {
-      lam <- Inf
-      logelr <- -Inf
-      converged <- FALSE
-      iter <- NA
-      estim.prec <- NA
-      f.root <- NA
       exitcode <- 4
-      if (verbose) warning("Root finder returned an error!")
     }
-  } else {
-    lam <- Inf
-    logelr <- -Inf
-    converged <- FALSE
-    iter <- NA
-    minlambda <- -Inf
-    maxlambda <- Inf
-    estim.prec <- NA
-    f.root <- NA
-    exitcode <- 5
-    if (verbose) warning("mu is not strictly in the convex hull of z!")
   }
 
-  return(list(logelr = logelr, lam = lam, wts = wts, converged = converged, iter = iter, bracket = c(minlambda, maxlambda), estim.prec = estim.prec, f.root = f.root, exitcode = exitcode))
+  err.msg <- c("FOC not met: the value of d/dlambda(weighted EL) is different from 0 by more than sqrt(Mach.eps)!",
+               "Lambda is very close to the boundary (closer than sqrt(Mach.eps))!",
+               "Lambda is very close to the boundary and FOC not met!",
+               "Root finder returned an error!",
+               "mu is not strictly in the convex hull of z (spanning condition fail)!")
+  if (verbose & exitcode > 0) warning(err.msg[exitcode])
+
+  return(list(logelr = logelr, lam = lam, wts = wts, converged = converged, iter = iter, bracket = int, estim.prec = estim.prec, f.root = f.root, exitcode = exitcode))
 }
 
 #' Smoothed Empirical Likelihood function value
@@ -207,11 +226,27 @@ weightedEL <- function(z,
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).
 #' @param parallel If TRUE, uses \code{parallel::mclapply} to speed up the computation.
 #' @param cores The number of cores used by \code{parallel::mclapply}.
-#' @param memory.saving A string. \code{"none"} implies no memory-saving tricks, and the entire problem is processed in the computer memory at once (good for sample sizes 2000 and below; if \code{sel.weights} is not provided or is a function, the weight matrix / list is computed at once.). If \code{"full"}, then the smoothed likelihoods are computed in series, which saves memory but computes kernel weights at every step of a loop, increasing CPU time; the SEL weights, normally found in the rows of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then, the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists. If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.
+#' @param memory.saving A string. \code{"none"} implies no memory-saving tricks,
+#' and the entire problem is processed in the computer memory at once (good for
+#' sample sizes 2000 and below; if \code{sel.weights} is not provided or is a function,
+#' the weight matrix / list is computed at once.). If \code{"full"}, then, the smoothed
+#' likelihoods are computed in series, which saves memory but computes kernel weights at
+#' every step of a loop, increasing CPU time; the SEL weights, normally found in the rows
+#' of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then,
+#' the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists.
+#' If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.
 #' @param chunks The number of chunks into which the weight matrix is split. Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks (resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.
 #' @param print.progress If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.
 #' @param bad.value Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).
-#' @param attach.attributes If \code{"none"}, returns just the sum of expected likelihoods; otherwise, attaches certain attributes for diagnostics: \code{"ELRs"} for expected likelihoods, \code{"residuals"} for the residuals (moment function values), \code{"lam"} for the Lagrange multipliers in the EL problems, \code{"converged"} for the convergence of individual EL problems, \code{"exitcode"} for the \code{weightedEL} exit codes (0 for success), \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).
+#' @param attach.attributes If \code{"none"}, returns just the sum of expected likelihoods;
+#' otherwise, attaches certain attributes for diagnostics:
+#' \code{"ELRs"} for expected likelihoods,
+#' \code{"residuals"} for the residuals (moment function values),
+#' \code{"lam"} for the Lagrange multipliers lambda in the EL problems,
+#' \code{"nabla"} for d/d(lambda)EL (should be close to zero because this must be true for any \code{theta}),
+#' \code{"converged"} for the convergence of #' individual EL problems,
+#' \code{"exitcode"} for the \code{weightedEL} exit codes (0 for success),
+#' \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).
 #' @param ... Passed to \code{rho}.
 #'
 #' @return A scalar with the SEL value and, if requested, attributes containing the diagnostic information attached to it.
@@ -227,7 +262,7 @@ smoothEmplik <- function(rho,
                          parallel = FALSE, cores = 1,
                          memory.saving = c("none", "full", "partial"), chunks = 10, print.progress = FALSE,
                          bad.value = -Inf,
-                         attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "converged", "exitcode", "probabilities"),
+                         attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "nabla", "converged", "exitcode", "probabilities"),
                          ...
 ) {
   # Constructing residuals
@@ -289,6 +324,7 @@ smoothEmplik <- function(rho,
   if ("ELRs" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "ELRs") <- log.ELR.values
   if ("residuals" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "residuals") <- rho.series
   if ("lam" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "lam") <- unlist(lapply(empliklist, "[[", "lam"))
+  if ("nabla" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "nabla") <- unlist(lapply(empliklist, "[[", "f.root"))
   if ("converged" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "converged") <- unlist(lapply(empliklist, "[[", "converged"))
   if ("exitcode" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "exitcode") <- unlist(lapply(empliklist, "[[", "exitcode"))
   if (attach.probs) attr(ret, "probabilities") <- lapply(empliklist, "[[", "wts")
@@ -375,13 +411,14 @@ maximiseSEL <- function(start.values = NULL,
   SELToOptim <- function(theta, ...) constrSmoothEmplik(par.free = theta, par.fixed = restricted.params, minus = FALSE, ...)
   if (optmethod == "nlm") {
     if (is.null(nlm.step.max)) nlm.step.max <- sqrt(sum(start.values^2)) / 3
-    optim.SEL <- tryCatch(stats::nlm(p = start.values, f = SELToOptim, fscale = -1, print.level = verbose * 2, stepmax = nlm.step.max, ...), error = optError)
+    optim.SEL <- tryCatch(stats::nlm(p = start.values, f = function(x, ...) -SELToOptim(x, ...), print.level = verbose * 2, stepmax = nlm.step.max, ...), error = optError)
     if (optim.SEL$code %in% c(4, 5)) { # If there are optimisation issues
       warning(paste0("nlm exit code: ", optim.SEL$code, ", restarting with BFGS."))
-      optmethod <- "BFGS"
-      optim.SEL <- tryCatch(stats::optim(par = start.values, fn = SELToOptim, control = opt.controls, method = optmethod, ...), error = optError)
+      rm(optim.SEL) # Purging the faulty result
     }
-  } else {
+  }
+  if (!exists("optim.SEL")) {
+    if (optmethod == "nlm") optmethod <- "BFGS" # Overriding the more fragile method
     optim.SEL <- tryCatch(stats::optim(par = start.values, fn = SELToOptim, control = opt.controls, method = optmethod, ...), error = optError)
   }
 
@@ -392,8 +429,8 @@ maximiseSEL <- function(start.values = NULL,
   } else {
     thetahat <- if (optmethod != "nlm") optim.SEL$par else optim.SEL$estimate
   }
-  SEL <- if (optmethod != "nlm") optim.SEL$value else optim.SEL$minimum
-  if (!isTRUE(abs(SEL) < 1e20)) {
+  SEL <- if (optmethod != "nlm") optim.SEL$value else -optim.SEL$minimum
+  if (!isTRUE(abs(SEL) < 1e15)) {
     SEL <- NA
     thetahat <- rep(NA, length(thetahat))
   }
@@ -419,15 +456,6 @@ maximiseSEL <- function(start.values = NULL,
   return(results)
 }
 
-#' Fail gracefully
-#'
-#' Return parseable output in case the optimiser fails
-#'
-#' @return A list of the same format as the output of \code{\link{maximiseSEL}}.
-fail <- function() {
-  return(list(par = c(NA, NA), value = NA, restricted = c(FALSE, FALSE), code = NA, iterations = NA, xtimes = c(0, 0)))
-}
-
 #' Convert a weight vector to list
 #'
 #' This function saves memory (which is crucial in large samples) and allows one to speed up the code by minimising the number of
@@ -438,15 +466,17 @@ fail <- function() {
 #'
 #' @param x A numeric vector (with many close-to-zero elements).
 #' @param trim A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.
+#' @param renormalise Logical: renormalise the sum of weights to one after trimming?
 #'
 #' @return A list with indices of large enough elements.
 #' @export
 #'
 #' @examples
-sparseVectorToList <- function(x, trim = NULL) {
+sparseVectorToList <- function(x, trim = NULL, renormalise = TRUE) {
   if (is.null(trim)) trim <- function(x) 0.01 / length(x)
   idx <- which(x >= trim(x))
   x <- x[idx]
+  if (renormalise) x <- x / sum(x)
   return(list(idx = idx, ct = x))
 }
 
@@ -517,10 +547,25 @@ lmEff <- function(y, incl = NULL, endog = NULL, excl = NULL, bw = NULL, iteratio
   return(list(coefficients = mod$coefficients, vcov = v, residuals = U))
 }
 
-getSELWeights <- function(X, bw, trim = NULL) {
-  sel.weights <- kernelWeights(X, bw = bw)
+
+#' Construct memory-efficient weights for estimation
+#'
+#' This function constructs SEL weights with appropriate trimming for numerical stability and optional renormalisation so that the sum of the weights be unity
+#'
+#' @param x A numeric vector (with many close-to-zero elements).
+#' @param bw A numeric scalar or a vector passed to `kernelWeights`.
+#' @param trim A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.
+#' @param renormalise Logical; passed to `sparseVectorToList`.
+#'
+#' @return A list with indices of large enough elements.
+#' @export
+#'
+#' @examples
+getSELWeights <- function(x, bw, trim = NULL, renormalise = TRUE) {
+  sel.weights <- kernelWeights(x, bw = bw)
   sel.weights <- sel.weights / rowSums(sel.weights)
-  sel.weights <- apply(sel.weights, 1, sparseVectorToList, trim = trim)
+  sel.weights <- apply(sel.weights, 1, sparseVectorToList, trim = trim, renormalise = renormalise)
+  return(sel.weights)
 }
 
 optError <- function(e = NULL) return(list(code = 5))

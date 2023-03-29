@@ -26,6 +26,6 @@ These functions are similar to \eqn{g(\theta, x)} described in the documentation
 }
 \section{Functions}{
 \itemize{
-\item \code{g.unconditional.eff}: Moment function incorporating the propensity score.
-}}
+\item \code{g.unconditional.eff()}: Moment function incorporating the propensity score.
 
+}}

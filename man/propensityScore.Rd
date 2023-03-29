@@ -40,10 +40,10 @@ The propensity score functions from Wang and Rao with possibly one of three spec
 }
 \section{Functions}{
 \itemize{
-\item \code{propensityScore.discrete}: The propensity score for the discrete case.
+\item \code{propensityScore.discrete()}: The propensity score for the discrete case.
 
-\item \code{sigma2cragg}: The skedastic function for the continuous case.
+\item \code{sigma2cragg()}: The skedastic function for the continuous case.
 
-\item \code{sigma2.discrete}: The skedastic function for the discrete case.
+\item \code{sigma2.discrete()}: The skedastic function for the discrete case.
+
 }}
-
