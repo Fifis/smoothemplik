@@ -8,9 +8,8 @@ kernelWeights(
   x,
   xgrid = NULL,
   bw = NULL,
-  gaussian = TRUE,
-  PIT = FALSE,
-  method = "CPP"
+  kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+  PIT = FALSE
 )
 }
 \arguments{
@@ -22,18 +21,16 @@ kernelWeights(
 \item{bw}{Kernel bandwidth. Since it is the crucial parameter in many applications, throws a warning if not supplied, and then, Silverman's
 rule of thumb (via \code{bw.row()}) is applied to every dimension of \code{x}.}
 
-\item{gaussian}{If TRUE, the normal (Gaussian) product kernel with full support is used, otherwise Epanechnikov.}
+\item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
 
 \item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns of \code{x} via \code{ecdf} in order to map all values
-into the [0, 1] range. May be an integer vector of indices of columns to which the PIT should be applied.}
-
-\item{method}{"R" or "CPP". If "CPP", then faster Rcpp functions are invoked, otherwise use a pure R implementation.
+  into the [0, 1] range. May be an integer vector of indices of columns to which the PIT should be applied.
 
 Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
 internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.}
 }
 \value{
-A matrix
+A matrix of weights of dimensions nrow(xgrid) x nrow(x).
 }
 \description{
 Get kernel-based weights

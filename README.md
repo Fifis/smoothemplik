@@ -8,6 +8,11 @@ Very preliminary and incomplete! Do not circulate!
 
 ### High priority
 
+* Fix the bug: no speed-up in the `kernelMixedSmooth` example
+* Check all instances of kernelSmooth, kernelDensity, kernelWeights, and everything that used the obsolete argument.
+* Adapt bw.rot to non-standardised kernels (roughness different from 1)
+* Check there `kernelWeights` and `standardise` were used.
+* Extend the CV to non-Gaussian cases.
 * `smoothEmplikDiscrete`: if the split variable does not take contiguous values from 1 to the number of categories, estimation fails.
 
 ### Medium priority

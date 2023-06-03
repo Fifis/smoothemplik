@@ -51,7 +51,7 @@ If \code{func} returns a scalar, a vector of the same length as \code{x}.
 If \code{func} returns a vector, then, a matrix of dimensions \code{length(f(x)) length(x)}
 }
 \description{
-Computes a two- or one-sided
+Computes a two- or one-sided numerical derivative that approximates the gradient | Jacobian using the indicated number of cores for maximum efficiency.
 }
 \examples{
 \dontrun{

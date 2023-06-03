@@ -45,11 +45,11 @@ pit <- function(x, xgrid = NULL) {
     xgrid.cut[xgrid %in% x.uniq.sorted] <- NA # Exact matches will be dealt with at the last step
     xgrid.list <- split(xgrid, xgrid.cut)
     ecdf.uniq01 <- c(0, ecdf.uniq.sorted, 1)
-    xgrid.list.unique <- lapply(xgrid.list, function(x) sort(unique(x)))
-    xgrid.spaced <- lapply(1:(length(xgrid.list.unique)), function(i) {
-      xg <- xgrid.list.unique[[i]]
+    xgrid.list.uniq <- lapply(xgrid.list, function(x) sort(unique(x)))
+    xgrid.spaced <- lapply(1:(length(xgrid.list.uniq)), function(i) {
+      xg <- xgrid.list.uniq[[i]]
       l <- length(xg)
-      if (l > 0) return(seq(ecdf.uniq01[i], ecdf.uniq01[i+1], length.out = l + 2)[c(-1, -l-2)]) else return(NULL)
+      if (l > 0) return(seq(ecdf.uniq01[i], ecdf.uniq01[i+1], length.out = l+2)[c(-1, -l-2)]) else return(NULL)
     })
     xgrid.spaced <- unlist(xgrid.spaced)
     xgrid.uniq.sorted.noorig <- xgrid.uniq.sorted[!(xgrid.uniq.sorted %in% x)]
@@ -59,79 +59,41 @@ pit <- function(x, xgrid = NULL) {
   }
 }
 
-kernelWeightsOneR <- function(x, # A numeric vector
-                              xgrid, # A numeric vector
-                              bw, # A scalar
-                              gaussian = TRUE) {
-  kernelFun <- function(x) if (gaussian) stats::dnorm(x) else 0.75 / sqrt(5) * (1 - x^2 / 5) * as.numeric(abs(x) <= sqrt(5))
-  K <- kernelFun(outer(xgrid, x, "-") / bw)
-  return(K)
-}
+.prepareKernel <- function(x,
+                           y = NULL,
+                           xgrid = NULL,
+                           bw = NULL,
+                           kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+                           PIT = FALSE
+) {
+  kernel <- kernel[1]
+  if (is.data.frame(x)) x <- as.matrix(x)
+  if (is.vector(x)) x <- matrix(x, ncol = 1) # The C++ code is equally fast for vectors and matrices
+  if (is.null(xgrid)) xgrid <- x
+  if (is.data.frame(xgrid)) xgrid <- as.matrix(xgrid)
+  if (is.vector(xgrid)) xgrid <- matrix(xgrid, ncol = 1)
 
-kernelDensityOneR <- function(x, # A numeric vector
-                              xgrid, # A numeric vector
-                              bw, # A scalar
-                              gaussian = TRUE) {
-  nx <- length(x)
-  K <- kernelWeightsOneR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian)
-  dens <- rowSums(K) / (nx * bw)
-  return(dens)
-}
+  d <- ncol(x) # Dimension of the problem
+  if (d != ncol(xgrid)) stop("x and xgrid must be have the same number of columns (i.e. the same dimension).")
 
-kernelSmoothOneR <- function(x, # A numeric vector
-                             y, # A numeric vector of the same length
-                             xgrid, # A numeric vector
-                             bw, # A scalar
-                             gaussian = TRUE,
-                             LOO = FALSE) {
-  nx <- length(x)
-  K <- kernelWeightsOneR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian)
-  if (LOO) diag(K) <- 0
-  num <- rowSums(sweep(K, 2, y, "*"))
-  den <- rowSums(K)
-  muhat <- num / den
-  return(muhat)
-}
-
-kernelWeightsMultiR <- function(x, # A matrix with d columns
-                                xgrid, # A matrix with d columns
-                                bw, # A vector of length d
-                                gaussian = TRUE) {
-  kernelFun <- function(x) if (gaussian) stats::dnorm(x) else 0.75 / sqrt(5) * (1 - x^2 / 5) * as.numeric(abs(x) <= sqrt(5))
-  nx <- nrow(x)
-  ng <- nrow(xgrid)
-  d <- ncol(xgrid)
-  pk <- matrix(1, nrow = ng, ncol = nx) # Accumulating the product kernel
-  for (i in 1:d) {
-    K <- kernelFun(outer(xgrid[, i], x[, i], "-") / bw[i])
-    pk <- pk * K
+  if (PIT) {
+    for (i in 1:d) {
+      x[, i] <- pit(x[, i])
+      xgrid[, i] <- pit(x = x[, i], xgrid = xgrid[, i])
+    }
   }
-  return(pk)
-}
 
-kernelDensityMultiR <- function(x, # A matrix with d columns
-                                xgrid, # A matrix with d columns
-                                bw, # A vector of length d
-                                gaussian = TRUE) {
-  nx <- nrow(x)
-  pk <- kernelWeightsMultiR(x=x, xgrid=xgrid, bw=bw, gaussian=gaussian)
-  dens <- rowSums(pk) / (nx * prod(bw))
-  return(dens)
-}
+  if (is.null(bw)) {
+    bw <- bw.rot(x)
+    warning("No bandwidth supplied, using Silverman's multi-dimensional rule of thumb: bw = (", paste(round(bw, 5), collapse = ", "), ").")
+  }
+  if (length(bw) == 1) bw <- rep(bw, d)
+  if (length(bw) != d) stop("The vector of bandwidths must have length either 1 or ncol(x)!")
 
-kernelSmoothMultiR <- function(x,
-                               y,
-                               xgrid,
-                               bw,
-                               gaussian = TRUE,
-                               LOO = FALSE) {
-  nx <- nrow(x)
-  pk <- kernelWeightsMultiR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian)
-  if (LOO) diag(pk) <- 0
-  num <- rowSums(sweep(pk, 2, y, "*"))
-  den <- rowSums(pk)
-  muhat <- num / den
-  return(muhat)
+  if (!is.null(y)) {
+    if (length(y) != nrow(x)) stop("x and y lengths differ.")
+    return(list(x = x, y = y, xgrid = xgrid, bw = bw, kernel = kernel))
+  } else return(list(x = x, xgrid = xgrid, bw = bw, kernel = kernel))
 }
 
 #' Get kernel-based weights
@@ -141,63 +103,25 @@ kernelSmoothMultiR <- function(x,
 #' \code{x} itself is used as the grid.
 #' @param bw Kernel bandwidth. Since it is the crucial parameter in many applications, throws a warning if not supplied, and then, Silverman's
 #' rule of thumb (via \code{bw.row()}) is applied to every dimension of \code{x}.
-#' @param gaussian If TRUE, the normal (Gaussian) product kernel with full support is used, otherwise Epanechnikov.
+#' @param kernel Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).
 #' @param PIT If TRUE, the Probability Integral Transform (PIT) is applied to all columns of \code{x} via \code{ecdf} in order to map all values
 #'   into the [0, 1] range. May be an integer vector of indices of columns to which the PIT should be applied.
-#' @param method "R" or "CPP". If "CPP", then faster Rcpp functions are invoked, otherwise use a pure R implementation.
 #'
 #' Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
 #' internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.
 #'
-#' @return A matrix
+#' @return A matrix of weights of dimensions nrow(xgrid) x nrow(x).
 #' @export
 #'
 #' @examples
 kernelWeights <- function(x,
                           xgrid = NULL,
                           bw = NULL,
-                          gaussian = TRUE,
-                          PIT = FALSE,
-                          method = "CPP"
+                          kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+                          PIT = FALSE
 ) {
-  one.dimensional <- is.vector(x)
-  if (is.null(xgrid)) xgrid <- x
-  if (one.dimensional) {
-    if (PIT) {
-      x <- pit(x)
-      xgrid <- pit(x = x, xgrid = xgrid)
-    }
-    if (is.null(bw)) {
-      bw <- bw.rot(x)
-      warning(paste0("No bandwidth supplied, using Silverman's one-dimensional rule of thumb: bw = ", round(bw, 5), "."))
-    }
-    if (length(bw) != 1) stop("The bandwidth for one-dimensional smoothing must be a scalar.")
-    if (!is.vector(xgrid)) stop("The grid for one-dimensional smoothing must be a vector.")
-    result <- switch(method,
-                     R   = kernelWeightsOneR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian),
-                     CPP = kernelWeightsOneCPP(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian)
-    )
-  } else {
-    d <- ncol(x)
-    if (!is.matrix(xgrid)) stop("x and xgrid must be both matrices.")
-    if (d != ncol(xgrid)) stop("x and xgrid must be have the same number of columns (i.e. the same dimension).")
-    if (PIT) {
-      for (i in 1:d) {
-        x[, i] <- pit(x[, i])
-        xgrid[, i] <- pit(x = x[, i], xgrid = xgrid[, i])
-      }
-    }
-    if (is.null(bw)) {
-      bw <- bw.rot(x)
-      warning("No bandwidth supplied, using Silverman's multi-dimensional rule of thumb: bw = (", paste(round(bw, 5), collapse = ", "), ").")
-    }
-    if (length(bw) == 1) bw <- rep(bw, d)
-    if (length(bw) != d) stop("The number of data dimensions is not the same as the number of bandwidths!")
-    result <- switch(method,
-                     R   = kernelWeightsMultiR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian),
-                     CPP = kernelWeightsMultiCPP(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian)
-    )
-  }
+  arg <- .prepareKernel(x = x, xgrid = xgrid, bw = bw, kernel = kernel, PIT = PIT)
+  result <- kernelWeightsCPP(x = arg$x, xgrid = arg$xgrid, bw = arg$bw, kernel = arg$kernel)
   return(result)
 }
 
@@ -207,8 +131,8 @@ kernelWeights <- function(x,
 #' @param x A numeric vector or numeric matrix of predictors.
 #' @param xgrid A numeric vector or numeric matrix with \code{ncol(xgrid) = ncol(x)} of points at which the density is estimated.
 #' @param bw Bandwidth: a scalar or a vector of the same length as \code{ncol(x)}.
-#' @param gaussian If TRUE, the normal (Gaussian) product kernel with full support is used, otherwise Epanechnikov.
-#' @param method "R" or "CPP". If "CPP", then faster Rcpp functions are invoked, otherwise use a pure R implementation.
+#' @param kernel Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).
+#' @param PIT Passed to \code{kernelWeights}.
 #' @param return.grid Logical: if true, then returns \code{xgrid} and appends the estimated density as the last column.
 #'
 #' @return A vector of density estimates evaluated at the grid points or, if \code{return.gric}, a matrix with the density in the last column.
@@ -218,41 +142,13 @@ kernelWeights <- function(x,
 kernelDensity <- function(x,
                           xgrid = NULL,
                           bw = NULL,
-                          gaussian = TRUE,
-                          method = "CPP",
+                          kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+                          PIT = FALSE,
                           return.grid = FALSE
 ) {
-  one.dimensional <- is.vector(x)
-  if (one.dimensional) {
-    if (is.null(bw)) {
-      bw <- bw.rot(x)
-      warning(paste0("No bandwidth supplied, using Silverman's one-dimensional rule of thumb: bw = ", round(bw, 5), "."))
-    }
-    if (length(bw) != 1) stop("The bandwidth for one-dimensional smoothing must be a scalar.")
-    if (is.null(xgrid)) xgrid <- x
-    if (!is.vector(xgrid)) stop("The grid for one-dimensional smoothing must be a vector.")
-    result <- switch(method,
-      R = kernelDensityOneR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian),
-      CPP = kernelDensityOneCPP(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian)
-    )
-  } else {
-    d <- ncol(x)
-    if (is.data.frame(x)) x <- as.matrix(x)
-    if (is.null(xgrid)) xgrid <- x
-    if (is.data.frame(xgrid)) xgrid <- as.matrix(xgrid)
-    if (d != ncol(xgrid)) stop("x and xgrid must be have the same number of columns (i.e. the same dimension).")
-    if (is.null(bw)) {
-      bw <- apply(x, 2, bw.rot)
-      warning("No bandwidth supplied, using Silverman's one-dimensional rule of thumb in every dimension: bw = (", paste(round(bw, 5), collapse = ", "), ").")
-    }
-    if (length(bw) == 1) bw <- rep(bw, d)
-    if (length(bw) != d) stop("The number of data dimensions is not the same as the number of bandwidths!")
-    result <- switch(method,
-      R = kernelDensityMultiR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian),
-      CPP = kernelDensityMultiCPP(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian)
-    )
-  }
-  if (return.grid) result <- cbind(xgrid, result)
+  arg <- .prepareKernel(x = x, xgrid = xgrid, bw = bw, kernel = kernel, PIT = PIT)
+  result <- kernelDensityCPP(x = arg$x, xgrid = arg$xgrid, bw = arg$bw, kernel = arg$kernel)
+  if (return.grid) result <- cbind(xgrid, density = result)
   return(result)
 }
 
@@ -263,13 +159,12 @@ kernelDensity <- function(x,
 #' @param y A vector of dependent variable values.
 #' @param xgrid A vector or a matrix with the same number of columns as \code{x} contatining the values at which to evaluate the smoother.
 #' @param bw A scalar or a vector of smoothing bandwidths.
-#' @param gaussian If \code{TRUE}, Gaussian kernel is used, otherwise Epanechnikov.
+#' @param kernel Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).
+#' @param PIT Passed to \code{kernelWeights}.
 #' @param LOO If \code{TRUE}, the leave-one-out estimator is returned.
-#' @param method \code{"R"} or \code{"CPP"}. The latter requires \code{Rcpp} compilation.
 #' @param degree Integer: 0 for locally constant estimator (Nadaraya---Watson), 1 for locally linear (Cleveland's LOESS), 2 for locally quadratic (use with care)
-#' @param standardise If \code{TRUE}, then the variables are centred to have mean 0 and re-scaled to have standard deviation 1.
 #' @param trim Trimming function for small weights to speed up local regression (if \code{degree} is 1 or 2).
-#' @param robust.iterations The number of robustifying iterations (due to Cleveland, 1979).
+#' @param robust.iterations The number of robustifying iterations (due to Cleveland, 1979). If >0, xgrid is ignored.
 #' @param return.grid If \code{TRUE}, prepends \code{xgrid} to the return results.
 #'
 #' Standardisation is recommended for the purposes of numerical stability (sometimes \code{lm()} might choke when the dependent variable takes very large absolute values and its square is used).
@@ -282,16 +177,15 @@ kernelSmooth <- function(x,
                          y,
                          xgrid = NULL,
                          bw = NULL,
-                         gaussian = TRUE,
+                         kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+                         PIT = FALSE,
                          LOO = FALSE,
-                         method = "CPP",
                          degree = 0,
-                         standardise = TRUE,
                          trim = function(x) 0.01 / length(x),
                          robust.iterations = 0,
                          return.grid = FALSE
 ) {
-  one.dimensional <- is.vector(x)
+  if (!(degree %in% 0:2)) stop("kernelSmooth: degree must be 0, 1, or 2.")
   if (robust.iterations > 0 & !is.null(xgrid)) {
     warning("kernelSmooth: robust LOESS requested but a custom xgrid provided! Ignoring it.")
     xgrid <- NULL
@@ -300,86 +194,43 @@ kernelSmooth <- function(x,
     warning("kernelSmooth: Leave-One-Out estimation requested, but a custom xgrid passed! Ignoring it.")
     xgrid <- NULL
   }
-  if (is.data.frame(x)) x <- as.matrix(x)
-  if (is.null(xgrid)) xgrid <- x
-  if (one.dimensional) {
-    if (length(y) != length(x)) stop("x and y lengths differ.")
-    if (is.null(bw)) {
-      bw <- bw.rot(x)
-      warning(paste0("No bandwidth supplied, using Silverman's one-dimensional rule of thumb: bw = ", round(bw, 5), "."))
-    }
-    if (length(bw) != 1) stop("The bandwidth for one-dimensional smoothing must be a scalar.")
-    if (!is.vector(xgrid)) stop("The grid for one-dimensional smoothing must be a vector.")
-    if (degree == 0) {
-      result <- switch(method,
-                       R   = kernelSmoothOneR(x = x, y = y, xgrid = xgrid, bw = bw, gaussian = gaussian, LOO = LOO),
-                       CPP = kernelSmoothOneCPP(x = x, y = y, xgrid = xgrid, bw = bw, gaussian = gaussian, LOO = LOO))
-    } else {
-      K <- switch(method,
-                  R = kernelWeightsOneR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian),
-                  CPP = kernelWeightsOneCPP(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian))
-    }
+  arg <- .prepareKernel(x = x, y = y, xgrid = xgrid, bw = bw, kernel = kernel, PIT = PIT)
+
+  if (degree == 0) {
+    result <- kernelSmoothCPP(x = arg$x, y = arg$y, xgrid = arg$xgrid, bw = arg$bw, kernel = arg$kernel, LOO = LOO)
   } else {
-    if (length(y) != nrow(x)) stop("x and y lengths differ.")
-    d <- ncol(x)
-    if (is.data.frame(xgrid)) xgrid <- as.matrix(xgrid)
-    if (d != ncol(xgrid)) stop("x and xgrid must be have the same number of columns (i.e. the same dimension).")
-    if (is.null(bw)) {
-      bw <- apply(x, 2, bw.rot)
-      warning("No bandwidth supplied, using Silverman's one-dimensional rule of thumb in every dimension: bw = (", paste(round(bw, 5), collapse = ", "), ").")
-    }
-    if (length(bw) == 1) bw <- rep(bw, d)
-    if (length(bw) != d) stop("The number of data dimensions is not the same as the number of bandwidths!")
-    if (degree == 0) {
-      result <- switch(method,
-                       R   = kernelSmoothMultiR(x = x, y = y, xgrid = xgrid, bw = bw, gaussian = gaussian, LOO = LOO),
-                       CPP = kernelSmoothMultiCPP(x = x, y = y, xgrid = xgrid, bw = bw, gaussian = gaussian, LOO = LOO))
-    } else {
-      K <- switch(method,
-                  R = kernelWeightsMultiR(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian),
-                  CPP = kernelWeightsMultiCPP(x = x, xgrid = xgrid, bw = bw, gaussian = gaussian))
-    }
-  }
-  if (degree %in% 1:2) {
+    x <- arg$x
+    y <- arg$y
+    xgrid <- arg$xgrid
+    bw <- arg$bw
+    kernel <- arg$kernel
+    K <- kernelWeightsCPP(x = x, xgrid = xgrid, bw = bw, kernel = kernel)
     if (LOO) diag(K) <- 0
     K <- K / rowSums(K)
 
-    if (standardise) {
-      if (one.dimensional) {
-        m <- mean(x)
-        s <- stats::sd(x)
-        xs <- (x - m) / s
-        xgrids <- (xgrid - m) / s
-      } else {
-        m <- colMeans(x)
-        s <- apply(x, 2, stats::sd)
-        xs <- sweep(sweep(x, 2, m, "-"), 2, s, "/")
-        xgrids <- sweep(sweep(xgrid, 2, m, "-"), 2, s, "/")
-      }
-    } else {
-      xs <- x
-      xgrids <- xgrid
-    }
+    m <- colMeans(x) # Standardising for LM fit stability
+    s <- apply(x, 2, stats::sd)
+    xs <- sweep(sweep(x, 2, m, "-"), 2, s, "/")
+    xgrids <- sweep(sweep(xgrid, 2, m, "-"), 2, s, "/")
     if (degree == 2) {
       xs <- cbind(xs, xs^2)
       xgrids <- cbind(xgrids, xgrids^2)
     }
-    if (is.vector(xs)) { # For simplicity, now we need to use matrices in weighs OLS
-      xs <- matrix(xs, ncol = 1)
-      xgrids <- matrix(xgrids, ncol = 1)
-    }
-    coefhat <- t(apply(K, 1, function(w) {
-      nonzw <- sparseVectorToList(w, trim = trim)
-      # If there are no non-zero neighbours or one point has too much influence, declare failure, declare failure
-      if (length(nonzw$idx) == 1 & any(nonzw$ct > 0.999)) return(rep(NA, d + 1))
+    wList <- apply(K, 1, sparseVectorToList, trim = trim)
+    wCoef <- function(i, robustw = NULL) {
+      nonzw <- wList[[i]]
+      # If there are no non-zero neighbours or one point has too much influence, declare failure
+      if (length(nonzw$idx) == 1 | any(nonzw$ct > 0.999)) return(rep(NA, ncol(x) + 1))
       wreg <- sqrt(nonzw$ct)
+      if (!is.null(robustw)) wreg <- wreg * sqrt(robustw[nonzw$idx])
       xw <- cbind(1, xs[nonzw$idx, ]) * wreg
       yw <- y[nonzw$idx] * wreg
       return(stats::.lm.fit(xw, yw)$coefficients)
-    }))
+    }
+    coefhat <- do.call(rbind, lapply(1:length(wList), wCoef))
     if (any(is.na(coefhat))) {
       bad.rows <- which(apply(coefhat, 1, function(x) any(is.na(x))))
-      stop(paste0("Local weighted fit numerical problems: one point has a huge kernel weight > 0.999.
+      warning(paste0("Local weighted fit numerical problems: one point has a huge kernel weight > 0.999.
 Potentially no neighbours with weights > trimming value, terminating to avoid a singular fit.
 Problematic xgrid row indices: ", paste0(bad.rows, collapse = ", "), ".
 Try increasing the bandwidth to get more data points in the vicinity!"))
@@ -388,23 +239,17 @@ Try increasing the bandwidth to get more data points in the vicinity!"))
     if (robust.iterations > 0) {
       for (i in 1:robust.iterations) {
         resid <- y - result
-        ss <- stats::median(abs(resid))
+        ss <- stats::median(abs(resid), na.rm = TRUE)
         resid <- resid / ss / 6
         deltak <- (1 - resid^2)^2 # Bisquare weights
         deltak[abs(resid) > 1] <- 0
-        coefhat <- t(apply(K, 1, function(w) {
-          nonzw <- sparseVectorToList(w, trim = trim)
-          wreg <- sqrt(nonzw$ct) * sqrt(deltak[nonzw$idx])
-          xw <- cbind(1, xs[nonzw$idx, ]) * wreg
-          yw <- y[nonzw$idx] * wreg
-          return(stats::.lm.fit(xw, yw)$coefficients)
-        }))
+        coefhat <- do.call(rbind, lapply(1:length(wList), function(i) wCoef(i, robustw = deltak)))
         result <- rowSums(coefhat * cbind(1, xgrids))
       }
     }
   }
 
-  if (return.grid) result <- cbind(xgrid, result)
+  if (return.grid) result <- cbind(xgrid, fhat = result)
   return(result)
 }
 
@@ -456,35 +301,91 @@ kernelDiscreteDensitySmooth <- function(x,
 #' @param x A numeric vector or matrix.
 #' @param by A variable containing unique identifiers of discrete categories.
 #' @param xgrid A numeric vector or a numeric matrix.
-#' @param xgrid.by A variable containing unique identifiers of discrete categories of the grid.
-#' @param bw Smoothing bandwidth(s) for continuous variables.
-#' @param gaussian Passed to \code{kernelDensity},
+#' @param ... Passed to \code{kernelDensity}.
 #'
 #' @return A numeric vector of the density estimate of the same length as \code{nrow(xgrid)}.
 #' @export
 #'
 #' @examples
-kernelMixedDensity <- function(x,
-                               by,
-                               xgrid = NULL,
-                               xgrid.by = NULL,
-                               bw = NULL,
-                               gaussian = TRUE
+kernelMixedDensity <- function(x, by, xgrid = NULL, ...) {
+  .kernelMixed(x = x, by = by, xgrid = xgrid, type = "density", ...)
+}
+
+
+#' Smoothing with conditioning on discrete and continuous variables
+#'
+#' @param x A numeric vector or matrix.
+#' @param y A vector of dependent variable values.
+#' @param by A variable containing unique identifiers of discrete categories.
+#' @param xgrid A numeric vector or a numeric matrix.
+#' @param ... Passed to \code{kernelSmooth} (usually \code{bw}, \code{gaussian} for both; \code{degree} and \code{robust.iterations} for "smooth"),
+#'
+#' @return A numeric vector of the kernel estimate of the same length as \code{nrow(xgrid)}.
+#' @export
+#'
+#' @examples
+#' set.seed(1)
+#' n <- 1000
+#' z1 <- rbinom(n, 1, 0.5)
+#' z2 <- rbinom(n, 1, 0.5)
+#' x <- rnorm(n, sd = 2)
+#' u <- rnorm(n)
+#' y <- 1 + x^2 + z1 + 2*z2 + z1*z2 + u
+#' by <- as.integer(interaction(list(z1, z2)))
+#' yhat <- kernelMixedSmooth(x = x, y = y, by = by, bw = 1, degree = 1)
+#' plot(x, y)
+#' for (i in 1:4) points(x[by == i], yhat[by == i], col = i+1, lwd = 2, pch = 16, cex = 0.7)
+#'
+#' # The function works faster if there are duplicated values of the condtioning variables
+#' x2 <- round(x)
+#' y2 <- 1 + x2^2 + z1 + 2*z2 + z1*z2 + u
+#' yhat2 <- kernelMixedSmooth(x = x2, y = y2, by = by, bw = 1)
+#' plot(x2, y2)
+#' for (i in 1:4) points(x2[by == i], yhat2[by == i], col = i+1, lwd = 2, pch = 16, cex = 0.7)
+#' system.time(replicate(20, kernelMixedSmooth(x = x, y = y, by = by, bw = 1)))
+#' # Much faster
+#' system.time(replicate(20, kernelMixedSmooth(x = x2, y = y2, by = by, bw = 1)))
+kernelMixedSmooth <- function(x, y, by, xgrid = NULL, ...) {
+  .kernelMixed(x = x, y = y, by = by, xgrid = xgrid, type = "smooth", ...)
+}
+
+.kernelMixed <- function(x,
+                         y = NULL,
+                         by,
+                         xgrid = NULL,
+                         type = c("density", "smooth"),
+                         ...
 ) {
+  type <- type[1]
+  if (is.data.frame(x)) x <- as.matrix(x)
+  if (is.null(dim(x))) x <- matrix(x, ncol = 1)
+  if (is.null(y) & type == "smooth") stop("Supply the mandatory 'y' argument to obtain a kernel regression smoother.")
   if (is.null(xgrid)) xgrid <- x
-  by <- as.character(by)
+  by <- as.integer(factor(by))
   xtab <- table(by)
-  xgridtab <- table(xgrid.by)
-  if (! names(xgridtab) %in% names(xtab))
-  if (any(xtab<2)) stop("Some of the categories have only one observation, the distribution is degenerate. At least 2 observarions per category are needed.")
   n <- sum(xtab)
-  res <- numeric(n)
-  for (v in unique(names(xtab))) {
-    s <- by==v
-    prob <- sum(s)/n
-    xsub <- x[s, ]
-    xgridsub <- xgrid[s, ]
-    res[s] <- kernelDensity(x=xsub, xgrid = xgridsub, bw = bw, gaussian = gaussian) * prob
+  # if (!all*names(xgridtab) %in% names(xtab))
+  if (any(xtab < 2)) warning("Some of the categories have only one observation, the distribution is degenerate. At least 2 observarions per category are needed.")
+  res <- numeric(nrow(x))
+  k <- max(by) # Number of partitions
+  for (v in 1L:k) {
+    s <- by == v
+    x.sub <- x[s, , drop = FALSE]
+    y.sub <- y[s]
+    xgrid.sub <- xgrid[s, , drop = FALSE]
+    if (mean(duplicated(xgrid.sub)) > 0.25) { # If there are at least 25% duplicates, use the redundancy
+      xgrid.sub <- cbind(xgrid.sub, id = as.integer(interaction(xgrid.sub))) # The last column contains the id of the unique combination
+      xgrid.uniq <- unique(xgrid.sub)
+      m <- match(as.integer(xgrid.sub[, ncol(xgrid.sub)]), as.integer(xgrid.uniq[, ncol(xgrid.uniq)])) # Indices of the original rows in the de-duplicated set
+      res.sub <- switch(type,
+                        density = kernelDensity(x = x.sub, xgrid = xgrid.uniq[, -ncol(xgrid.uniq), drop = FALSE], ...) * (sum(s) / n),
+                        smooth = kernelSmooth(x = x.sub, y = y.sub, xgrid = xgrid.uniq[, -ncol(xgrid.uniq), drop = FALSE], ...))
+      res[s] <- res.sub[m]
+    } else { # Vanilla smoothing, no optimisation
+      res[s] <- switch(type,
+                       density = kernelDensity(x = x.sub, xgrid = xgrid.sub, ...),
+                       smooth = kernelSmooth(x = x.sub, y = y.sub, xgrid = xgrid.sub, ...))
+    }
   }
   return(res)
 }
@@ -494,15 +395,13 @@ kernelMixedDensity <- function(x,
 #' @param x A numeric vector or matrix.
 #' @param bw Candidate bandwidth values: scalar, vector, or a matrix (with columns corresponding to columns of \code{x}).
 #' @param same Logical: use the same bandwidth for all columns of \code{x}?
-#' @param gaussian Passed to \code{kernelWeights}.
-#' @param method Passed to \code{kernelWeights}.
+#' @param kernel Passed to \code{kernelWeights}.
 #'
 #' @return A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.
 #'
 #' @export
 #' @examples
-DCV <- function(x, bw, same = FALSE, gaussian = TRUE, method = "CPP") {
-  if (!gaussian) stop("So far, I have programmed only Gaussian DCV.")
+DCV <- function(x, bw, same = FALSE, kernel = "gaussian") {
   one.dim <- is.vector(x) # Are our data one-dimensional?
   if (is.data.frame(bw)) bw <- as.matrix(bw)
   if (one.dim) {
@@ -520,11 +419,11 @@ DCV <- function(x, bw, same = FALSE, gaussian = TRUE, method = "CPP") {
     # A sub-function to compute the CV for one BW, parallelisable
     if (any(b <= 0)) return(Inf)
     if (!one.dim & length(b) == 1) b <- rep(b, ncol(x))
-    K0 <- if (gaussian) stats::dnorm(0)^length(b) else 0.75^length(b) # Product kernel at 0
-    KK <- kernelWeights(x = x, xgrid = x, bw = b*sqrt(2), gaussian = gaussian, method = method) # Easy Gaussian convolution!
+    K0 <- kernelWeights(x = matrix(0, nrow = 1, ncol = ncol(x)), xgrid = matrix(0, nrow = 1, ncol = ncol(x)), bw = 1, kernel = kernel)
+    KK <- kernelWeights(x = x, xgrid = x, bw = b*sqrt(2), kernel = kernel) # Easy Gaussian convolution!
     term1 <- sum(KK) / (n^2 * prod(b))
     # Computing the LOO estimator efficiently: fhat_i(x) = n/(n-1) * fhat(x) - 1/((n-1)*b^s) * K((X[i] - x)/b)
-    fhat <- kernelDensity(x = x, xgrid = x, bw = b, gaussian = gaussian, method = method)
+    fhat <- kernelDensity(x = x, xgrid = x, bw = b, kernel = kernel)
     fhat.LOO <- (n * fhat - K0 / (prod(b))) / (n - 1)
     term2 <- -2 * mean(fhat.LOO)
     return(term1 + term2)
@@ -540,15 +439,14 @@ DCV <- function(x, bw, same = FALSE, gaussian = TRUE, method = "CPP") {
 #' @param bw Candidate bandwidth values: scalar, vector, or a matrix (with columns corresponding to columns of \code{x}).
 #' @param same Logical: use the same bandwidth for all columns of \code{x}?
 #' @param degree Passed to \code{kernelSmooth}.
-#' @param gaussian Passed to \code{kernelSmooth}.
+#' @param kernel Passed to \code{kernelSmooth}.
 #' @param robust.iterations Passed to \code{kernelSmooth}.
-#' @param method Passed to \code{kernelSmooth}.
 #'
 #' @return A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.
 #' @export
 #'
 #' @examples
-LSCV <- function(x, y, bw, same = FALSE, degree = 0, gaussian = TRUE, robust.iterations = 0, method = "CPP") {
+LSCV <- function(x, y, bw, same = FALSE, degree = 0, kernel = "gaussian", robust.iterations = 0) {
   one.dim <- is.vector(x) # Are our data one-dimensional?
   if (is.data.frame(bw)) bw <- as.matrix(bw)
   if (one.dim) {
@@ -564,7 +462,7 @@ LSCV <- function(x, y, bw, same = FALSE, degree = 0, gaussian = TRUE, robust.ite
   }
   ASE <- function(b) {
     if (any(b <= 0)) return(Inf)
-    muhat_i <- kernelSmooth(x = x, y = y, bw = b, gaussian = gaussian, degree = degree, method = method, LOO = TRUE, robust.iterations = robust.iterations)
+    muhat_i <- kernelSmooth(x = x, y = y, bw = b, kernel = kernel, degree = degree, LOO = TRUE, robust.iterations = robust.iterations)
     m <- mean((y - muhat_i)^2)
     if (!is.finite(m)) m <- Inf
     return(m)
@@ -585,9 +483,8 @@ LSCV <- function(x, y, bw, same = FALSE, degree = 0, gaussian = TRUE, robust.ite
 #'
 #' @param x A numeric vector or numeric matrix.
 #' @param y A numeric vector of responses (dependent variable) if \code{CV = "LSCV"}.
-#' @param gaussian Passed to \code{kernelDensity} or to \code{kernelSmooth}.
+#' @param kernel Passed to \code{kernelDensity} or to \code{kernelSmooth}.
 #' @param robust.iterations Passed to \code{kernelSmooth} if \code{CV = "LSCV"}.
-#' @param method Passed to \code{kernelDensity} or to \code{kernelSmooth}.
 #' @param degree Passed to \code{kernelSmooth} if \code{CV = "LSCV"}.
 #' @param start.bw Initial value for bandwidth search.
 #' @param same Logical: use the same bandwidth for all columns of \code{x}?
@@ -603,7 +500,7 @@ LSCV <- function(x, y, bw, same = FALSE, degree = 0, gaussian = TRUE, robust.ite
 #' @export
 #'
 #' @examples
-bw.CV <- function(x, y = NULL, gaussian = TRUE, robust.iterations = 0, method = "CPP", degree = 0, start.bw = NULL, same = FALSE, CV = c("DCV", "LSCV"),
+bw.CV <- function(x, y = NULL, kernel = "gaussian", robust.iterations = 0, degree = 0, start.bw = NULL, same = FALSE, CV = c("DCV", "LSCV"),
                   opt.fun = c("nlm", "optim", "nlminb", "optimise"),
                   ret.fun = NULL,
                   par.name.in.opt = NULL,
@@ -614,7 +511,9 @@ bw.CV <- function(x, y = NULL, gaussian = TRUE, robust.iterations = 0, method = 
   CV <- CV[1]
   one.dim <- is.vector(x) # Are our data one-dimensional?
   opt <- get(opt.fun)
-  f.to.min <- if (CV == "DCV") function(b) DCV(x = x, bw = b, gaussian = gaussian, same = same, method = method) else if (CV == "LSCV") function(b) LSCV(x = x, y = y, bw = b, same = same, degree = degree, gaussian = gaussian, robust.iterations = robust.iterations, method = method) else stop("bw.CV: 'CV' should be either 'DCV' or 'LSCV'!")
+  f.to.min <- if (CV == "DCV") function(b) DCV(x = x, bw = b, kernel = kernel, same = same) else
+    if (CV == "LSCV") function(b) LSCV(x = x, y = y, bw = b, same = same, degree = degree, kernel = kernel, robust.iterations = robust.iterations) else
+      stop("bw.CV: 'CV' should be either 'DCV' or 'LSCV'!")
   if (is.null(ret.fun)) ret.fun <- switch(opt.fun, nlm = function(x) x[["estimate"]],
                                           optim = function(x) x[["par"]],
                                           optimise = function(x) x[["minimum"]],
@@ -644,8 +543,8 @@ bw.CV <- function(x, y = NULL, gaussian = TRUE, robust.iterations = 0, method = 
 
 #' Basic univatiate kernel functions
 #'
-#' Computes 5 most
-#'  popular kernel functions of orders 2, 4, and 6 with the potential of returning an analytical convolution kernel for density cross-validation.
+#' Computes 5 most popular kernel functions of orders 2, 4, and 6 with the potential of returning
+#' an analytical convolution kernel for density cross-validation.
 #'
 #' @param x A numeric vector of values at which to compute the kernel function.
 #' @param kernel Kernel type: uniform, Epanechnikov, triangular, quartic, or Gaussian.

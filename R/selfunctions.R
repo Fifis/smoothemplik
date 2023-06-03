@@ -143,9 +143,11 @@ weightedEL <- function(z, mu = 0,
     ct[ct < weight.tolerance] <- truncto
   }
   nonz <- which(ct > 0)
-  z <- z[nonz]
-  ct <- ct[nonz]
-  shift <- shift[nonz]
+  if (length(nonz) < length(z)) { # Not all observations made it
+    z <- z[nonz]
+    ct <- ct[nonz]
+    shift <- shift[nonz]
+  }
   if (SEL) ct <- ct / sum(ct) # We might have truncated some weights, so re-normalisation is needed!
   # The denominator for EL with counts is the sum of total counts, and for SEL, it is the number of observations!
   N <- if (SEL) n.orig else sum(ct)
@@ -174,12 +176,12 @@ weightedEL <- function(z, mu = 0,
     comp <- (ct / N - 1 - shift) / z
     minlambda <- max(comp[!negz])
     maxlambda <- min(comp[negz])
-    int <- c(minlambda, maxlambda)
+    int <- c(minlambda + .Machine$double.eps, maxlambda - .Machine$double.eps)
     con <- list(tol = .Machine$double.eps, maxiter = 200, trace = 0)
     con[names(uniroot.control)] <- uniroot.control
 
     dllik <- function(lambda) return(sum(ct * z / (1 + lambda * z + shift)))
-    lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), # If there is a warning, we still return the object
+    lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt = "yes"), # If there is a warning, we still return the object
       warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
       error = function(e) return(NULL)
     )
@@ -669,10 +671,9 @@ smoothEmplikDiscrete <- function(rho,
     return(suppressWarnings(weightedEL(x, SEL = TRUE, weight.tolerance = weight.tolerance)))
   }
 
-  # Attempting to save memory
   if (parallel & cores > 1) { # Returns a list, one item for each conditioning vector point
     empliklist <- parallel::mclapply(rho.list, SELi, mc.cores = cores)
-  } else {
+  } else { # If no parallelisation or the memory is scarce
     empliklist <- lapply(rho.list, SELi)
   }
 
@@ -686,6 +687,7 @@ smoothEmplikDiscrete <- function(rho,
   return(SEL)
 }
 
+
 smoothEmplikMixed <- function(rho, theta, data,
                               by = NULL,
                               sel.weights = NULL,
@@ -695,18 +697,20 @@ smoothEmplikMixed <- function(rho, theta, data,
                               trim = NULL,
                               bad.value = -Inf,
                               minus = FALSE,
-                              weight.tolerance = NULL,
+                              weight.tolerance = NULL, # To speed up computation by excluding the observations that contribute almost nothing
                               ...) {
   if (is.null(by)) stop("You forgot to supply the factor or integer variable 'by' indicating the unique values of the conditioning set.")
-  if (parallel.in & parallel.out) {
-    warning("Cannot parallelise at both levels, setting inner parallelisation to FALSE.")
-    parallel.in <- FALSE
-  }
 
+  # if (parallel.in & parallel.out) {
+  #   warning("Cannot parallelise at both levels, setting inner parallelisation to FALSE.")
+  #   parallel.in <- FALSE
+  # }
 
   rho.series <- rho(theta, data, ...)
   n <- length(rho.series)
   if (is.null(weight.tolerance)) weight.tolerance <- 0.01 / n
+
+
   rho.list <- split(rho.series, f = by)
   if (is.null(trim)) trim <- rep(1, n)
   trim.list <- split(trim, f = by)

@@ -75,7 +75,7 @@ linesWithHalo <- function(x, y, nhalo = 32, hscale = 0.01, vscale = 0.01, col.ha
 #' This function computes the coefficients that yield an numerical approximation
 #' or arbitrary order to the true first derivative of any function, or, for a given
 #' grid (stencil) \emph{a}, the weights yielding the derivative approximation using the
-#' function values evaluated on the grid:
+#' function evaluated on the grid:
 #' \deqn{\frac{df}{dx} \approx h^{-1} \sum_{i=1}^n a_i f(x + s_i\cdot h)}{f'(x) ~ sum_i a[i] f(x + s[i]*h)}
 #'
 #' @param order Order of accuracy in terms of the step size (usually
@@ -127,7 +127,7 @@ fdCoef <- function(order = 2, side = c("central", "forward", "backward"), stenci
 
 #' Parallelised gradient computation
 #'
-#' Computes a two- or one-sided
+#' Computes a two- or one-sided numerical derivative that approximates the gradient | Jacobian using the indicated number of cores for maximum efficiency.
 #'
 #' @param func A function that returns a numeric scalar or a vector. If the function is vector-valued, the, the result is the Jacobian.
 #' @param x A point at which the gradient or Jacobian needs to be estimated.

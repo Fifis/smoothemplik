@@ -1,42 +1,75 @@
-#include <Rcpp.h>
-using namespace Rcpp;
+#include <RcppArmadillo.h>
+// [[Rcpp::depends(RcppArmadillo)]]
 
-double dstdnorm(double x) {
-  return 0.39894228040143267794 * std::exp(-0.5 * x * x);
+// Uniform kernel, unscaled (with roughness = int x^2 f(x) dx = 1/3)
+arma::vec kuniform(arma::vec x) {
+  arma::vec ax = arma::abs(x);
+  for (int i=0; i < ax.n_elem; i++) {
+    if (ax[i] < 1.0) {
+      ax[i] = 0.5;
+    } else {
+      ax[i] = 0;
+    }
+  }
+  return ax;
 }
 
-// Epanechnikov divided by sqrt(5)
-double depan(double x) {
-  if (std::abs(x) < 2.23606797749978969641) {
-    return 0.33541019662496845446 - 0.067082039324993690892 * x * x;
-  } else {
-    return 0;
+// Triangular kernel, unscaled (with roughness = int x^2 f(x) dx = 1/6)
+arma::vec ktriangular(arma::vec x) {
+  arma::vec ax = arma::abs(x);
+  for (int i=0; i < ax.n_elem; i++) {
+    if (ax[i] < 1.0) {
+      ax[i] = 1.0 - ax[i];
+    } else {
+      ax[i] = 0;
+    }
   }
+  return ax;
+}
+
+// Epanechnikov kernel, unscaled (with roughness = int x^2 f(x) dx = 1/5)
+arma::vec kepanechnikov(arma::vec x) {
+  arma::vec ax = arma::abs(x);
+  for (int i=0; i < ax.n_elem; i++) {
+    if (ax[i] < 1.0) {
+      ax[i] = 0.75 * (1.0 - ax[i] * ax[i]);
+    } else {
+      ax[i] = 0;
+    }
+  }
+  return ax;
+}
+
+// Gaussian kernel unscaled (with roughness 1)
+arma::vec kgaussian(arma::vec x) {
+  return 0.398942280401432678 * arma::exp(-0.5 * (x % x));
 }
 
 // In the innermost loop, using ksum += dnorm((xgrid[i] - x[j]) / bw, 0, 1, 0) gives terrible performance
 // [[Rcpp::export]]
-NumericMatrix kernelWeightsOneCPP(NumericVector x, NumericVector xgrid, double bw, bool gaussian = true) {
-  int i, j;
-  int n = xgrid.size();
-  int nx = x.size();
-  NumericMatrix kw(n, nx);
+arma::mat kernelWeightsOneCPP(arma::vec x, arma::vec xgrid, double bw, std::string kernel = "gaussian") {
+  int i;
+  int n = xgrid.n_elem;
+  int nx = x.n_elem;
+  arma::mat kw(n, nx);
+  arma::vec xs = x / bw;
+  arma::vec gs = xgrid / bw; // Scaling by the bandwidth
 
-  if (gaussian) {
+  if (kernel == "gaussian") {
     for (i=0; i < n; i++) {
-      NumericVector thisrow(nx);
-      for (j=0; j < nx; j++) {
-        thisrow[j] = dstdnorm((xgrid[i] - x[j]) / bw);
-      }
-      kw(i, _) = thisrow;
+      kw.row(i) = kgaussian(gs[i] - xs).t();
     }
-  } else {
+  } else if (kernel == "uniform") {
     for (i=0; i < n; i++) {
-      NumericVector thisrow(nx);
-      for (j=0; j < nx; j++) {
-        thisrow[j] = depan((xgrid[i] - x[j]) / bw);
-      }
-      kw(i, _) = thisrow;
+      kw.row(i) = kuniform(gs[i] - xs).t();
+    }
+  } else if (kernel == "triangular") {
+    for (i=0; i < n; i++) {
+      kw.row(i) = ktriangular(gs[i] - xs).t();
+    }
+  } else if (kernel == "epanechnikov") {
+    for (i=0; i < n; i++) {
+      kw.row(i) = kepanechnikov(gs[i] - xs).t();
     }
   }
 
@@ -44,185 +77,49 @@ NumericMatrix kernelWeightsOneCPP(NumericVector x, NumericVector xgrid, double b
 }
 
 // [[Rcpp::export]]
-NumericVector kernelDensityOneCPP(NumericVector x, NumericVector xgrid, double bw, bool gaussian = true) {
-  int i, j;
-  int n = xgrid.size();
-  int nx = x.size();
-  NumericVector out(n);
-
-  double nb = (double)nx * bw;
-
-  NumericMatrix kw = kernelWeightsOneCPP(x, xgrid, bw, gaussian);
-
-  for (i=0; i < n; i++) {
-    double ksum = 0;
-    NumericVector krow = kw(i, _);
-    for (j=0; j < nx; j++) {
-      ksum += krow[j];
-    }
-    out[i] = ksum / nb;
-  }
-
-  return out;
-}
-
-// [[Rcpp::export]]
-NumericVector kernelSmoothOneCPP(NumericVector x, NumericVector y, NumericVector xgrid, double bw, bool gaussian = true, bool LOO = false) {
-  int i, j;
-  int n = xgrid.size();
-  int nx = x.size();
-  NumericVector out(n);
-  NumericMatrix kw = kernelWeightsOneCPP(x, xgrid, bw, gaussian);
-
-  // LOO: setting diagonal elements to zero, assuming x = xgrid! (R makes sure it happens, though.)
-  if (LOO) {
-    for (i=0; i < n; i++) {
-      kw(i, i) = 0;
+arma::mat kernelWeightsCPP(arma::mat x, arma::mat xgrid, arma::vec bw, std::string kernel = "gaussian") {
+  int d = x.n_cols;
+  // The product kernel matrix starts with the first dimension (there is at least one column or row)
+  arma::mat pk = kernelWeightsOneCPP(x.col(0), xgrid.col(0), bw[0], kernel);
+  if (d > 1) { // We need to compute the product kernel starting from the 2nd till the last dimension
+    for (int k=1; k < d; k++) {
+      pk %= kernelWeightsOneCPP(x.col(k), xgrid.col(k), bw[k], kernel);
     }
   }
-
-  for (i=0; i < n; i++) {
-    double ysum = 0;
-    double ksum = 0;
-    NumericVector krow = kw(i, _);
-    for (j=0; j < nx; j++) {
-      ysum += y[j]*krow[j];
-      ksum += krow[j];
-    }
-    out[i] = ysum / ksum;
-  }
-
-  return out;
-}
-
-// [[Rcpp::export]]
-NumericMatrix kernelWeightsMultiCPP(NumericMatrix x, NumericMatrix xgrid, NumericVector bw, bool gaussian = true) {
-  int i, j, k;
-  int nx = x.nrow(), d = x.ncol(), n = xgrid.nrow();
-
-  NumericMatrix pk(n, nx); // Product kernel matrix
-  NumericVector out(n);
-  pk.fill(1.0);
-
-  double nb = (double)nx;
-  for (k=0; k < d; k++) {
-    nb *= bw[k];
-  }
-
-  if (gaussian) {
-    for (k=0; k < d; k++) {
-      for (i=0; i < n; i++) {
-        for (j=0; j < nx; j++) {
-          pk(i, j) *= dstdnorm((xgrid(i, k) - x(j, k)) / bw[k]);
-        }
-      }
-    }
-  } else {
-    for (k=0; k < d; k++) {
-      for (i=0; i < n; i++) {
-        for (j=0; j < nx; j++) {
-          pk(i, j) *= depan((xgrid(i, k) - x(j, k)) / bw[k]);
-        }
-      }
-    }
-  }
-
   return pk;
 }
 
 // [[Rcpp::export]]
-NumericVector kernelDensityMultiCPPold(NumericMatrix x, NumericMatrix xgrid, NumericVector bw, bool gaussian = true) {
-  int i, j, k;
-  int nx = x.nrow(), d = x.ncol(), n = xgrid.nrow();
-  NumericVector out(n);
+Rcpp::NumericVector kernelDensityCPP(arma::mat x, arma::mat xgrid, arma::vec bw, std::string kernel = "gaussian") {
+  int d = x.n_cols;
 
-  double nbs = (double)nx;
-  for (k=0; k < d; k++) {
-    nbs *= bw[k];
-  }
-
-  if (gaussian) {
-    for (i=0; i < n; i++) {
-      double ksum = 0;
-      for (j=0; j < nx; j++) {
-        NumericVector dx = xgrid(i,_) - x(j,_);
-        double kprod = 1.0;
-        for (k=0; k < d; k++) {
-          kprod *= dstdnorm(dx[k] / bw[k]);
-        }
-        ksum += kprod;
-      }
-      out[i] = ksum / nbs;
-    }
-  } else {
-    for (i=0; i < n; i++) {
-      double ksum = 0;
-      for (j=0; j < nx; j++) {
-        NumericVector dx = xgrid(i,_) - x(j,_);
-        double kprod = 1.0;
-        for (k=0; k < d; k++) {
-          kprod *= depan(dx[k] / bw[k]);
-        }
-        ksum += kprod;
-      }
-      out[i] = ksum / nbs;
-    }
-  }
-
-  return out;
-}
-
-// [[Rcpp::export]]
-NumericVector kernelDensityMultiCPP(NumericMatrix x, NumericMatrix xgrid, NumericVector bw, bool gaussian = true) {
-  int i, j, k;
-  int nx = x.nrow(), d = x.ncol(), n = xgrid.nrow();
-
-  NumericVector out(n);
-
-  double nb = (double)nx;
-  for (k=0; k < d; k++) {
+  double nb = (double)x.n_rows; // n*prod(b) in the denominator
+  for (int k=0; k < d; k++) {
     nb *= bw[k];
   }
 
-  NumericMatrix kw = kernelWeightsMultiCPP(x, xgrid, bw, gaussian);
-
-  for (i=0; i < n; i++) {
-    double ksum = 0;
-    for (j=0; j < nx; j++) {
-      ksum += kw(i, j);
-    }
-    out[i] = ksum / nb;
-  }
-
-  return out;
+  arma::mat kw = kernelWeightsCPP(x, xgrid, bw, kernel);
+  arma::vec out = sum(kw, 1) / nb;
+  Rcpp::NumericVector rout = Rcpp::NumericVector(out.begin(), out.end());
+  return rout;
 }
 
-
 // [[Rcpp::export]]
-NumericVector kernelSmoothMultiCPP(NumericMatrix x, NumericVector y, NumericMatrix xgrid, NumericVector bw, bool gaussian = true, bool LOO = false) {
-  int i, j;
-  int nx = x.nrow(), n = xgrid.nrow();
-  NumericVector out(n);
-  NumericMatrix kw = kernelWeightsMultiCPP(x, xgrid, bw, gaussian);
+Rcpp::NumericVector kernelSmoothCPP(arma::mat x, arma::vec y, arma::mat xgrid, arma::vec bw, std::string kernel = "gaussian", bool LOO = false) {
+  arma::mat kw = kernelWeightsCPP(x, xgrid, bw, kernel);
 
   // LOO: setting diagonal elements to zero, assuming x = xgrid! (R makes sure it happens, though.)
   if (LOO) {
-    for (i=0; i < n; i++) {
+    for (int i=0; i < x.n_rows; i++) {
       kw(i, i) = 0;
     }
   }
 
-  for (i=0; i < n; i++) {
-    double ysum = 0;
-    double ksum = 0;
-    NumericVector krow = kw(i, _);
-    for (j=0; j < nx; j++) {
-      ysum += y[j]*krow[j];
-      ksum += krow[j];
-    }
-    out[i] = ysum / ksum;
-  }
-
-  return out;
+  arma::vec ksum = sum(kw, 1); // Nadaraya--Watson denominator
+  kw.each_row() %= y.t(); // Nadaraya--Watson numerator: y_i * w_ij (in place to save memory)
+  arma::vec ysum = sum(kw, 1);
+  arma::vec out = ysum / ksum;
+  Rcpp::NumericVector rout = Rcpp::NumericVector(out.begin(), out.end());
+  return rout;
 }
 

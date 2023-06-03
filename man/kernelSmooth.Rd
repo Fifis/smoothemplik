@@ -9,11 +9,10 @@ kernelSmooth(
   y,
   xgrid = NULL,
   bw = NULL,
-  gaussian = TRUE,
+  kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+  PIT = FALSE,
   LOO = FALSE,
-  method = "CPP",
   degree = 0,
-  standardise = TRUE,
   trim = function(x) 0.01/length(x),
   robust.iterations = 0,
   return.grid = FALSE
@@ -28,19 +27,17 @@ kernelSmooth(
 
 \item{bw}{A scalar or a vector of smoothing bandwidths.}
 
-\item{gaussian}{If \code{TRUE}, Gaussian kernel is used, otherwise Epanechnikov.}
+\item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
+
+\item{PIT}{Passed to \code{kernelWeights}.}
 
 \item{LOO}{If \code{TRUE}, the leave-one-out estimator is returned.}
 
-\item{method}{\code{"R"} or \code{"CPP"}. The latter requires \code{Rcpp} compilation.}
-
 \item{degree}{Integer: 0 for locally constant estimator (Nadaraya---Watson), 1 for locally linear (Cleveland's LOESS), 2 for locally quadratic (use with care)}
-
-\item{standardise}{If \code{TRUE}, then the variables are centred to have mean 0 and re-scaled to have standard deviation 1.}
 
 \item{trim}{Trimming function for small weights to speed up local regression (if \code{degree} is 1 or 2).}
 
-\item{robust.iterations}{The number of robustifying iterations (due to Cleveland, 1979).}
+\item{robust.iterations}{The number of robustifying iterations (due to Cleveland, 1979). If >0, xgrid is ignored.}
 
 \item{return.grid}{If \code{TRUE}, prepends \code{xgrid} to the return results.
 

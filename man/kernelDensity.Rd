@@ -8,8 +8,8 @@ kernelDensity(
   x,
   xgrid = NULL,
   bw = NULL,
-  gaussian = TRUE,
-  method = "CPP",
+  kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+  PIT = FALSE,
   return.grid = FALSE
 )
 }
@@ -20,9 +20,9 @@ kernelDensity(
 
 \item{bw}{Bandwidth: a scalar or a vector of the same length as \code{ncol(x)}.}
 
-\item{gaussian}{If TRUE, the normal (Gaussian) product kernel with full support is used, otherwise Epanechnikov.}
+\item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
 
-\item{method}{"R" or "CPP". If "CPP", then faster Rcpp functions are invoked, otherwise use a pure R implementation.}
+\item{PIT}{Passed to \code{kernelWeights}.}
 
 \item{return.grid}{Logical: if true, then returns \code{xgrid} and appends the estimated density as the last column.}
 }

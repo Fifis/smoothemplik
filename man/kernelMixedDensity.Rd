@@ -4,14 +4,7 @@
 \alias{kernelMixedDensity}
 \title{Density with conditioning on discrete and continuous variables}
 \usage{
-kernelMixedDensity(
-  x,
-  by,
-  xgrid = NULL,
-  xgrid.by = NULL,
-  bw = NULL,
-  gaussian = TRUE
-)
+kernelMixedDensity(x, by, xgrid = NULL, ...)
 }
 \arguments{
 \item{x}{A numeric vector or matrix.}
@@ -20,11 +13,7 @@ kernelMixedDensity(
 
 \item{xgrid}{A numeric vector or a numeric matrix.}
 
-\item{xgrid.by}{A variable containing unique identifiers of discrete categories of the grid.}
-
-\item{bw}{Smoothing bandwidth(s) for continuous variables.}
-
-\item{gaussian}{Passed to \code{kernelDensity},}
+\item{...}{Passed to \code{kernelDensity}.}
 }
 \value{
 A numeric vector of the density estimate of the same length as \code{nrow(xgrid)}.

@@ -18,7 +18,7 @@ fdCoef(order = 2, side = c("central", "forward", "backward"), stencil = NULL)
 This function computes the coefficients that yield an numerical approximation
 or arbitrary order to the true first derivative of any function, or, for a given
 grid (stencil) \emph{a}, the weights yielding the derivative approximation using the
-function values evaluated on the grid:
+function evaluated on the grid:
 \deqn{\frac{df}{dx} \approx h^{-1} \sum_{i=1}^n a_i f(x + s_i\cdot h)}{f'(x) ~ sum_i a[i] f(x + s[i]*h)}
 }
 \details{

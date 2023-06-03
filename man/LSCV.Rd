@@ -10,9 +10,8 @@ LSCV(
   bw,
   same = FALSE,
   degree = 0,
-  gaussian = TRUE,
-  robust.iterations = 0,
-  method = "CPP"
+  kernel = "gaussian",
+  robust.iterations = 0
 )
 }
 \arguments{
@@ -26,11 +25,9 @@ LSCV(
 
 \item{degree}{Passed to \code{kernelSmooth}.}
 
-\item{gaussian}{Passed to \code{kernelSmooth}.}
+\item{kernel}{Passed to \code{kernelSmooth}.}
 
 \item{robust.iterations}{Passed to \code{kernelSmooth}.}
-
-\item{method}{Passed to \code{kernelSmooth}.}
 }
 \value{
 A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.

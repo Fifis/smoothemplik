@@ -63,9 +63,9 @@ plot(r.Ystar, r.gstar, bty = "n", col = data$D + 1)
 
 # Smoothing linear functions with locally constant kernels is a bad idea
 Zthetahat0 <- kernelSmooth(data.VS[, c("Z", "X")], Ztheta[as.logical(data$D)],
-  xgrid = data[, c("Z", "X")], bw = c(0.5, 0.15), degree = 0, standardise = FALSE)
+  xgrid = data[, c("Z", "X")], bw = c(0.5, 0.15), degree = 0)
 Zthetahat1 <- kernelSmooth(data.VS[, c("Z", "X")], Ztheta[as.logical(data$D)],
-  xgrid = data[, c("Z", "X")], bw = c(1.25, 0.25), degree = 1, standardise = FALSE)
+  xgrid = data[, c("Z", "X")], bw = c(1.25, 0.25), degree = 1)
 plot(data$Z, Zthetahat1, bty = "n")
 points(data$Z, Zthetahat0, col = 2)
 }

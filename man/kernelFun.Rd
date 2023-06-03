@@ -31,8 +31,8 @@ from \insertCite{silverman1986density;textual}{smoothemplik} is equal to 1.}
 A numeric vector of the same length as input.
 }
 \description{
-Computes 5 most
- popular kernel functions of orders 2, 4, and 6 with the potential of returning an analytical convolution kernel for density cross-validation.
+Computes 5 most popular kernel functions of orders 2, 4, and 6 with the potential of returning
+an analytical convolution kernel for density cross-validation.
 }
 \examples{
 ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"); names(ks) <- ks

@@ -851,9 +851,9 @@ rho.complete.case.pi <- function(theta, data, pi.hat) {
 #'
 #' # Smoothing linear functions with locally constant kernels is a bad idea
 #' Zthetahat0 <- kernelSmooth(data.VS[, c("Z", "X")], Ztheta[as.logical(data$D)],
-#'   xgrid = data[, c("Z", "X")], bw = c(0.5, 0.15), degree = 0, standardise = FALSE)
+#'   xgrid = data[, c("Z", "X")], bw = c(0.5, 0.15), degree = 0)
 #' Zthetahat1 <- kernelSmooth(data.VS[, c("Z", "X")], Ztheta[as.logical(data$D)],
-#'   xgrid = data[, c("Z", "X")], bw = c(1.25, 0.25), degree = 1, standardise = FALSE)
+#'   xgrid = data[, c("Z", "X")], bw = c(1.25, 0.25), degree = 1)
 #' plot(data$Z, Zthetahat1, bty = "n")
 #' points(data$Z, Zthetahat0, col = 2)
 rho.full.sample <- function(theta, data,
@@ -870,7 +870,7 @@ rho.full.sample <- function(theta, data,
   Dg[is.na(data$Y)] <- 0
   if (is.null(pi.hat)) {
     if (PIT) X0 <- pit(data$X) else X0 <- data$X
-    pi.hat <- kernelSmooth(x = X0, y = data$D, bw = pi.bw, degree = 0, standardise = FALSE)
+    pi.hat <- kernelSmooth(x = X0, y = data$D, bw = pi.bw, degree = 0)
     pi.hat[pi.hat < 1 / nrow(data)] <- 1 / nrow(data)
     pi.hat[pi.hat > 1 - 1 / nrow(data)] <- 1 - 1 / nrow(data)
     # warning(paste0("No ^pi estimator was passed, estimated the propensity score with ", if (is.null(pi.bw)) "RoT" else round(pi.bw, 3), " bandwidth!"))
@@ -891,16 +891,16 @@ rho.full.sample <- function(theta, data,
     }
     if (helper == "Ystar") {
       Y.VS <- data$Y[as.logical(data$D)]
-      Ystar.hat <- kernelSmooth(x = ZX.VS, y = Y.VS,    xgrid = ZX.support, bw = helper.bw, degree = helper.degree, standardise = FALSE)
+      Ystar.hat <- kernelSmooth(x = ZX.VS, y = Y.VS,    xgrid = ZX.support, bw = helper.bw, degree = helper.degree)
       mu.hat <- Ystar.hat - Ztheta
     } else if (helper == "gstar") {
       g.VS <- Dg[as.logical(data$D)]
-      mu.hat    <- kernelSmooth(x = ZX.VS, y = g.VS,    xgrid = ZX.support, bw = helper.bw, degree = helper.degree, standardise = FALSE)
+      mu.hat    <- kernelSmooth(x = ZX.VS, y = g.VS,    xgrid = ZX.support, bw = helper.bw, degree = helper.degree)
     } else if (helper == "DY") {
-      Ystar.hat <- kernelSmooth(x = ZX,    y = data$DY, xgrid = NULL,       bw = helper.bw, degree = helper.degree, standardise = FALSE) / pi.hat
+      Ystar.hat <- kernelSmooth(x = ZX,    y = data$DY, xgrid = NULL,       bw = helper.bw, degree = helper.degree) / pi.hat
       mu.hat <- Ystar.hat - Ztheta
     } else if (helper == "Dg") {
-      mu.hat    <- kernelSmooth(x = ZX,    y = Dg,      xgrid = NULL,       bw = helper.bw, degree = helper.degree, standardise = FALSE) / pi.hat
+      mu.hat    <- kernelSmooth(x = ZX,    y = Dg,      xgrid = NULL,       bw = helper.bw, degree = helper.degree) / pi.hat
     }
     # warning("No Y* estimator was passed, estimated Y* with", if (is.null(helper.bw)) "RoT" else round(helper.bw, 3), "bandwidth!")
   } else { # A helper was passed

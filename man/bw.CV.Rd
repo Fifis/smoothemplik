@@ -7,9 +7,8 @@
 bw.CV(
   x,
   y = NULL,
-  gaussian = TRUE,
+  kernel = "gaussian",
   robust.iterations = 0,
-  method = "CPP",
   degree = 0,
   start.bw = NULL,
   same = FALSE,
@@ -27,11 +26,9 @@ bw.CV(
 
 \item{y}{A numeric vector of responses (dependent variable) if \code{CV = "LSCV"}.}
 
-\item{gaussian}{Passed to \code{kernelDensity} or to \code{kernelSmooth}.}
+\item{kernel}{Passed to \code{kernelDensity} or to \code{kernelSmooth}.}
 
 \item{robust.iterations}{Passed to \code{kernelSmooth} if \code{CV = "LSCV"}.}
-
-\item{method}{Passed to \code{kernelDensity} or to \code{kernelSmooth}.}
 
 \item{degree}{Passed to \code{kernelSmooth} if \code{CV = "LSCV"}.}
 
