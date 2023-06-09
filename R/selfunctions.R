@@ -1,45 +1,3 @@
-#' Silverman's rule-of-thumb bandwidth
-#'
-#' A fail-safe function that would return a nice Silverman-like bandwidth suggestion for data for which
-#' the standard deviation might be NA or 0.
-#'
-#' It is obtained under the assumption that the true density is multivariate normal with zero covariances
-#' (i.e. a diagonal variance-covariance matrix
-#' \eqn{\Sigma = \mathrm{\mathop{diag}}(\sigma^2_k)}{\Sigma = diag(\sigma^2_k)} with
-#' \eqn{\det \Sigma = \prod_k \sigma^2_k}{det \Sigma = prod(\sigma^2_k)} and \eqn{\Sigma^{-1} = diag(\sigma^{-2}_k)}{\Sigma = diag(1/\sigma^2_k)}).
-#' Then, the formula 4.12 in Silverman (1986) depends only on \eqn{\alpha}{\alpha}, \eqn{\beta}{\beta}
-#' (which depend only on the kernel and are fixed for a multivariate normal), and on the L2-norm of the
-#' second derivative of the density. The (i, i)th element of the Hessian of multi-variate normal
-#' (\eqn{\phi(x_1, \ldots, x_d) = \phi(X)}{\phi(x_1, ..., x_d) = \phi(X)}) is
-#' \eqn{\phi(X)(x_i^2 - \sigma^2_i)/\sigma_i^4}{\phi(X)(x_i^2 - \sigma^2_i)/\sigma_i^4}.
-#'
-#' @param x A numeric vector without non-finite values.
-#' @param na.rm Logical: should missing values be removed? Setting it to TRUE may cause issued because variable-wise removal of NAs may return a bandwidth that is inappropriate for the final data set to which it is applied.
-#' @return A bandwidth that might be optimal for non-parametric density estimation of \code{x}.
-#' @examples
-#' set.seed(1); bw.rot(stats::rnorm(100)) # Should be 0.3787568 in R version 4.0.4
-#' set.seed(1); bw.rot(matrix(stats::rnorm(500), ncol = 10)) # 0.4737872 ... 0.7089850
-#' @export
-bw.rot <- function(x, na.rm = FALSE) {
-  if (any(is.na(x))) {
-    if (na.rm) warning("bw.rot: There are missing values in the data, and you should do something about it because proper analysis is impossible with NA, and your results might be unreliable with these bandwidths.") else
-      stop("bw.rot: There are missing values in the data, but non-parametric methods rely on data with finite numeric values only.")
-  }
-  one.dim <- is.vector(x) # Are our data one-dimensional?
-  if (one.dim) x <- matrix(x, ncol = 1)
-  d <- ncol(x)
-  n <- nrow(x)
-  s <- apply(x, 2, function(x) stats::sd(x, na.rm = na.rm))
-  AK <- (4 / (2*d + 1))^(1 / (d + 4)) # (4.15) from Silverman (1986)
-  if (any(!is.finite(s))) {
-    stop("bw.rot: Could not compute the bandwidth, check your data, most likely it has length 1.")
-  } else if (all(s > 0)) {
-    return(AK * s * length(x)^(-1/(d+4)))
-  } else {
-    return(rep(1, d))
-  }
-}
-
 #' Empirical likelihood for one-dimensional vectors
 #'
 #' Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm. Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}
@@ -536,7 +494,7 @@ lmEff <- function(y, incl = NULL, endog = NULL, excl = NULL, bw = NULL, iteratio
     bw0 <- bw
     for (i in 1:iterations) {
       e2 <- as.numeric(y - cbind(1, incl, endog) %*% mod$coefficients)^2
-      if (is.null(bw0)) bw <- bw.CV(x = IV0, y = e2, CV = "LSCV", degree = 0, robust.iterations = 0)
+      if (is.null(bw0)) bw <- bw.CV(x = IV0, y = e2, degree = 0, robust.iterations = 0)
       mod.var <- kernelSmooth(x = IV0, y = e2, bw = bw, degree = 0)
       # plot(IV0[, 1], e2)
       # points(IV0[, 1], mod.var, cex = 0.7, col = "red", pch = 16)

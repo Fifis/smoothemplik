@@ -11,6 +11,7 @@ LSCV(
   same = FALSE,
   degree = 0,
   kernel = "gaussian",
+  order = 2,
   robust.iterations = 0
 )
 }
@@ -26,6 +27,8 @@ LSCV(
 \item{degree}{Passed to \code{kernelSmooth}.}
 
 \item{kernel}{Passed to \code{kernelSmooth}.}
+
+\item{order}{Passed to \code{kernelSmooth}.}
 
 \item{robust.iterations}{Passed to \code{kernelSmooth}.}
 }

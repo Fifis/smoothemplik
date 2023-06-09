@@ -523,7 +523,7 @@ estimateOneModelDesign1 <- function(start.mod,
   if (do.restr | !is.null(CI.lev)) {
     # Getting the semiparametrically efficient estimator under constraints
     U2 <- start.mod$residuals^2
-    VarUX <- kernelSmooth(data.VS$X, U2, bw = bw.CV(x = data.VS$X, y = U2, CV = "LSCV"))
+    VarUX <- kernelSmooth(data.VS$X, U2, bw = bw.CV(x = data.VS$X, y = U2))
     sigmax <- sqrt(VarUX)
     Yp <- kernelSmooth(x = data.VS$X, y = data.VS$Y, bw = bw.rot(data.VS$X), degree = 1) / sigmax
     Cp <- 1 / sigmax
@@ -644,9 +644,9 @@ getCoefSELContinuous <- function(seed, design = list(),
 
   tic1 <- Sys.time()
   if (CV) { # Cross-validated bw for pi
-    pi.bw <- tryCatch(bw.CV(x = data$X, y = data$D, CV = "LSCV"), error = function(e) {cat("Seed", seed, "CV error:\n"); print(e); return(bw.CV(data$X))})
+    pi.bw <- tryCatch(bw.CV(x = data$X, y = data$D), error = function(e) {cat("Seed", seed, "CV error:\n"); print(e); return(bw.CV(data$X))})
     u <- data.VS$Y - as.numeric(cbind(1, data.VS$Z) %*% models.VS[[1]]$sel$par)
-    helper.bw <- tryCatch(bw.CV(x = as.matrix(data.VS[ , c("X", "Z")]), y = u, CV = "LSCV", same = TRUE), error = function(e) {cat("Seed", seed, "CV error:\n"); print(e); return(bw.CV(as.matrix(data.VS[ , c("X", "Z")]), same = TRUE))})
+    helper.bw <- tryCatch(bw.CV(x = as.matrix(data.VS[ , c("X", "Z")]), y = u, same = TRUE), error = function(e) {cat("Seed", seed, "CV error:\n"); print(e); return(bw.CV(as.matrix(data.VS[ , c("X", "Z")]), same = TRUE))})
   }
 
   if ((length(pi.bw) > 0) & (length(helper.bw) > 0) & (length(helper) > 0) & (length(degree) > 0)) {
@@ -832,14 +832,15 @@ rho.complete.case.pi <- function(theta, data, pi.hat) {
 #' @examples
 #' data <- generateData()
 #' data.VS <- data[as.logical(data$D), ]
-#' Ztheta <- 1 + 1 * data$Z
-#' b.pi <- bw.CV(pit(data$X), data$D, CV = "LSCV")
-#' b.muY  <- bw.CV(apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), data.VS$Y, CV = "LSCV")
-#' b.mug <- bw.CV(apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), data.VS$U, CV = "LSCV")
-#' r.Ystar <- rho.full.sample(c(1, 1), data, helper = "Ystar", pi.bw = b.pi, helper.bw = b.muY)
-#' r.DY    <- rho.full.sample(c(1, 1), data, helper = "DY"   , pi.bw = b.pi, helper.bw = b.muY)
-#' r.gstar <- rho.full.sample(c(1, 1), data, helper = "gstar", pi.bw = b.pi, helper.bw = b.mug)
-#' r.Dg    <- rho.full.sample(c(1, 1), data, helper = "Dg"   , pi.bw = b.pi, helper.bw = b.mug)
+#' t0 <- c(1, 1) # True parameters
+#' Ztheta <- t0[1] + t0[2] * data$Z
+#' b.pi <- bw.CV(x = pit(data$X), y = data$D, tol = 1e-3)
+#' b.muY  <- bw.CV(x = apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), y = data.VS$Y)
+#' b.mug <- bw.CV(x = apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), y = data.VS$U)
+#' r.Ystar <- rho.full.sample(t0, data, helper = "Ystar", pi.bw = b.pi, helper.bw = b.muY)
+#' r.DY    <- rho.full.sample(t0, data, helper = "DY"   , pi.bw = b.pi, helper.bw = b.muY)
+#' r.gstar <- rho.full.sample(t0, data, helper = "gstar", pi.bw = b.pi, helper.bw = b.mug)
+#' r.Dg    <- rho.full.sample(t0, data, helper = "Dg"   , pi.bw = b.pi, helper.bw = b.mug)
 #'
 #' cols <- rainbow(4, end = 0.8, v = 0.6, alpha = 0.6)
 #' plot(NULL, NULL, xlim = c(0, 1), ylim = c(-10, 10), bty = "n", xlab = "X", ylab = "rho")

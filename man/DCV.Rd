@@ -4,7 +4,7 @@
 \alias{DCV}
 \title{Density cross-validation}
 \usage{
-DCV(x, bw, same = FALSE, kernel = "gaussian")
+DCV(x, bw, same = FALSE, kernel = "gaussian", order = 2)
 }
 \arguments{
 \item{x}{A numeric vector or matrix.}
@@ -14,6 +14,8 @@ DCV(x, bw, same = FALSE, kernel = "gaussian")
 \item{same}{Logical: use the same bandwidth for all columns of \code{x}?}
 
 \item{kernel}{Passed to \code{kernelWeights}.}
+
+\item{order}{Passed to \code{kernelWeights}.}
 }
 \value{
 A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.

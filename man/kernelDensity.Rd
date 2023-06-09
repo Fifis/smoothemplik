@@ -9,25 +9,46 @@ kernelDensity(
   xgrid = NULL,
   bw = NULL,
   kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+  order = 2,
+  convolution = FALSE,
   PIT = FALSE,
   return.grid = FALSE
 )
 }
 \arguments{
-\item{x}{A numeric vector or numeric matrix of predictors.}
+\item{x}{A numeric vector, matrix, or data frame containing observations. For density, the
+points used to compute the density. For kernel regression, the points corresponding to
+explanatory variables.}
 
-\item{xgrid}{A numeric vector or numeric matrix with \code{ncol(xgrid) = ncol(x)} of points at which the density is estimated.}
+\item{xgrid}{A vector or a matrix of data points with \code{ncol(xgrid) = ncol(x)}
+at which the user desires to compute the weights, density, or predictions.
+In other words, this is the requested evaluation grid.
+If \code{NULL}, then \code{x} itself is used as the grid.}
 
-\item{bw}{Bandwidth: a scalar or a vector of the same length as \code{ncol(x)}.}
+\item{bw}{Bandwidth for the kernel: a scalar or a vector of the same length as \code{ncol(x)}.
+Since it is the crucial parameter in many applications, a warning is thrown if the bandwidth
+is not supplied, and then, Silverman's rule of thumb (via \code{bw.row()}) is applied
+to *every dimension* of \code{x}.}
 
 \item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
 
-\item{PIT}{Passed to \code{kernelWeights}.}
+\item{order}{An integer: 2, 4, or 6. Order-2 kernels are the standard kernels that
+are positive everywhere. Orders 4 and 6 produce some negative values, which reduces bias but may hamper density estimation.}
 
-\item{return.grid}{Logical: if true, then returns \code{xgrid} and appends the estimated density as the last column.}
+\item{convolution}{Logical: if FALSE, returns the usual kernel. If TRUE, returns
+the convolution kernel that is used in density cross-validation.}
+
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+  of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+  be an integer vector of indices of columns to which the PIT should be applied.
+
+Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
+internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.}
+
+\item{return.grid}{Logical: if \code{TRUE}, returns \code{xgrid} and appends the estimated density as the last column.}
 }
 \value{
-A vector of density estimates evaluated at the grid points or, if \code{return.gric}, a matrix with the density in the last column.
+A vector of density estimates evaluated at the grid points or, if \code{return.grid}, a matrix with the density in the last column.
 }
 \description{
 Kernel density estimation

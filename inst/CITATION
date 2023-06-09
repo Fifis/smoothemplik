@@ -5,9 +5,9 @@ citEntry(
   title = "smoothemplik: Smoothed Empirikal Likelihood for efficient estimation and specification testing",
   author = as.person("Andreï V. Kostyrka"),
   year = "2023",
-  note = "R package version 0.0.2",
+  note = "R package version 0.0.9",
   organization = "University of Luxembourg",
   address = "Luxembourg",
-  textVersion = "Kostyrka, Andreï V. (2023). smoothemplik: Smoothed Empirikal Likelihood for efficient estimation and specification testing. R package version 0.0.6. https://github.com/Fifis/smoothemplik",
+  textVersion = "Kostyrka, Andreï V. (2023). smoothemplik: Smoothed Empirikal Likelihood for efficient estimation and specification testing. R package version 0.0.9. https://github.com/Fifis/smoothemplik",
   url = "https://github.com/Fifis/smoothemplik"
 )

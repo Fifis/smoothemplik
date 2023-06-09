@@ -44,14 +44,15 @@ Moment function for efficient full-sample estimation
 \examples{
 data <- generateData()
 data.VS <- data[as.logical(data$D), ]
-Ztheta <- 1 + 1 * data$Z
-b.pi <- bw.CV(pit(data$X), data$D, CV = "LSCV")
-b.muY  <- bw.CV(apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), data.VS$Y, CV = "LSCV")
-b.mug <- bw.CV(apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), data.VS$U, CV = "LSCV")
-r.Ystar <- rho.full.sample(c(1, 1), data, helper = "Ystar", pi.bw = b.pi, helper.bw = b.muY)
-r.DY    <- rho.full.sample(c(1, 1), data, helper = "DY"   , pi.bw = b.pi, helper.bw = b.muY)
-r.gstar <- rho.full.sample(c(1, 1), data, helper = "gstar", pi.bw = b.pi, helper.bw = b.mug)
-r.Dg    <- rho.full.sample(c(1, 1), data, helper = "Dg"   , pi.bw = b.pi, helper.bw = b.mug)
+t0 <- c(1, 1) # True parameters
+Ztheta <- t0[1] + t0[2] * data$Z
+b.pi <- bw.CV(x = pit(data$X), y = data$D, tol = 1e-3)
+b.muY  <- bw.CV(x = apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), y = data.VS$Y)
+b.mug <- bw.CV(x = apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), y = data.VS$U)
+r.Ystar <- rho.full.sample(t0, data, helper = "Ystar", pi.bw = b.pi, helper.bw = b.muY)
+r.DY    <- rho.full.sample(t0, data, helper = "DY"   , pi.bw = b.pi, helper.bw = b.muY)
+r.gstar <- rho.full.sample(t0, data, helper = "gstar", pi.bw = b.pi, helper.bw = b.mug)
+r.Dg    <- rho.full.sample(t0, data, helper = "Dg"   , pi.bw = b.pi, helper.bw = b.mug)
 
 cols <- rainbow(4, end = 0.8, v = 0.6, alpha = 0.6)
 plot(NULL, NULL, xlim = c(0, 1), ylim = c(-10, 10), bty = "n", xlab = "X", ylab = "rho")

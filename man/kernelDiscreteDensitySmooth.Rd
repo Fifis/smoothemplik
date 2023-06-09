@@ -7,7 +7,8 @@
 kernelDiscreteDensitySmooth(x, y = NULL, compact = FALSE, fun = mean)
 }
 \arguments{
-\item{x}{A vector or a matrix/data frame of discrete explanatory variables (exogenous). Non-integer values are fine because the data are split into bins defined by interactions of these variables.}
+\item{x}{A vector or a matrix/data frame of discrete explanatory variables (exogenous).
+Non-integer values are fine because the data are split into bins defined by interactions of these variables.}
 
 \item{y}{Optional: a vector of dependent variable values.}
 

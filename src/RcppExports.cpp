@@ -12,8 +12,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // kernelWeightsOneCPP
-arma::mat kernelWeightsOneCPP(arma::vec x, arma::vec xgrid, double bw, std::string kernel);
-RcppExport SEXP _smoothemplik_kernelWeightsOneCPP(SEXP xSEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP) {
+arma::mat kernelWeightsOneCPP(arma::vec x, arma::vec xgrid, double bw, std::string kernel, int order, bool convolution);
+RcppExport SEXP _smoothemplik_kernelWeightsOneCPP(SEXP xSEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP, SEXP orderSEXP, SEXP convolutionSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -21,13 +21,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::vec >::type xgrid(xgridSEXP);
     Rcpp::traits::input_parameter< double >::type bw(bwSEXP);
     Rcpp::traits::input_parameter< std::string >::type kernel(kernelSEXP);
-    rcpp_result_gen = Rcpp::wrap(kernelWeightsOneCPP(x, xgrid, bw, kernel));
+    Rcpp::traits::input_parameter< int >::type order(orderSEXP);
+    Rcpp::traits::input_parameter< bool >::type convolution(convolutionSEXP);
+    rcpp_result_gen = Rcpp::wrap(kernelWeightsOneCPP(x, xgrid, bw, kernel, order, convolution));
     return rcpp_result_gen;
 END_RCPP
 }
 // kernelWeightsCPP
-arma::mat kernelWeightsCPP(arma::mat x, arma::mat xgrid, arma::vec bw, std::string kernel);
-RcppExport SEXP _smoothemplik_kernelWeightsCPP(SEXP xSEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP) {
+arma::mat kernelWeightsCPP(arma::mat x, arma::mat xgrid, arma::vec bw, std::string kernel, int order, bool convolution);
+RcppExport SEXP _smoothemplik_kernelWeightsCPP(SEXP xSEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP, SEXP orderSEXP, SEXP convolutionSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -35,13 +37,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type xgrid(xgridSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type bw(bwSEXP);
     Rcpp::traits::input_parameter< std::string >::type kernel(kernelSEXP);
-    rcpp_result_gen = Rcpp::wrap(kernelWeightsCPP(x, xgrid, bw, kernel));
+    Rcpp::traits::input_parameter< int >::type order(orderSEXP);
+    Rcpp::traits::input_parameter< bool >::type convolution(convolutionSEXP);
+    rcpp_result_gen = Rcpp::wrap(kernelWeightsCPP(x, xgrid, bw, kernel, order, convolution));
     return rcpp_result_gen;
 END_RCPP
 }
 // kernelDensityCPP
-Rcpp::NumericVector kernelDensityCPP(arma::mat x, arma::mat xgrid, arma::vec bw, std::string kernel);
-RcppExport SEXP _smoothemplik_kernelDensityCPP(SEXP xSEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP) {
+Rcpp::NumericVector kernelDensityCPP(arma::mat x, arma::mat xgrid, arma::vec bw, std::string kernel, int order, bool convolution);
+RcppExport SEXP _smoothemplik_kernelDensityCPP(SEXP xSEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP, SEXP orderSEXP, SEXP convolutionSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -49,13 +53,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type xgrid(xgridSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type bw(bwSEXP);
     Rcpp::traits::input_parameter< std::string >::type kernel(kernelSEXP);
-    rcpp_result_gen = Rcpp::wrap(kernelDensityCPP(x, xgrid, bw, kernel));
+    Rcpp::traits::input_parameter< int >::type order(orderSEXP);
+    Rcpp::traits::input_parameter< bool >::type convolution(convolutionSEXP);
+    rcpp_result_gen = Rcpp::wrap(kernelDensityCPP(x, xgrid, bw, kernel, order, convolution));
     return rcpp_result_gen;
 END_RCPP
 }
 // kernelSmoothCPP
-Rcpp::NumericVector kernelSmoothCPP(arma::mat x, arma::vec y, arma::mat xgrid, arma::vec bw, std::string kernel, bool LOO);
-RcppExport SEXP _smoothemplik_kernelSmoothCPP(SEXP xSEXP, SEXP ySEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP, SEXP LOOSEXP) {
+Rcpp::NumericVector kernelSmoothCPP(arma::mat x, arma::vec y, arma::mat xgrid, arma::vec bw, std::string kernel, int order, bool LOO, bool convolution);
+RcppExport SEXP _smoothemplik_kernelSmoothCPP(SEXP xSEXP, SEXP ySEXP, SEXP xgridSEXP, SEXP bwSEXP, SEXP kernelSEXP, SEXP orderSEXP, SEXP LOOSEXP, SEXP convolutionSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -64,17 +70,19 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type xgrid(xgridSEXP);
     Rcpp::traits::input_parameter< arma::vec >::type bw(bwSEXP);
     Rcpp::traits::input_parameter< std::string >::type kernel(kernelSEXP);
+    Rcpp::traits::input_parameter< int >::type order(orderSEXP);
     Rcpp::traits::input_parameter< bool >::type LOO(LOOSEXP);
-    rcpp_result_gen = Rcpp::wrap(kernelSmoothCPP(x, y, xgrid, bw, kernel, LOO));
+    Rcpp::traits::input_parameter< bool >::type convolution(convolutionSEXP);
+    rcpp_result_gen = Rcpp::wrap(kernelSmoothCPP(x, y, xgrid, bw, kernel, order, LOO, convolution));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_smoothemplik_kernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_kernelWeightsOneCPP, 4},
-    {"_smoothemplik_kernelWeightsCPP", (DL_FUNC) &_smoothemplik_kernelWeightsCPP, 4},
-    {"_smoothemplik_kernelDensityCPP", (DL_FUNC) &_smoothemplik_kernelDensityCPP, 4},
-    {"_smoothemplik_kernelSmoothCPP", (DL_FUNC) &_smoothemplik_kernelSmoothCPP, 6},
+    {"_smoothemplik_kernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_kernelWeightsOneCPP, 6},
+    {"_smoothemplik_kernelWeightsCPP", (DL_FUNC) &_smoothemplik_kernelWeightsCPP, 6},
+    {"_smoothemplik_kernelDensityCPP", (DL_FUNC) &_smoothemplik_kernelDensityCPP, 6},
+    {"_smoothemplik_kernelSmoothCPP", (DL_FUNC) &_smoothemplik_kernelSmoothCPP, 8},
     {NULL, NULL, 0}
 };
 

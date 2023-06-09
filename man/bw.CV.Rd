@@ -8,12 +8,13 @@ bw.CV(
   x,
   y = NULL,
   kernel = "gaussian",
+  order = 2,
   robust.iterations = 0,
   degree = 0,
   start.bw = NULL,
   same = FALSE,
-  CV = c("DCV", "LSCV"),
   opt.fun = c("nlm", "optim", "nlminb", "optimise"),
+  tol = 1e-04,
   ret.fun = NULL,
   par.name.in.opt = NULL,
   fun.name.in.opt = NULL,
@@ -24,21 +25,23 @@ bw.CV(
 \arguments{
 \item{x}{A numeric vector or numeric matrix.}
 
-\item{y}{A numeric vector of responses (dependent variable) if \code{CV = "LSCV"}.}
+\item{y}{A numeric vector of responses (dependent variable) if the user wants least-squares cross-validation.}
 
 \item{kernel}{Passed to \code{kernelDensity} or to \code{kernelSmooth}.}
 
-\item{robust.iterations}{Passed to \code{kernelSmooth} if \code{CV = "LSCV"}.}
+\item{order}{Passed to \code{kernelDensity} or to \code{kernelSmooth}.}
 
-\item{degree}{Passed to \code{kernelSmooth} if \code{CV = "LSCV"}.}
+\item{robust.iterations}{Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).}
+
+\item{degree}{Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).}
 
 \item{start.bw}{Initial value for bandwidth search.}
 
 \item{same}{Logical: use the same bandwidth for all columns of \code{x}?}
 
-\item{CV}{"DCV" for density cross-validation, "LSCV" for least-squares cross-validation.}
-
 \item{opt.fun}{Optimiser name (can be a custom function).}
+
+\item{tol}{Relative tolerance used by the optimiser as the stopping criterion.}
 
 \item{ret.fun}{A function that extract the optimal parameter from the output of the optimiser.}
 
@@ -61,4 +64,8 @@ The user might want to standardise the input matrix \code{x} by column (divide b
 or \code{IQR}) and examine the behaviour of the CV criterion as a function of unique bandwidth (\code{same} argument).
 If it seems that the optimum is unique, then they may proceed by multiplying the bandwidth by the scale measure,
 and start the search for the optimal bandwidth in multiple dimensions.
+}
+\details{
+If \code{y} is NULL and only \code{x} is supplied, returns the density-cross-validated bandwidth (DCV).
+If \code{y} is supplied, then, returns the least-squares-cross-validated bandwidth (LSCV).
 }
