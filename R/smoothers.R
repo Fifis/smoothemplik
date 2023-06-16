@@ -41,16 +41,20 @@ bw.rot <- function(x, kernel = c("gaussian", "uniform", "triangular", "epanechni
   s <- apply(x, 2, function(x) stats::sd(x, na.rm = na.rm))
   if (robust) {
     sr <- apply(x, 2, function(x) stats::IQR(x, na.rm = na.rm)) / 1.34898
-    s <- pmin(s, sr)
+    # Some IQRs can be zeros if the variable is dummy; we want to specifically avoid that
+    gt0 <- sr > 0
+    if (any(gt0)) s[gt0] <- pmin(s[gt0], sr[gt0])
   }
   vk <- switch(kernel, gaussian = 1, uniform = 1/3, triangular = 1/6, epanechnikov = 1/5, quartic = 1/7) # Variance of the kernel
-  # rk <- switch(kernel, gaussian = 1/sqrt(4*pi), uniform = 1/2, triangular = 2/3, epanechnikov = 3/5, quartic = 5/7) # Roughness of the kernel
+  rk <- switch(kernel, gaussian = 1/sqrt(4*pi), uniform = 1/2, triangular = 2/3, epanechnikov = 3/5, quartic = 5/7)^d # Roughness of the kernel
+  rdnorm2 <- (0.5*d + 0.25*d^2) / (2*sqrt(pi))^d
   p <- 1/(d+4)
-  AK <- (4/(2*d+1))^p # (4.15 from Silverman, 1986; table 4.1)
-  AK <- AK / sqrt(vk) # Simple re-scaling according to the chosen kernel
+  AK <- (d*rk / vk^2 / rdnorm2)^p # (4.15 from Silverman, 1986)
+
+  # AK <- AK / sqrt(vk) # Simple re-scaling according to the chosen kernel
 
   if (any(!is.finite(s))) {
-    stop("bw.rot: Could not compute the bandwidth, check your data, most likely it has length 1.")
+    stop("bw.rot: Could not compute the bandwidth; check your data -- most likely it has fewer than 2 observations.")
   } else if (all(s > 0)) { # Positive variance = at least two points
     return(AK * s * n^(-p))
   } else {
