@@ -4,16 +4,26 @@
 \alias{bw.rot}
 \title{Silverman's rule-of-thumb bandwidth}
 \usage{
-bw.rot(x, na.rm = FALSE, robust = TRUE)
+bw.rot(
+  x,
+  kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
+  na.rm = FALSE,
+  robust = TRUE,
+  discontinuous = FALSE
+)
 }
 \arguments{
 \item{x}{A numeric vector without non-finite values.}
+
+\item{kernel}{A string character: \code{"gaussian"}, \code{"uniform"}, \code{"triangular"}, \code{"epanechnikov"}, or  \code{"quartic"}.}
 
 \item{na.rm}{Logical: should missing values be removed? Setting it to TRUE may cause
 issues because variable-wise removal of NAs may return a bandwidth that is inappropriate
 for the final data set for which it is suggested.}
 
 \item{robust}{Logical: safeguard against extreme observations? If TRUE, uses \code{min(sd(x), IQR(x)/1.34)} to estimate the spread.}
+
+\item{discontinuous}{Logical: if the true density is discontinuous (i.e. has jumps), then, the formula for the optimal bandwidth for density estimation changes.}
 }
 \value{
 A numeric vector of bandwidths that are a reasonable start optimal non-parametric density estimation of \code{x}.
@@ -30,7 +40,8 @@ with
 \eqn{\det\Sigma = \prod_k \sigma^2_k}{det \Sigma = prod(\sigma^2_k)}
 and
 \eqn{\Sigma^{-1} = \mathrm{\mathop{diag}}(1/\sigma^{2}_k)}{\Sigma = diag(1/\sigma^2_k)}).
-Then, the formula 4.12 in Silverman (1986) depends only on \eqn{\alpha}{\alpha}, \eqn{\beta}{\beta}
+Then, the formula 4.12 in Silverman (1986) depends only on \eqn{\alpha}{\alpha}, \eqn{\beta}{\beta}.
+\eqn{\alpha = \mathrm{\mathop{diag}}(\sigma^2_k)}{\Sigma = diag(\sigma^2_k)}
 (which depend only on the kernel and are fixed for a multivariate normal), and on the L2-norm of the
 second derivative of the density. The (i, i)th element of the Hessian of multi-variate normal
 (\eqn{\phi(x_1, \ldots, x_d) = \phi(X)}{\phi(x_1, ..., x_d) = \phi(X)}) is

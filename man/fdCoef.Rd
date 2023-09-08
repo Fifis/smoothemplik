@@ -4,9 +4,16 @@
 \alias{fdCoef}
 \title{Finite-difference coefficients for arbitrary grids}
 \usage{
-fdCoef(order = 2, side = c("central", "forward", "backward"), stencil = NULL)
+fdCoef(
+  d = 1,
+  order = 2,
+  side = c("central", "forward", "backward"),
+  stencil = NULL
+)
 }
 \arguments{
+\item{d}{Order of the derivative}
+
 \item{order}{Order of accuracy in terms of the step size (usually
 \eqn{h^o/o! \cdot f^{(o)}(x)}{h^o/o! * d^o/dx^o f(x)}).}
 

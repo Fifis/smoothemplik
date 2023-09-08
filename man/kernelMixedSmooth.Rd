@@ -4,7 +4,16 @@
 \alias{kernelMixedSmooth}
 \title{Smoothing with conditioning on discrete and continuous variables}
 \usage{
-kernelMixedSmooth(x, y, by, xgrid = NULL, ...)
+kernelMixedSmooth(
+  x,
+  y,
+  by,
+  xgrid = NULL,
+  parallel = FALSE,
+  cores = 1,
+  preschedule = TRUE,
+  ...
+)
 }
 \arguments{
 \item{x}{A numeric vector or matrix.}
@@ -14,6 +23,12 @@ kernelMixedSmooth(x, y, by, xgrid = NULL, ...)
 \item{by}{A variable containing unique identifiers of discrete categories.}
 
 \item{xgrid}{A numeric vector or a numeric matrix.}
+
+\item{parallel}{Logical: if \code{TRUE}, parallelises the calculation over the unique values of \code{by}. At this moment, supports only \code{parallel::mclapply} (therefore, will not work on Windows).}
+
+\item{cores}{Integer: the number of CPU cores to use. High core count = high RAM usage.}
+
+\item{preschedule}{Logical: passed as \code{mc.preschedule} to \code{mclapply}.}
 
 \item{...}{Passed to \code{kernelSmooth} (usually \code{bw}, \code{gaussian} for both; \code{degree} and \code{robust.iterations} for "smooth"),}
 }
@@ -45,4 +60,24 @@ for (i in 1:4) points(x2[by == i], yhat2[by == i], col = i+1, lwd = 2, pch = 16,
 system.time(replicate(20, kernelMixedSmooth(x = x, y = y, by = by, bw = 1)))
 # Much faster
 system.time(replicate(20, kernelMixedSmooth(x = x2, y = y2, by = by, bw = 1)))
+
+# TODO: does not work
+# Parallel capabilities shine in large data sets
+\dontrun{
+if (.Platform$OS.type != "windows") {
+set.seed(1)
+n <- 10000
+z1 <- rbinom(n, 1, 0.5)
+z2 <- rbinom(n, 1, 0.5)
+x <- rnorm(n, sd = 2)
+u <- rnorm(n)
+y <- 1 + x^2 + z1 + 2*z2 + z1*z2 + u
+by <- as.integer(interaction(list(z1, z2)))
+pFun <- function(n) kernelMixedSmooth(x = x, y = y, by = by,
+                                      bw = 1, degree = 1, parallel = TRUE, cores = n)
+system.time(pFun(1))
+system.time(pFun(2))
+system.time(pFun(4))
+}
+}
 }

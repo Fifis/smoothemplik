@@ -1,8 +1,8 @@
 Package: smoothemplik
 Type: Package
 Title: Smoothed Empirical Likelihood
-Version: 0.0.8
-Date: 2023-06-03
+Version: 0.0.9
+Date: 2023-09-08
 Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
         role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï V. Kostyrka <andrei.kostyrka@gmail.com>

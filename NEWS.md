@@ -4,6 +4,8 @@
 - Added 4th-order C++ versions of all kernels (for bias reduction) and their convolutions
 - Auto-detect cross-validation type (density or least-squares) based on the input
 - Changed the default behaviour of Silverman's rule of thumb: use a robust estimator of SD (IQR/1.34)
+- Prepared a stub for discontinuous densities
+- Preparing moving the gradient-related functions to a new package
 
 # smoothemplik 0.0.8
 

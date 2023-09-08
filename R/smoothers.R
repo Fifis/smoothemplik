@@ -18,16 +18,19 @@
 #' \eqn{\phi(X)(x_i^2 - \sigma^2_i)/\sigma_i^4}{\phi(X)(x_i^2 - \sigma^2_i)/\sigma_i^4}.
 #'
 #' @param x A numeric vector without non-finite values.
+#' @param kernel A string character: \code{"gaussian"}, \code{"uniform"}, \code{"triangular"}, \code{"epanechnikov"}, or  \code{"quartic"}.
 #' @param na.rm Logical: should missing values be removed? Setting it to TRUE may cause
 #'   issues because variable-wise removal of NAs may return a bandwidth that is inappropriate
 #'   for the final data set for which it is suggested.
 #' @param robust Logical: safeguard against extreme observations? If TRUE, uses \code{min(sd(x), IQR(x)/1.34)} to estimate the spread.
+#' @param discontinuous Logical: if the true density is discontinuous (i.e. has jumps), then, the formula for the optimal bandwidth for density estimation changes.
 #' @return A numeric vector of bandwidths that are a reasonable start optimal non-parametric density estimation of \code{x}.
 #' @examples
 #' set.seed(1); bw.rot(stats::rnorm(100)) # Should be 0.3787568 in R version 4.0.4
 #' set.seed(1); bw.rot(matrix(stats::rnorm(500), ncol = 10)) # 0.4737872 ... 0.7089850
 #' @export
-bw.rot <- function(x, kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"), na.rm = FALSE, robust = TRUE) {
+bw.rot <- function(x, kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
+                   na.rm = FALSE, robust = TRUE, discontinuous = FALSE) {
   kernel <- kernel[1]
   if (!(kernel %in% c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"))) stop("bw.rot: Wrong kernel type.")
   if (any(is.na(x))) {
@@ -51,15 +54,18 @@ bw.rot <- function(x, kernel = c("gaussian", "uniform", "triangular", "epanechni
   p <- 1/(d+4)
   AK <- (d*rk / vk^2 / rdnorm2)^p # (4.15 from Silverman, 1986)
 
-  # AK <- AK / sqrt(vk) # Simple re-scaling according to the chosen kernel
-
-  if (any(!is.finite(s))) {
-    stop("bw.rot: Could not compute the bandwidth; check your data -- most likely it has fewer than 2 observations.")
-  } else if (all(s > 0)) { # Positive variance = at least two points
-    return(AK * s * n^(-p))
+  if (!discontinuous) {
+    if (any(!is.finite(s))) {
+      stop("bw.rot: Could not compute the bandwidth; check your data -- most likely it has fewer than 2 observations.")
+    } else if (all(s > 0)) { # Positive variance = at least two points
+      return(AK * s * n^(-p))
+    } else {
+      return(rep(1, d))
+    }
   } else {
-    return(rep(1, d))
+    stop("Discontinuous density not implemented yet.")
   }
+
 }
 
 #' Probability integral transform
@@ -345,6 +351,7 @@ Try increasing the bandwidth to get more data points in the vicinity!"))
     }
   }
 
+  if (any(is.nan(result))) warning("Some smoothed values are NaN, which happens (among other reasons) when the sum of smoothing weights is exactly zero. Try increasing the bandwidth.")
   if (return.grid) result <- cbind(xgrid, fhat = result)
   return(result)
 }
@@ -398,14 +405,17 @@ kernelDiscreteDensitySmooth <- function(x,
 #' @param x A numeric vector or matrix.
 #' @param by A variable containing unique identifiers of discrete categories.
 #' @param xgrid A numeric vector or a numeric matrix.
+#' @param parallel Logical: if \code{TRUE}, parallelises the calculation over the unique values of \code{by}. At this moment, supports only \code{parallel::mclapply} (therefore, will not work on Windows).
+#' @param cores Integer: the number of CPU cores to use. High core count = high RAM usage.
+#' @param preschedule Logical: passed as \code{mc.preschedule} to \code{mclapply}.
 #' @param ... Passed to \code{kernelDensity}.
 #'
 #' @return A numeric vector of the density estimate of the same length as \code{nrow(xgrid)}.
 #' @export
 #'
 #' @examples
-kernelMixedDensity <- function(x, by, xgrid = NULL, ...) {
-  .kernelMixed(x = x, by = by, xgrid = xgrid, type = "density", ...)
+kernelMixedDensity <- function(x, by, xgrid = NULL, parallel = FALSE, cores = 1, preschedule = TRUE, ...) {
+  .kernelMixed(x = x, by = by, xgrid = xgrid, type = "density", parallel = parallel, cores = cores, preschedule = preschedule, ...)
 }
 
 
@@ -415,6 +425,9 @@ kernelMixedDensity <- function(x, by, xgrid = NULL, ...) {
 #' @param y A vector of dependent variable values.
 #' @param by A variable containing unique identifiers of discrete categories.
 #' @param xgrid A numeric vector or a numeric matrix.
+#' @param parallel Logical: if \code{TRUE}, parallelises the calculation over the unique values of \code{by}. At this moment, supports only \code{parallel::mclapply} (therefore, will not work on Windows).
+#' @param cores Integer: the number of CPU cores to use. High core count = high RAM usage.
+#' @param preschedule Logical: passed as \code{mc.preschedule} to \code{mclapply}.
 #' @param ... Passed to \code{kernelSmooth} (usually \code{bw}, \code{gaussian} for both; \code{degree} and \code{robust.iterations} for "smooth"),
 #'
 #' @return A numeric vector of the kernel estimate of the same length as \code{nrow(xgrid)}.
@@ -442,8 +455,28 @@ kernelMixedDensity <- function(x, by, xgrid = NULL, ...) {
 #' system.time(replicate(20, kernelMixedSmooth(x = x, y = y, by = by, bw = 1)))
 #' # Much faster
 #' system.time(replicate(20, kernelMixedSmooth(x = x2, y = y2, by = by, bw = 1)))
-kernelMixedSmooth <- function(x, y, by, xgrid = NULL, ...) {
-  .kernelMixed(x = x, y = y, by = by, xgrid = xgrid, type = "smooth", ...)
+#'
+#' # TODO: does not work
+#' # Parallel capabilities shine in large data sets
+#' \dontrun{
+#' if (.Platform$OS.type != "windows") {
+#' set.seed(1)
+#' n <- 10000
+#' z1 <- rbinom(n, 1, 0.5)
+#' z2 <- rbinom(n, 1, 0.5)
+#' x <- rnorm(n, sd = 2)
+#' u <- rnorm(n)
+#' y <- 1 + x^2 + z1 + 2*z2 + z1*z2 + u
+#' by <- as.integer(interaction(list(z1, z2)))
+#' pFun <- function(n) kernelMixedSmooth(x = x, y = y, by = by,
+#'                                       bw = 1, degree = 1, parallel = TRUE, cores = n)
+#' system.time(pFun(1))
+#' system.time(pFun(2))
+#' system.time(pFun(4))
+#' }
+#' }
+kernelMixedSmooth <- function(x, y, by, xgrid = NULL, parallel = FALSE, cores = 1, preschedule = TRUE, ...) {
+  .kernelMixed(x = x, y = y, by = by, xgrid = xgrid, type = "smooth", parallel = parallel, cores = cores, preschedule = preschedule, ...)
 }
 
 .kernelMixed <- function(x,
@@ -451,6 +484,9 @@ kernelMixedSmooth <- function(x, y, by, xgrid = NULL, ...) {
                          by,
                          xgrid = NULL,
                          type = c("density", "smooth"),
+                         parallel = FALSE,
+                         cores = 1,
+                         preschedule = TRUE,
                          ...
 ) {
   type <- type[1]
@@ -463,9 +499,9 @@ kernelMixedSmooth <- function(x, y, by, xgrid = NULL, ...) {
   n <- sum(xtab)
   # if (!all*names(xgridtab) %in% names(xtab))
   if (any(xtab < 2)) warning("Some of the categories have only one observation, the distribution is degenerate. At least 2 observarions per category are needed.")
-  res <- numeric(nrow(x))
+  res <- numeric(nrow(xgrid))
   k <- max(by) # Number of partitions
-  for (v in 1L:k) {
+  innerFun <- function(v) {
     s <- by == v
     x.sub <- x[s, , drop = FALSE]
     y.sub <- y[s]
@@ -476,13 +512,18 @@ kernelMixedSmooth <- function(x, y, by, xgrid = NULL, ...) {
       m <- match(as.integer(xgrid.sub[, ncol(xgrid.sub)]), as.integer(xgrid.uniq[, ncol(xgrid.uniq)])) # Indices of the original rows in the de-duplicated set
       res.sub <- switch(type,
                         density = kernelDensity(x = x.sub, xgrid = xgrid.uniq[, -ncol(xgrid.uniq), drop = FALSE], ...) * (sum(s) / n),
-                        smooth = kernelSmooth(x = x.sub, y = y.sub, xgrid = xgrid.uniq[, -ncol(xgrid.uniq), drop = FALSE], ...))
-      res[s] <- res.sub[m]
+                        smooth  = kernelSmooth( x = x.sub, y = y.sub, xgrid = xgrid.uniq[, -ncol(xgrid.uniq), drop = FALSE], ...))
+      return(res.sub[m])
     } else { # Vanilla smoothing, no optimisation
-      res[s] <- switch(type,
-                       density = kernelDensity(x = x.sub, xgrid = xgrid.sub, ...),
-                       smooth = kernelSmooth(x = x.sub, y = y.sub, xgrid = xgrid.sub, ...))
+      return(switch(type,
+                        density = kernelDensity(x = x.sub, xgrid = xgrid.sub, ...),
+                        smooth  = kernelSmooth( x = x.sub, y = y.sub, xgrid = xgrid.sub, ...)))
     }
+  }
+  res.list <- if (parallel & cores > 1) parallel::mclapply(X = 1L:k, FUN = innerFun, mc.preschedule = preschedule, mc.cores = cores) else lapply(1L:k, innerFun)
+  for (v in 1L:k) {
+    s <- by == v
+    res[s] <- res.list[[v]]
   }
   return(res)
 }

@@ -4,7 +4,15 @@
 \alias{kernelMixedDensity}
 \title{Density with conditioning on discrete and continuous variables}
 \usage{
-kernelMixedDensity(x, by, xgrid = NULL, ...)
+kernelMixedDensity(
+  x,
+  by,
+  xgrid = NULL,
+  parallel = FALSE,
+  cores = 1,
+  preschedule = TRUE,
+  ...
+)
 }
 \arguments{
 \item{x}{A numeric vector or matrix.}
@@ -12,6 +20,12 @@ kernelMixedDensity(x, by, xgrid = NULL, ...)
 \item{by}{A variable containing unique identifiers of discrete categories.}
 
 \item{xgrid}{A numeric vector or a numeric matrix.}
+
+\item{parallel}{Logical: if \code{TRUE}, parallelises the calculation over the unique values of \code{by}. At this moment, supports only \code{parallel::mclapply} (therefore, will not work on Windows).}
+
+\item{cores}{Integer: the number of CPU cores to use. High core count = high RAM usage.}
+
+\item{preschedule}{Logical: passed as \code{mc.preschedule} to \code{mclapply}.}
 
 \item{...}{Passed to \code{kernelDensity}.}
 }

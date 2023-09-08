@@ -1,9 +1,12 @@
 ---
 title: "Using Rcpp to speed up non-parametric estimation in R"
-output: rmarkdown::html_vignette
+output:
+  rmarkdown::html_vignette:
+    toc: true
 author: "Andreï V. Kostyrka, University of Luxembourg"
+date: Sys.date()
 abstract: "This vignette demonstrates how to carry out non-parametric density and kernel estimation with a high degree of flexibiity and faster than via the straightforward textbook approach."
-keywords: "non-parametric methds, density estimation, kernel smoothing, Nadaraya-Watson, local regression"
+keywords: "non-parametric methods, density estimation, kernel smoothing, Nadaraya-Watson, local regression"
 vignette: >
   %\VignetteIndexEntry{Using Rcpp to speed up non-parametric estimation in R}
   %\VignetteEngine{knitr::rmarkdown}
@@ -33,7 +36,7 @@ library(smoothemplik)
 
 The most straightforward approach to implement kernel weights, kernel density estimation, and locally constant kernel regression in **R** would be as follows.
 
-The kernel weights are used in many applications to define a local neighbourhood for a point, i.\U2009e. the value of the kernel function:
+The kernel weights are used in many applications to define a local neighbourhood for a point, i.e. the value of the kernel function:
 \[
 w_{ij} := k\left( \frac{X_i - X_j}{b} \right),
 \]

@@ -18,6 +18,7 @@ Very preliminary and incomplete! Do not circulate!
 
 ### High priority
 
+* The parallelisation in .kernelMixed does not work
 * Add custom kernels to Silverman's rule of thumb (with roughness != 1)
 * Fix the DCV code with convolutions (especially the quartic one)
 * Fix the bug: no speed-up in the `kernelMixedSmooth` example
@@ -29,8 +30,9 @@ Very preliminary and incomplete! Do not circulate!
 
 ### Medium priority
 
+* Check: if the kernel is finite-support and bandwidth is smaller than the largest gap between two observations, then
 * Merging cells: allow arbitrary variables (including continuous ones) for proximity.
-* Create a cluster in gradParallel for Windows machines inside the function.
+
 
 ### Low priority
 

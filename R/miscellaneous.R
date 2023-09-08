@@ -78,6 +78,7 @@ linesWithHalo <- function(x, y, nhalo = 32, hscale = 0.01, vscale = 0.01, col.ha
 #' function evaluated on the grid:
 #' \deqn{\frac{df}{dx} \approx h^{-1} \sum_{i=1}^n a_i f(x + s_i\cdot h)}{f'(x) ~ sum_i a[i] f(x + s[i]*h)}
 #'
+#' @param d Order of the derivative
 #' @param order Order of accuracy in terms of the step size (usually
 #' \eqn{h^o/o! \cdot f^{(o)}(x)}{h^o/o! * d^o/dx^o f(x)}).
 #' @param side Centred or one-sided differences. Unless the function is computationally prohibitively expensive, two-sided differences are strongly recommended.
@@ -111,17 +112,21 @@ linesWithHalo <- function(x, y, nhalo = 32, hscale = 0.01, vscale = 0.01, col.ha
 #' colnames(t3) <- 0:8; rownames(t3) <- 1:8
 #' print(t3, digits = 4)
 #' @export
-fdCoef <- function(order = 2, side = c("central", "forward", "backward"), stencil = NULL) {
+fdCoef <- function(d = 1, order = 2, side = c("central", "forward", "backward"), stencil = NULL) {
   side <- side[1]
   if (length(order) != 1) stop("The 'order' argument must have length 1.")
   if (order < 1 | (side == "central" & order/2 != round(order/2)) | (order != round(order)))
     stop("The order of accuracy must be a positive integer. For 2-sided derivatives, it must be even.")
   if (is.null(stencil)) stencil <- switch(side, backward = (-order):0,
-                                          central = setdiff(-(order/2):(order/2), 0),
+                                          central = -(order/2):(order/2),
                                           forward = 0:order)
   l <- length(stencil)
   A <- t(sapply(1:l, function(i) stencil^(i-1)))
-  weights <- solve(A, c(0, 1, rep(0, l-2)))
+  b <- numeric(l); b[1+d] <- factorial(d)
+  weights <- solve(A, b)
+  nzw <- abs(weights) > .Machine$double.eps
+  stencil <- stencil[nzw]
+  weights <- weights[nzw]
   return(list(stencil = stencil, weights = weights))
 }
 
@@ -131,7 +136,7 @@ fdCoef <- function(order = 2, side = c("central", "forward", "backward"), stenci
 #'
 #' @param func A function that returns a numeric scalar or a vector. If the function is vector-valued, the, the result is the Jacobian.
 #' @param x A point at which the gradient or Jacobian needs to be estimated.
-#' @param h The numerical difference step size. Too large = the slope of the second is a bad estimator of the gradient, too small = ill conditioning (0/0).
+#' @param h The numerical difference step size. Too large = the slope of the secant is a bad estimator of the gradient, too small = ill conditioning (0/0).
 #' @param order Desired order of accuracy. The error is usually O(h^order). To achieve this order of accuracy, the function needs to be evaluated \code{order*length(x)} times.
 #' @param side Passed to \code{fdCoef()}. Centred or one-sided differences. Unless the function is computationally prohibitively expensive, two-sided differences are strongly recommended.
 #' @param parallel If TRUE, estimates the gradient via finite differences where the function is evaluated in parallel.

@@ -27,7 +27,7 @@ gradParallel(
 
 \item{order}{Desired order of accuracy. The error is usually O(h^order). To achieve this order of accuracy, the function needs to be evaluated \code{order*length(x)} times.}
 
-\item{h}{The numerical difference step size. Too large = the slope of the second is a bad estimator of the gradient, too small = ill conditioning (0/0).}
+\item{h}{The numerical difference step size. Too large = the slope of the secant is a bad estimator of the gradient, too small = ill conditioning (0/0).}
 
 \item{parallel}{If TRUE, estimates the gradient via finite differences where the function is evaluated in parallel.}
 
