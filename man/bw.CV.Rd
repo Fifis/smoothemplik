@@ -7,29 +7,47 @@
 bw.CV(
   x,
   y = NULL,
+  weights = NULL,
   kernel = "gaussian",
   order = 2,
+  PIT = FALSE,
+  chunks = 0,
   robust.iterations = 0,
   degree = 0,
   start.bw = NULL,
   same = FALSE,
-  opt.fun = c("nlm", "optim", "nlminb", "optimise"),
   tol = 1e-04,
-  ret.fun = NULL,
-  par.name.in.opt = NULL,
-  fun.name.in.opt = NULL,
-  report.code = FALSE,
+  try.grid = TRUE,
+  verbose = FALSE,
+  attach.attributes = FALSE,
+  control = list(),
   ...
 )
 }
 \arguments{
-\item{x}{A numeric vector or numeric matrix.}
+\item{x}{A numeric vector, matrix, or data frame containing observations. For density, the
+points used to compute the density. For kernel regression, the points corresponding to
+explanatory variables.}
 
 \item{y}{A numeric vector of responses (dependent variable) if the user wants least-squares cross-validation.}
 
-\item{kernel}{Passed to \code{kernelDensity} or to \code{kernelSmooth}.}
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
 
-\item{order}{Passed to \code{kernelDensity} or to \code{kernelSmooth}.}
+\item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
+
+\item{order}{An integer: 2, 4, or 6. Order-2 kernels are the standard kernels that
+are positive everywhere. Orders 4 and 6 produce some negative values, which reduces bias but may hamper density estimation.}
+
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+be an integer vector of indices of columns to which the PIT should be applied.}
+
+\item{chunks}{Integer: the number of chunks to split the task into (limits
+RAM usage but increases overhead). \code{0} = auto-select (making sure that
+no matrix has more than 2^27 elements).}
 
 \item{robust.iterations}{Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).}
 
@@ -39,19 +57,18 @@ bw.CV(
 
 \item{same}{Logical: use the same bandwidth for all columns of \code{x}?}
 
-\item{opt.fun}{Optimiser name (can be a custom function).}
-
 \item{tol}{Relative tolerance used by the optimiser as the stopping criterion.}
 
-\item{ret.fun}{A function that extract the optimal parameter from the output of the optimiser.}
+\item{try.grid}{Logical: if true, 10 different bandwidths around the rule-of-thumb
+one are tried with multiplier \code{1.2^(-3:6)}}
 
-\item{par.name.in.opt}{The name of the initial parameter vector in the output of the optimiser.}
+\item{verbose}{Logical: print out the optimiser return code for diagnostics?}
 
-\item{fun.name.in.opt}{The name of the criterion in the output of the optimiser (to be minimised).}
+\item{attach.attributes}{Logical: if TRUE, returns the output of `optim()` for diagnostics.}
 
-\item{report.code}{Logical: print out the optimiser return code for diagnostics?}
+\item{control}{List: extra arguments to pass to the control-argument list of `optim`.}
 
-\item{...}{Other parameters passed to the optimiser.}
+\item{...}{Other parameters passed to the optimiser (e.g. `lower` for `"L-BFGS-B"`).}
 }
 \value{
 Numeric vector or scalar of the optimal bandwidth.
@@ -68,4 +85,28 @@ and start the search for the optimal bandwidth in multiple dimensions.
 \details{
 If \code{y} is NULL and only \code{x} is supplied, returns the density-cross-validated bandwidth (DCV).
 If \code{y} is supplied, then, returns the least-squares-cross-validated bandwidth (LSCV).
+}
+\examples{
+set.seed(1)  # Creating a data set with many duplicates
+n.uniq <- 200
+n <- 500
+inds <- sort(ceiling(runif(n, 0, n.uniq)))
+x.uniq <- sort(rnorm(n.uniq))
+y.uniq <- 1 + 0.1*x.uniq + sin(x.uniq) + rnorm(n.uniq)
+x <- x.uniq[inds]
+y <- y.uniq[inds]
+w <- 1 + runif(n, 0, 2) # Relative importance
+data.table::setDTthreads(1) # For measuring the pure gains and overhead
+RcppParallel::setThreadOptions(numThreads = 1)
+bw.grid <- seq(0.1, 1.3, 0.2)
+CV <- LSCV(x, y, bw.grid, weights = w)
+bw.init <- bw.grid[which.min(CV)]
+bw.opt <- bw.CV(x, y, w) # 0.49, very close
+g <- seq(-3.5, 3.5, 0.05)
+yhat <- kernelSmooth(x, y, g, w, bw.opt, deduplicate.xout = FALSE)
+par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
+plot(bw.grid, CV, bty = "n", xlab = "", ylab = "", main = "Cross-validation")
+points(bw.opt, LSCV(x, y, bw.opt, w), col = 2, pch = 15)
+plot(x.uniq, y.uniq, bty = "n", xlab = "", ylab = "", main = "Optimal fit")
+points(g, yhat, pch = 16, col = 2, cex = 0.5)
 }

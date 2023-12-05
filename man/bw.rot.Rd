@@ -15,22 +15,26 @@ bw.rot(
 \arguments{
 \item{x}{A numeric vector without non-finite values.}
 
-\item{kernel}{A string character: \code{"gaussian"}, \code{"uniform"}, \code{"triangular"}, \code{"epanechnikov"}, or  \code{"quartic"}.}
+\item{kernel}{A string character: \code{"gaussian"}, \code{"uniform"},
+\code{"triangular"}, \code{"epanechnikov"}, or  \code{"quartic"}.}
 
-\item{na.rm}{Logical: should missing values be removed? Setting it to TRUE may cause
-issues because variable-wise removal of NAs may return a bandwidth that is inappropriate
-for the final data set for which it is suggested.}
+\item{na.rm}{Logical: should missing values be removed? Setting it to TRUE
+may cause issues because variable-wise removal of NAs may return a
+bandwidth that is inappropriate for the final data set for which it is
+suggested.}
 
-\item{robust}{Logical: safeguard against extreme observations? If TRUE, uses \code{min(sd(x), IQR(x)/1.34)} to estimate the spread.}
+\item{robust}{Logical: safeguard against extreme observations? If TRUE, uses
+\code{min(sd(x), IQR(x)/1.34)} to estimate the spread.}
 
-\item{discontinuous}{Logical: if the true density is discontinuous (i.e. has jumps), then, the formula for the optimal bandwidth for density estimation changes.}
+\item{discontinuous}{Logical: if the true density is discontinuous (i.e. has
+jumps), then, the formula for the optimal bandwidth for density estimation changes.}
 }
 \value{
 A numeric vector of bandwidths that are a reasonable start optimal non-parametric density estimation of \code{x}.
 }
 \description{
-A fail-safe function that would return a nice Silverman-like bandwidth suggestion for data for which
-the standard deviation might be NA or 0.
+A fail-safe function that would return a nice Silverman-like bandwidth
+  suggestion for data for which the standard deviation might be NA or 0.
 }
 \details{
 It is obtained under the assumption that the true density is multivariate normal with zero covariances

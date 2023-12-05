@@ -7,7 +7,9 @@
 kernelMixedDensity(
   x,
   by,
-  xgrid = NULL,
+  xout = NULL,
+  byout = NULL,
+  weights = NULL,
   parallel = FALSE,
   cores = 1,
   preschedule = TRUE,
@@ -15,22 +17,39 @@ kernelMixedDensity(
 )
 }
 \arguments{
-\item{x}{A numeric vector or matrix.}
+\item{x}{A numeric vector, matrix, or data frame containing observations. For density, the
+points used to compute the density. For kernel regression, the points corresponding to
+explanatory variables.}
 
 \item{by}{A variable containing unique identifiers of discrete categories.}
 
-\item{xgrid}{A numeric vector or a numeric matrix.}
+\item{xout}{A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
+at which the user desires to compute the weights, density, or predictions.
+In other words, this is the requested evaluation grid.
+If \code{NULL}, then \code{x} itself is used as the grid.}
 
-\item{parallel}{Logical: if \code{TRUE}, parallelises the calculation over the unique values of \code{by}. At this moment, supports only \code{parallel::mclapply} (therefore, will not work on Windows).}
+\item{byout}{A variable containing unique identifiers of discrete categories
+for the output grid (same points as \code{xout})}
 
-\item{cores}{Integer: the number of CPU cores to use. High core count = high RAM usage.}
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
+
+\item{parallel}{Logical: if \code{TRUE}, parallelises the calculation over
+the unique values of \code{by}. At this moment, supports only
+\code{parallel::mclapply} (therefore, will not work on Windows).}
+
+\item{cores}{Integer: the number of CPU cores to use. High core count = high RAM usage.
+If the number of unique values of 'by' is less than the number of cores requested,
+then, only \code{length(unique(by))} cores are used.}
 
 \item{preschedule}{Logical: passed as \code{mc.preschedule} to \code{mclapply}.}
 
 \item{...}{Passed to \code{kernelDensity}.}
 }
 \value{
-A numeric vector of the density estimate of the same length as \code{nrow(xgrid)}.
+A numeric vector of the density estimate of the same length as \code{nrow(xout)}.
 }
 \description{
 Density with conditioning on discrete and continuous variables

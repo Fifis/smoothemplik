@@ -6,12 +6,17 @@
 \usage{
 kernelDensity(
   x,
-  xgrid = NULL,
+  xout = NULL,
+  weights = NULL,
   bw = NULL,
-  kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+  kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
   order = 2,
   convolution = FALSE,
+  chunks = 0,
   PIT = FALSE,
+  deduplicate.x = TRUE,
+  deduplicate.xout = TRUE,
+  no.dedup = FALSE,
   return.grid = FALSE
 )
 }
@@ -20,10 +25,15 @@ kernelDensity(
 points used to compute the density. For kernel regression, the points corresponding to
 explanatory variables.}
 
-\item{xgrid}{A vector or a matrix of data points with \code{ncol(xgrid) = ncol(x)}
+\item{xout}{A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
 at which the user desires to compute the weights, density, or predictions.
 In other words, this is the requested evaluation grid.
 If \code{NULL}, then \code{x} itself is used as the grid.}
+
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
 
 \item{bw}{Bandwidth for the kernel: a scalar or a vector of the same length as \code{ncol(x)}.
 Since it is the crucial parameter in many applications, a warning is thrown if the bandwidth
@@ -38,18 +48,68 @@ are positive everywhere. Orders 4 and 6 produce some negative values, which redu
 \item{convolution}{Logical: if FALSE, returns the usual kernel. If TRUE, returns
 the convolution kernel that is used in density cross-validation.}
 
+\item{chunks}{Integer: the number of chunks to split the task into (limits
+RAM usage but increases overhead). \code{0} = auto-select (making sure that
+no matrix has more than 2^27 elements).}
+
 \item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
-  of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
-  be an integer vector of indices of columns to which the PIT should be applied.
+of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+be an integer vector of indices of columns to which the PIT should be applied.}
 
-Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
-internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.}
+\item{deduplicate.x}{Logical: if TRUE, full duplicates in the input \code{x}
+and \code{y} are counted and transformed into weights; subsetting indices
+to reconstruct the duplicated data set from the unique one are also returned.}
 
-\item{return.grid}{Logical: if \code{TRUE}, returns \code{xgrid} and appends the estimated density as the last column.}
+\item{deduplicate.xout}{Logical: if TRUE, full duplicates in the input \code{xout}
+are counted; subsetting indices to reconstruct the duplicated data set from
+the unique one are returned.}
+
+\item{no.dedup}{Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
+to FALSE (shorthand).}
+
+\item{return.grid}{Logical: if \code{TRUE}, returns \code{xout} and appends the estimated density as the last column.
+
+The number of chunks for kernel density and regression estimation is chosen
+in such a manner that the number of elements in the internal weight matrix
+should not exceed \eqn{2^{27} = 1.3\cdot 10^8}{2^{27} = 1.3e+8}, which caps
+RAM use (64 bits = 8 bytes per element) at 1 GB. Larger matrices are processed
+in parallel in chunks of size at most \eqn{2^{26} = 6.7\cdot 10^7}{2^{26} = 6.7e+7}
+elements. The number of threads is 4 by default, which can be changed by
+\code{RcppParallel::setThreadOptions(numThreads = 8)} or something similar.}
 }
 \value{
 A vector of density estimates evaluated at the grid points or, if \code{return.grid}, a matrix with the density in the last column.
 }
 \description{
 Kernel density estimation
+}
+\examples{
+set.seed(1)
+x <- sort(rt(10000, df = 5)) # Observed values
+g <- seq(-6, 6, 0.05) # Grid for evaluation
+d2 <- kernelDensity(x, g, bw = 0.3, kernel = "epanechnikov", no.dedup = TRUE)
+d4 <- kernelDensity(x, g, bw = 0.4, kernel = "quartic", order = 4, no.dedup = TRUE)
+plot(g, d2, ylim = range(0, d2, d4), type = "l"); lines(g, d4, col = 2)
+
+# De-duplication facilities for faster operations
+set.seed(1)  # Creating a data set with many duplicates
+n.uniq <- 1000
+n <- 4000
+inds <- ceiling(runif(n, 0, n.uniq))
+x.uniq <- matrix(rnorm(n.uniq*10), ncol = 10)
+x <- x.uniq[inds, ]
+xout <- x.uniq[ceiling(runif(n.uniq*3, 0, n.uniq)), ]
+w <- runif(n)
+data.table::setDTthreads(1) # For measuring the pure gains and overhead
+RcppParallel::setThreadOptions(numThreads = 1)
+kd1 <- kernelDensity(x, xout, w, bw = 0.5)
+kd2 <- kernelDensity(x, xout, w, bw = 0.5, no.dedup = TRUE)
+stat1 <- attr(kd1, "duplicate.stats")
+stat2 <- attr(kd2, "duplicate.stats")
+print(stat1[3:5]) # De-duplication time -- worth it
+print(stat2[3:5]) # Without de-duplication, slower
+unname(prod((1 - stat1[1:2])) / (stat1[5] / stat2[5])) # > 1 = better time
+# savings than expected, < 1 = worse time savings than expected
+all.equal(as.numeric(kd1), as.numeric(kd2))
+max(abs(kd1 - kd2)) # Should be around machine epsilon or less
 }

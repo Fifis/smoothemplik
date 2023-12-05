@@ -8,7 +8,9 @@ kernelMixedSmooth(
   x,
   y,
   by,
-  xgrid = NULL,
+  xout = NULL,
+  byout = NULL,
+  weights = NULL,
   parallel = FALSE,
   cores = 1,
   preschedule = TRUE,
@@ -16,24 +18,41 @@ kernelMixedSmooth(
 )
 }
 \arguments{
-\item{x}{A numeric vector or matrix.}
+\item{x}{A numeric vector, matrix, or data frame containing observations. For density, the
+points used to compute the density. For kernel regression, the points corresponding to
+explanatory variables.}
 
-\item{y}{A vector of dependent variable values.}
+\item{y}{A numeric vector of dependent variable values.}
 
 \item{by}{A variable containing unique identifiers of discrete categories.}
 
-\item{xgrid}{A numeric vector or a numeric matrix.}
+\item{xout}{A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
+at which the user desires to compute the weights, density, or predictions.
+In other words, this is the requested evaluation grid.
+If \code{NULL}, then \code{x} itself is used as the grid.}
 
-\item{parallel}{Logical: if \code{TRUE}, parallelises the calculation over the unique values of \code{by}. At this moment, supports only \code{parallel::mclapply} (therefore, will not work on Windows).}
+\item{byout}{A variable containing unique identifiers of discrete categories
+for the output grid (same points as \code{xout})}
 
-\item{cores}{Integer: the number of CPU cores to use. High core count = high RAM usage.}
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
+
+\item{parallel}{Logical: if \code{TRUE}, parallelises the calculation over
+the unique values of \code{by}. At this moment, supports only
+\code{parallel::mclapply} (therefore, will not work on Windows).}
+
+\item{cores}{Integer: the number of CPU cores to use. High core count = high RAM usage.
+If the number of unique values of 'by' is less than the number of cores requested,
+then, only \code{length(unique(by))} cores are used.}
 
 \item{preschedule}{Logical: passed as \code{mc.preschedule} to \code{mclapply}.}
 
 \item{...}{Passed to \code{kernelSmooth} (usually \code{bw}, \code{gaussian} for both; \code{degree} and \code{robust.iterations} for "smooth"),}
 }
 \value{
-A numeric vector of the kernel estimate of the same length as \code{nrow(xgrid)}.
+A numeric vector of the kernel estimate of the same length as \code{nrow(xout)}.
 }
 \description{
 Smoothing with conditioning on discrete and continuous variables
@@ -43,41 +62,55 @@ set.seed(1)
 n <- 1000
 z1 <- rbinom(n, 1, 0.5)
 z2 <- rbinom(n, 1, 0.5)
-x <- rnorm(n, sd = 2)
+x <- rnorm(n)
 u <- rnorm(n)
 y <- 1 + x^2 + z1 + 2*z2 + z1*z2 + u
 by <- as.integer(interaction(list(z1, z2)))
-yhat <- kernelMixedSmooth(x = x, y = y, by = by, bw = 1, degree = 1)
+out <- expand.grid(x = seq(-4, 4, 0.25), by = 1:4)
+yhat <- kernelMixedSmooth(x = x, y = y, by = by, bw = 1, degree = 1,
+                          xout = out$x, byout = out$by)
 plot(x, y)
-for (i in 1:4) points(x[by == i], yhat[by == i], col = i+1, lwd = 2, pch = 16, cex = 0.7)
+for (i in 1:4) lines(out$x[out$by == i], yhat[out$by == i], col = i+1, lwd = 2)
+legend("top", c("00", "10", "01", "11"), col = 2:5, lwd  = 2)
 
-# The function works faster if there are duplicated values of the condtioning variables
-x2 <- round(x)
-y2 <- 1 + x2^2 + z1 + 2*z2 + z1*z2 + u
-yhat2 <- kernelMixedSmooth(x = x2, y = y2, by = by, bw = 1)
-plot(x2, y2)
-for (i in 1:4) points(x2[by == i], yhat2[by == i], col = i+1, lwd = 2, pch = 16, cex = 0.7)
-system.time(replicate(20, kernelMixedSmooth(x = x, y = y, by = by, bw = 1)))
-# Much faster
-system.time(replicate(20, kernelMixedSmooth(x = x2, y = y2, by = by, bw = 1)))
+# The function works faster if there are duplicated values of the
+# conditioning variables in the prediction grid and there are many
+# observations; this is illustrated by the following example
+# without a custom grid
+# In this example, ignore the fact that the conditioning variable is rounded
+# and therefore contains measurement error (ruining consistency)
+x  <- rnorm(10000)
+xout <- rnorm(5000)
+xr <- round(x)
+xrout <- round(xout)
+w <- runif(10000, 1, 3)
+y  <- 1 + x^2 + rnorm(10000)
+by <- rep(1:4, each = 2500)
+byout <- rep(1:4, each = 1250)
+system.time(kernelMixedSmooth(x = x, y = y, by = by, weights = w,
+                              xout = xout, byout = byout, bw = 1))
+#  user  system elapsed
+# 0.144   0.000   0.144
+system.time(km1 <- kernelMixedSmooth(x = xr, y = y, by = by, weights = w,
+                                     xout = xrout, byout = byout, bw = 1))
+#  user  system elapsed
+# 0.021   0.000   0.022
+system.time(km2 <- kernelMixedSmooth(x = xr, y = y, by = by, weights = w,
+                     xout = xrout, byout = byout, bw = 1, no.dedup = TRUE))
+#  user  system elapsed
+# 0.138   0.001   0.137
+all.equal(km1, km2)
 
-# TODO: does not work
 # Parallel capabilities shine in large data sets
 \dontrun{
 if (.Platform$OS.type != "windows") {
-set.seed(1)
-n <- 10000
-z1 <- rbinom(n, 1, 0.5)
-z2 <- rbinom(n, 1, 0.5)
-x <- rnorm(n, sd = 2)
-u <- rnorm(n)
-y <- 1 + x^2 + z1 + 2*z2 + z1*z2 + u
-by <- as.integer(interaction(list(z1, z2)))
-pFun <- function(n) kernelMixedSmooth(x = x, y = y, by = by,
-                                      bw = 1, degree = 1, parallel = TRUE, cores = n)
-system.time(pFun(1))
-system.time(pFun(2))
-system.time(pFun(4))
+# A function to carry out the same estimation in multiple cores
+pFun <- \(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
+         weights = rep(w, 2), by = rep(by, 2),
+         bw = 1, degree = 0, parallel = TRUE, cores = n)
+system.time(pFun(1))  # 0.6--0.7 s
+system.time(pFun(2))  # 0.4--0.5 s
+system.time(pFun(4))  # 0.2--0.3 s
 }
 }
 }

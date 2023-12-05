@@ -6,12 +6,16 @@
 \usage{
 kernelWeights(
   x,
-  xgrid = NULL,
+  xout = NULL,
   bw = NULL,
-  kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+  kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
   order = 2,
   convolution = FALSE,
-  PIT = FALSE
+  sparse = FALSE,
+  PIT = FALSE,
+  deduplicate.x = FALSE,
+  deduplicate.xout = FALSE,
+  no.dedup = FALSE
 )
 }
 \arguments{
@@ -19,7 +23,7 @@ kernelWeights(
 points used to compute the density. For kernel regression, the points corresponding to
 explanatory variables.}
 
-\item{xgrid}{A vector or a matrix of data points with \code{ncol(xgrid) = ncol(x)}
+\item{xout}{A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
 at which the user desires to compute the weights, density, or predictions.
 In other words, this is the requested evaluation grid.
 If \code{NULL}, then \code{x} itself is used as the grid.}
@@ -37,16 +41,37 @@ are positive everywhere. Orders 4 and 6 produce some negative values, which redu
 \item{convolution}{Logical: if FALSE, returns the usual kernel. If TRUE, returns
 the convolution kernel that is used in density cross-validation.}
 
-\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
-  of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
-  be an integer vector of indices of columns to which the PIT should be applied.
+\item{sparse}{Logical: TODO (should be ignored?)}
 
-Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
-internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.}
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+be an integer vector of indices of columns to which the PIT should be applied.}
+
+\item{deduplicate.x}{Logical: if TRUE, full duplicates in the input \code{x}
+and \code{y} are counted and transformed into weights; subsetting indices
+to reconstruct the duplicated data set from the unique one are also returned.}
+
+\item{deduplicate.xout}{Logical: if TRUE, full duplicates in the input \code{xout}
+are counted; subsetting indices to reconstruct the duplicated data set from
+the unique one are returned.}
+
+\item{no.dedup}{Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
+to FALSE (shorthand).}
 }
 \value{
-A matrix of weights of dimensions nrow(xgrid) x nrow(x).
+A matrix of weights of dimensions nrow(xout) x nrow(x).
 }
 \description{
 Kernel-based weights
+}
+\examples{
+set.seed(1)
+x   <- sort(rnorm(1000)) # Observed values
+g   <- seq(-10, 10, 0.1) # Grid for evaluation
+w   <- kernelWeights(x, g, bw = 2, kernel = "triangular")
+wsp <- kernelWeights(x, g, bw = 2, kernel = "triangular", sparse = TRUE)
+print(c(object.size(w), object.size(wsp)) / 1024) # Kilobytes used
+image(g, x, w)
+all.equal(w[, 1, drop = FALSE],  # Internal calculation for one column
+          smoothemplik:::kernelFunCPP((g - x[1])/2, "triangular", 2, FALSE))
 }

@@ -8,33 +8,85 @@ LSCV(
   x,
   y,
   bw,
+  weights = NULL,
   same = FALSE,
   degree = 0,
   kernel = "gaussian",
   order = 2,
-  robust.iterations = 0
+  PIT = FALSE,
+  chunks = 0,
+  robust.iterations = 0,
+  no.dedup = FALSE
 )
 }
 \arguments{
-\item{x}{A numeric vector or matrix.}
+\item{x}{A numeric vector, matrix, or data frame containing observations. For density, the
+points used to compute the density. For kernel regression, the points corresponding to
+explanatory variables.}
 
-\item{y}{A vector of dependent variable values.}
+\item{y}{A numeric vector of dependent variable values.}
 
 \item{bw}{Candidate bandwidth values: scalar, vector, or a matrix (with columns corresponding to columns of \code{x}).}
 
-\item{same}{Logical: use the same bandwidth for all columns of \code{x}?}
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
 
-\item{degree}{Passed to \code{kernelSmooth}.}
+\item{same}{Logical: use the same bandwidth for all columns of \code{x}?
 
-\item{kernel}{Passed to \code{kernelSmooth}.}
+Note: since LSCV requires zeroing out the diagonals of the weight matrix,
+  repeated observations are combined first; the de-duplication is therefore
+  forced in cross-validation. The only situation where de-duplication can be
+  skipped is passing de-duplicated data sets from outside (e.g. inside
+  optimisers).}
 
-\item{order}{Passed to \code{kernelSmooth}.}
+\item{degree}{Integer: 0 for locally constant estimator (Nadaraya--Watson), 1 for
+locally linear (Cleveland's LOESS), 2 for locally quadratic (use with care, less stable, requires larger bandwidths)}
 
-\item{robust.iterations}{Passed to \code{kernelSmooth}.}
+\item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
+
+\item{order}{An integer: 2, 4, or 6. Order-2 kernels are the standard kernels that
+are positive everywhere. Orders 4 and 6 produce some negative values, which reduces bias but may hamper density estimation.}
+
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+be an integer vector of indices of columns to which the PIT should be applied.}
+
+\item{chunks}{Integer: the number of chunks to split the task into (limits
+RAM usage but increases overhead). \code{0} = auto-select (making sure that
+no matrix has more than 2^27 elements).}
+
+\item{robust.iterations}{The number of robustifying iterations (due to Cleveland, 1979). If greater than 0, \code{xout} is ignored.}
+
+\item{no.dedup}{Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
+to FALSE (shorthand).}
 }
 \value{
 A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.
 }
 \description{
 Least-squares cross-validation function for the Nadaraya-Watson estimator
+}
+\examples{
+set.seed(1)  # Creating a data set with many duplicates
+n.uniq <- 1000
+n <- 4000
+inds <- sort(ceiling(runif(n, 0, n.uniq)))
+x.uniq <- sort(rnorm(n.uniq))
+y.uniq <- 1 + 0.2*x.uniq + 0.3*sin(x.uniq) + rnorm(n.uniq)
+x <- x.uniq[inds]
+y <- y.uniq[inds]
+w <- 1 + runif(n, 0, 2) # Relative importance
+data.table::setDTthreads(1) # For measuring the pure gains and overhead
+RcppParallel::setThreadOptions(numThreads = 1)
+bw.grid <- seq(0.1, 1.2, 0.05)
+CV <- LSCV(x, y, bw.grid, weights = w)
+bw.opt <- bw.grid[which.min(CV)]
+g <- seq(-3.5, 3.5, 0.05)
+yhat <- kernelSmooth(x, y, g, w, bw.opt, deduplicate.xout = FALSE)
+par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
+plot(bw.grid, CV, bty = "n", xlab = "", ylab = "", main = "Cross-validation")
+plot(x.uniq, y.uniq, bty = "n", xlab = "", ylab = "", main = "Optimal fit")
+points(g, yhat, pch = 16, col = 2, cex = 0.5)
 }

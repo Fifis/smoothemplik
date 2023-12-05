@@ -4,18 +4,53 @@
 \alias{DCV}
 \title{Density cross-validation}
 \usage{
-DCV(x, bw, same = FALSE, kernel = "gaussian", order = 2)
+DCV(
+  x,
+  bw,
+  weights = NULL,
+  same = FALSE,
+  kernel = "gaussian",
+  order = 2,
+  PIT = FALSE,
+  chunks = 0,
+  no.dedup = FALSE
+)
 }
 \arguments{
-\item{x}{A numeric vector or matrix.}
+\item{x}{A numeric vector, matrix, or data frame containing observations. For density, the
+points used to compute the density. For kernel regression, the points corresponding to
+explanatory variables.}
 
 \item{bw}{Candidate bandwidth values: scalar, vector, or a matrix (with columns corresponding to columns of \code{x}).}
 
-\item{same}{Logical: use the same bandwidth for all columns of \code{x}?}
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
 
-\item{kernel}{Passed to \code{kernelWeights}.}
+\item{same}{Logical: use the same bandwidth for all columns of \code{x}?
 
-\item{order}{Passed to \code{kernelWeights}.}
+Note: since DCV requires computing the leave-one-out estimator,
+  repeated observations are combined first; the de-duplication is therefore
+  forced in cross-validation. The only situation where de-duplication can be
+  skipped is passing de-duplicated data sets from outside (e.g. inside
+  optimisers).}
+
+\item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
+
+\item{order}{An integer: 2, 4, or 6. Order-2 kernels are the standard kernels that
+are positive everywhere. Orders 4 and 6 produce some negative values, which reduces bias but may hamper density estimation.}
+
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+be an integer vector of indices of columns to which the PIT should be applied.}
+
+\item{chunks}{Integer: the number of chunks to split the task into (limits
+RAM usage but increases overhead). \code{0} = auto-select (making sure that
+no matrix has more than 2^27 elements).}
+
+\item{no.dedup}{Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
+to FALSE (shorthand).}
 }
 \value{
 A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.

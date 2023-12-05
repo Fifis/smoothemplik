@@ -90,11 +90,12 @@ weightedEL <- function(z, mu = 0,
                        return.weights = FALSE,
                        verbose = FALSE
 ) {
-  if (is.null(n.orig)) n.orig <- length(z)
+  if (any(!is.finite(z))) stop("Non-finite observations (NA, NaN, Inf) are not welcome.")
   if (is.null(ct)) ct <- rep(1, length(z))
-  if (is.null(shift)) shift <- rep(0, length(z))
   if (any(!is.finite(ct))) stop("Non-finite weights (NA, NaN, Inf) are not welcome.")
   if (min(ct) < 0) stop("Negative weights are not welcome.")
+  if (is.null(n.orig)) n.orig <- length(z)
+  if (is.null(shift)) shift <- rep(0, length(z))
   # If originally the weights were too small, too many points would be truncated
   # Warn if any non-zero weights are smaller than weight.tolerance
   if (any(0 < ct & ct < weight.tolerance)) {

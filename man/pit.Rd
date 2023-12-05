@@ -4,16 +4,16 @@
 \alias{pit}
 \title{Probability integral transform}
 \usage{
-pit(x, xgrid = NULL)
+pit(x, xout = NULL)
 }
 \arguments{
 \item{x}{A numeric vector of data points.}
 
-\item{xgrid}{A numeric vector. If supplied, then the transformed function at the grid points different from \code{x} takes values
+\item{xout}{A numeric vector. If supplied, then the transformed function at the grid points different from \code{x} takes values
 equidistant between themselves and the ends of the interval to which they belong.}
 }
 \value{
-A numeric vector of values strictly between 0 and 1 of the same length as \code{xgrid} (or \code{x}, if \code{xgrid} is \code{NULL}).
+A numeric vector of values strictly between 0 and 1 of the same length as \code{xout} (or \code{x}, if \code{xout} is \code{NULL}).
 }
 \description{
 Probability integral transform

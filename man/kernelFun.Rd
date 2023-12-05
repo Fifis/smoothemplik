@@ -17,7 +17,9 @@ kernelFun(
 
 \item{kernel}{Kernel type: uniform, Epanechnikov, triangular, quartic, or Gaussian.}
 
-\item{order}{Kernel order. 2nd-order kernels are always non-negative. kth-order kernels have all moments from 1 to (k-1) equal to zero, which is achieved by having some negative values.}
+\item{order}{Kernel order. 2nd-order kernels are always non-negative.
+kth-order kernels have all moments from 1 to (k-1) equal to zero, which is
+achieved by having some negative values.}
 
 \item{rescale}{Logical: rescale to unit variance? If \code{TRUE}, ensures that, for the chosen kernel
 name, the second-order kernel integrates to 1:
@@ -39,22 +41,22 @@ ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"); names(k
 os <- c(2, 4, 6); names(os) <- paste0("o", os)
 cols <- c("#000000CC", "#0000CCCC", "#CC0000CC", "#00AA00CC", "#BB8800CC")
 put.legend <- function() legend("topright", legend = ks, lty = 1, col = cols, bty = "n")
-xgrid <- seq(-4, 4, length.out = 301)
-plot(NULL, NULL, xlim = range(xgrid), ylim = c(0, 1.1),
+xout <- seq(-4, 4, length.out = 301)
+plot(NULL, NULL, xlim = range(xout), ylim = c(0, 1.1),
   xlab = "", ylab = "", main = "Unscaled kernels", bty = "n"); put.legend()
-for (i in 1:5) lines(xgrid, kernelFun(xgrid, kernel = ks[i], rescale = FALSE), col = cols[i])
+for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], rescale = FALSE), col = cols[i])
 par(mfrow = c(1, 2))
-plot(NULL, NULL, xlim = range(xgrid), ylim = c(-0.1, 0.8), xlab = "", ylab = "",
+plot(NULL, NULL, xlim = range(xout), ylim = c(-0.1, 0.8), xlab = "", ylab = "",
   main = "4th-order scaled kernels", bty = "n"); put.legend()
-for (i in 1:5) lines(xgrid, kernelFun(xgrid, kernel = ks[i], order = 4), col = cols[i])
-plot(NULL, NULL, xlim = range(xgrid), ylim = c(-0.25, 1.2), xlab = "", ylab = "",
+for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 4), col = cols[i])
+plot(NULL, NULL, xlim = range(xout), ylim = c(-0.25, 1.2), xlab = "", ylab = "",
   main = "6th-order scaled kernels", bty = "n"); put.legend()
-for (i in 1:5) lines(xgrid, kernelFun(xgrid, kernel = ks[i], order = 6), col = cols[i])
+for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 6), col = cols[i])
 par(mfrow = c(1, 1))
-plot(NULL, NULL, xlim = range(xgrid), ylim = c(-0.25, 1.4), xlab = "", ylab = "",
+plot(NULL, NULL, xlim = range(xout), ylim = c(-0.25, 1.4), xlab = "", ylab = "",
   main = "Convolution kernels", bty = "n"); put.legend()
 for (i in 1:5) {
-  for (j in 1:3) lines(xgrid, kernelFun(xgrid, kernel = ks[i], order = os[j],
+  for (j in 1:3) lines(xout, kernelFun(xout, kernel = ks[i], order = os[j],
   convolution = TRUE), col = cols[i], lty = j)
 }; legend("topleft", c("2nd order", "4th order", "6th order"), lty = 1:3, bty = "n")
 

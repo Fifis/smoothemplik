@@ -46,7 +46,7 @@ data <- generateData()
 data.VS <- data[as.logical(data$D), ]
 t0 <- c(1, 1) # True parameters
 Ztheta <- t0[1] + t0[2] * data$Z
-b.pi <- bw.CV(x = pit(data$X), y = data$D, tol = 1e-3)
+b.pi <- bw.CV(x = pit(data$X), y = data$D)
 b.muY  <- bw.CV(x = apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), y = data.VS$Y)
 b.mug <- bw.CV(x = apply(as.matrix(data.VS[, c("Z", "X"), ]), 2, pit), y = data.VS$U)
 r.Ystar <- rho.full.sample(t0, data, helper = "Ystar", pi.bw = b.pi, helper.bw = b.muY)
@@ -64,9 +64,9 @@ plot(r.Ystar, r.gstar, bty = "n", col = data$D + 1)
 
 # Smoothing linear functions with locally constant kernels is a bad idea
 Zthetahat0 <- kernelSmooth(data.VS[, c("Z", "X")], Ztheta[as.logical(data$D)],
-  xgrid = data[, c("Z", "X")], bw = c(0.5, 0.15), degree = 0)
+  xout = data[, c("Z", "X")], bw = c(0.5, 0.15), degree = 0)
 Zthetahat1 <- kernelSmooth(data.VS[, c("Z", "X")], Ztheta[as.logical(data$D)],
-  xgrid = data[, c("Z", "X")], bw = c(1.25, 0.25), degree = 1)
+  xout = data[, c("Z", "X")], bw = c(1.25, 0.25), degree = 1)
 plot(data$Z, Zthetahat1, bty = "n")
 points(data$Z, Zthetahat0, col = 2)
 }

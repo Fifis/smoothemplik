@@ -7,11 +7,16 @@
 .prepareKernel(
   x,
   y = NULL,
-  xgrid = NULL,
+  xout = NULL,
+  weights = NULL,
   bw = NULL,
   kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
   order = 2,
   convolution = FALSE,
+  sparse = FALSE,
+  deduplicate.x = TRUE,
+  deduplicate.xout = TRUE,
+  no.dedup = FALSE,
   PIT = FALSE
 )
 }
@@ -22,10 +27,15 @@ explanatory variables.}
 
 \item{y}{Optional: a vector of dependent variable values.}
 
-\item{xgrid}{A vector or a matrix of data points with \code{ncol(xgrid) = ncol(x)}
+\item{xout}{A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
 at which the user desires to compute the weights, density, or predictions.
 In other words, this is the requested evaluation grid.
 If \code{NULL}, then \code{x} itself is used as the grid.}
+
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
 
 \item{bw}{Bandwidth for the kernel: a scalar or a vector of the same length as \code{ncol(x)}.
 Since it is the crucial parameter in many applications, a warning is thrown if the bandwidth
@@ -40,14 +50,45 @@ are positive everywhere. Orders 4 and 6 produce some negative values, which redu
 \item{convolution}{Logical: if FALSE, returns the usual kernel. If TRUE, returns
 the convolution kernel that is used in density cross-validation.}
 
-\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
-  of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
-  be an integer vector of indices of columns to which the PIT should be applied.
+\item{sparse}{Logical: TODO (ignored)}
 
-Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
-internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.}
+\item{deduplicate.x}{Logical: if TRUE, full duplicates in the input \code{x}
+and \code{y} are counted and transformed into weights; subsetting indices
+to reconstruct the duplicated data set from the unique one are also returned.}
+
+\item{deduplicate.xout}{Logical: if TRUE, full duplicates in the input \code{xout}
+are counted; subsetting indices to reconstruct the duplicated data set from
+the unique one are returned.}
+
+\item{no.dedup}{Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
+to FALSE (shorthand).}
+
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+be an integer vector of indices of columns to which the PIT should be applied.}
 }
 \description{
-Checks if the order is 2, 4, or 6, transforms the objects into matrices to pass to the C++ functions,
-checks the dimensions, provides the bandwidth etc.
+Checks if the order is 2, 4, or 6, transforms the objects into matrices,
+checks the dimensions, provides the bandwidth, creates default arguments
+to pass to the C++ functions, carries out de-duplication for speed-up etc.
+}
+\examples{
+# De-duplication facilities
+set.seed(1)  # Creating a data set with many duplicates
+n.uniq <- 10000
+n <- 60000
+inds <- ceiling(runif(n, 0, n.uniq))
+x.uniq <- matrix(rnorm(n.uniq*10), ncol = 10)
+x <- x.uniq[inds, ]
+y <- runif(n.uniq)[inds]
+xout <- x.uniq[ceiling(runif(n.uniq*3, 0, n.uniq)), ]
+w <- runif(n)
+print(system.time(a1 <- smoothemplik:::.prepareKernel(x, y, xout, w, bw = 0.5)))
+print(system.time(a2 <- smoothemplik:::.prepareKernel(x, y, xout, w, bw = 0.5,
+                  deduplicate.x = FALSE, deduplicate.xout = FALSE)))
+print(c(object.size(a1), object.size(a2)) / 1024) # Kilobytes used
+# Speed-memory trade-off: 4 times smaller, takes 0.2 s, but reduces the
+# number of matrix operations by a factor of
+1 - prod(1 - a1$duplicate.stats[1:2])    # 95\% fewer operations
+sum(a1$weights) - sum(a2$weights)  # Should be 0 or near machine epsilon
 }

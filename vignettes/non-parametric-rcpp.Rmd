@@ -4,7 +4,7 @@ output:
   rmarkdown::html_vignette:
     toc: true
 author: "Andreï V. Kostyrka, University of Luxembourg"
-date: Sys.date()
+date: "Updated: 2023-12-05, compiled: `r Sys.Date()`"
 abstract: "This vignette demonstrates how to carry out non-parametric density and kernel estimation with a high degree of flexibiity and faster than via the straightforward textbook approach."
 keywords: "non-parametric methods, density estimation, kernel smoothing, Nadaraya-Watson, local regression"
 vignette: >
@@ -68,26 +68,23 @@ Computations could be sped up twice for certain applications through exploiting 
 
 Univariate kernel weights:
 ```{r}
-# x = numeric vector, xgrid = numeric vector, bw = scalar, kfun = function
-kernelWeights1R <- function(x, xgrid, bw, kfun) {
-  kfun(outer(xgrid, x, "-") / bw)
-}
+# x = numeric vector, xout = numeric vector, bw = scalar, kfun = function
+kernelWeights1R <- function(x, xout, bw, kfun) kfun(outer(xout, x, "-") / bw)
 ```
 
 Here, type / length checks are skipped because the goal is to show the `Rcpp` solution superiority, not sanitise the inputs for a benchmark function. The hidden function `smoothemplik:::.prepareKernel` does these checks before calling the C++ function.
 
 ```{r}
-kernelWeightsR <- function(x, xgrid = NULL, bw = 1, kfun = stats::dnorm) {
+kernelWeightsR <- function(x, xout = NULL, bw = 1, kfun = stats::dnorm) {
   if (is.null(dim(x))) x <- as.matrix(x)
-  if (is.null(xgrid)) xgrid <- x
-  if (is.null(dim(xgrid))) xgrid <- as.matrix(xgrid)
+  if (is.null(xout)) xout <- x
+  if (is.null(dim(xout))) xout <- as.matrix(xout)
   d <- ncol(x)
   if (d > 1 & length(bw) == 1) bw <- rep(bw, d)
-  pk <- kernelWeights1R(x = x[, 1], xgrid = xgrid[, 1], bw = bw[1], kfun = kfun)
+  pk <- kernelWeights1R(x = x[, 1], xout = xout[, 1], bw = bw[1], kfun = kfun)
   if (d > 1) { # Accumulating the product kernel
-    for (i in 2:d) {
-      pk <- pk * kernelWeights1R(x = x[, i], xgrid = xgrid[, i], bw = bw[i], kfun = kfun)
-    }
+    for (i in 2:d)
+      pk <- pk * kernelWeights1R(x = x[, i], xout = xout[, i], bw = bw[i], kfun = kfun)
   }
   return(pk)
 }
@@ -98,11 +95,11 @@ The Parzen--Rosenblatt density estimator a rescaled sum of the kernel functions:
 \hat f_X(x) := \frac{1}{nb^{(1)} \cdots b^{(d)}} \sum_{i=1}^n K\left( \frac{X_i - x}{b} \right)
 \]
 ```{r}
-kernelDensityR <- function(x, xgrid = NULL, bw = 1, kfun = stats::dnorm) {
+kernelDensityR <- function(x, xout = NULL, bw = 1, kfun = stats::dnorm) {
   x1d <- is.null(dim(x))
   n <- if (x1d) length(x) else nrow(x)
   if (isTRUE(ncol(x) > 1) & length(bw) == 1) bw <- rep(bw, ncol(x))
-  pk <- kernelWeightsR(x = x, xgrid = xgrid, bw = bw, kfun = kfun)
+  pk <- kernelWeightsR(x = x, xout = xout, bw = bw, kfun = kfun)
   return(rowSums(pk) / (n * prod(bw)))
 }
 ```
@@ -119,9 +116,9 @@ For optimal bandwidth calculation, quite often, a Leave-One-One (LOO) variety is
 It can be implemented by setting the weight of the $i$^th observation to zero. Note that LOO estimator makes practical sense only on a grid of original observed points, $\{X_i\}_{i=1}^n$, or its subset.
 
 ```{r}
-kernelSmoothR <- function(x, y, xgrid = NULL, bw = 1,
+kernelSmoothR <- function(x, y, xout = NULL, bw = 1,
                           kfun = stats::dnorm, LOO = FALSE) {
-  pk <- kernelWeightsR(x = x, xgrid = xgrid, bw = bw, kfun = kfun)
+  pk <- kernelWeightsR(x = x, xout = xout, bw = bw, kfun = kfun)
   if (LOO) diag(pk) <- 0
   return(rowSums(sweep(pk, 2, y, "*")) / rowSums(pk))
 }
@@ -131,6 +128,7 @@ kernelSmoothR <- function(x, y, xgrid = NULL, bw = 1,
 
 1. The core of the package is built on `RcppArmadillo` for quick vector and matrix manipulations.
 1. All kernel calculations are done in place to save memory; no extra vectors are initialised; the return vector is created at the beginning and gradually substituted based on the chosen kernel. E.\,g. `ax = abs(x)`, replacements are done for `ax`, like `if (ax[i] < 1) ax[i] = 0.75*(1 - ax[i]^2)`, and `ax` itself is returned at the end. The Nadaraya--Watson numerator is also computed in place from the weight matrix, thus saving memory by never using more than one large matrix.
+1. *** TODO: Memory-saving of kernelWeights
 1. Following Silverman (1986, 4.4), we perform the bandwidth scaling $\frac{X_i-x}{b} = \frac{X_i}{b}-\frac{x}{b} = X^*_i - x^*$ to reduce the number or arithmetic operation in the double loop. The scaling factors in the form of $\frac{1}{nb^{(1)} \cdots b^{(d)}}$ are also applied after the final vector or kernel sums is obtained.
 1. Qualitatively different 4th-order kernels were developed to reduce the polynomial degree of the convolution kernels. If a kernel has polynomial degree $p$, is 4th-order analogue has degree $p$ as well, yielding convolution polynomial of degree at most $2p+1$. The traditional approach described in Li \& Racine (2007, section 1.11, p. 34) adds an extra polynomial; for the Epanechnikov kernel, their 4th-order version has degree 4, and convolution, degree $4\cdot 2 + 1 = 9$, whereas our version, consisting of piecewise quadratic polynomials, has degree 2 and convolution degree 5.
 
@@ -150,24 +148,24 @@ bw <- 0.5 # Bandwidth
 ```
 
 Now, we pit the pure R and Rcpp functions:
-```{r}
+```{r message=FALSE}
 library(microbenchmark)
 microbenchmark(
-  wCPP <- kernelWeights(X, xgrid = xg, bw = bw),
-  wR   <- kernelWeightsR(X, xgrid = xg, bw = bw),
-  times = 20, unit = "ms", check = "equal"
+  wCPP <- kernelWeights(X, xout = xg, bw = bw),
+  wR   <- kernelWeightsR(X, xout = xg, bw = bw),
+  times = 20, unit = "ms", check = "equivalent"
 )
 
 microbenchmark(
-  fCPP <- kernelDensity(X, xgrid = xg, bw = bw),
-  fR   <- kernelDensityR(X, xgrid = xg, bw = bw),
-  times = 20, unit = "ms", check = "equal"
+  fCPP <- kernelDensity(X, xout = xg, bw = bw),
+  fR   <- kernelDensityR(X, xout = xg, bw = bw),
+  times = 20, unit = "ms", check = "equivalent"
 )
 
 microbenchmark(
-  mCPP <- kernelSmooth(X, Y, xgrid = xg, bw = bw),
-  mR   <- kernelSmoothR(X, Y, xgrid = xg, bw = bw),
-  times = 20, unit = "ms", check = "equal"
+  mCPP <- kernelSmooth(X, Y, xout = xg, bw = bw),
+  mR   <- kernelSmoothR(X, Y, xout = xg, bw = bw),
+  times = 20, unit = "ms", check = "equivalent"
 )
 ```
 
@@ -178,24 +176,24 @@ all.equal(fR, fCPP, tolerance = 1e-16)
 all.equal(mR, mCPP, tolerance = 1e-16)
 ```
 
-We can visualised the result and see that the discrepancies are tiny
+We can visualise the result and see that the discrepancies are tiny
 ```{r}
 par(mfrow = c(2, 1), mar = c(4, 4, 2, 3))
-plot(X, Y, bty = "n", main = "Non-parametric regression (black) and density (blue) estimate")
+plot(X, Y, bty = "n", main = "Non-parametric regression (black) and density (blue) estimate", las = 1)
 lines(xg, mCPP, lwd = 2)
 par(new = TRUE)
-plot(xg, fCPP, type = "l", lwd = 2, yaxt = "n", bty = "n", xaxt = "n", col = 4, xlab = "", ylab = "")
-axis(4, col = 4, col.axis = 4)
+plot(xg, fCPP, type = "l", lwd = 2, yaxt = "n", bty = "n", xaxt = "n", col = 4, xlab = "", ylab = "", las = 1)
+axis(4, col = 4, col.axis = 4, las = 1)
 plot(xg, fR - fCPP, bty = "n", ylab = "", xlab = "X",
      main = "Discrepancy between the R and C++ implementation")
 ```
 
 Different kernel shapes can be used upon user request (all of them, except for the default Gaussian, have finite support on $[-1, 1]$):
-```{r}
+```{r message=FALSE}
 par(mfrow = c(1, 1))
-fCPPunif <- kernelDensity(X, xgrid = xg, bw = bw * sqrt(3), kernel = "uniform")
-fCPPtrng <- kernelDensity(X, xgrid = xg, bw = bw * sqrt(3), kernel = "triangular")
-fCPPepan <- kernelDensity(X, xgrid = xg, bw = bw * sqrt(5), kernel = "epanechnikov")
+fCPPunif <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "uniform")
+fCPPtrng <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "triangular")
+fCPPepan <- kernelDensity(X, xout = xg, bw = bw * sqrt(5), kernel = "epanechnikov")
 plot(xg, fCPP, ylim = range(0, fCPP, fCPPunif, fCPPtrng, fCPPepan), xlab = "X",
      type = "l", bty = "n", main = "Various kernel shapes", ylab = "Density")
 rug(X)
@@ -206,7 +204,7 @@ legend("topright", c("Gaussian", "Uniform", "Triangular", "Epanechnikov"), lwd =
 ```
 
 The speed-up is more substantial with large data sets:
-```{r}
+```{r message=FALSE}
 ns <- c(500, 1000, 2000)
 timings <- sapply(ns, function(n) {
   set.seed(1)
@@ -215,7 +213,7 @@ timings <- sapply(ns, function(n) {
   a <- summary(microbenchmark(
     fR   <- kernelDensityR(X, bw = b),
     fCPP <- kernelDensity(X, bw = b),
-    times = 3, unit = "ms", check = "equal", control = list(warmup = 1)
+    times = 3, unit = "ms", check = "equivalent", control = list(warmup = 1)
   ))
   c(R = a$median[1], CPP = a$median[2])
 })
@@ -238,8 +236,8 @@ Y <- sin(X[, 1]) + sin(X[, 2]) + rnorm(n)
 bw <- c(0.7, 0.8)
 
 microbenchmark(
-  wCPP <- kernelWeights(X, xgrid = xg, bw = bw),
-  wR <- kernelWeightsR(X, xgrid = xg, bw = bw),
+  wCPP <- kernelWeights(X, xout = xg, bw = bw),
+  wR <- kernelWeightsR(X, xout = xg, bw = bw),
   times = 10, unit = "ms", check = "equal")
 all.equal(wR, wCPP, tolerance = 1e-16)
 ```
@@ -253,19 +251,19 @@ points(X[, 1], X[, 2], pch = 16)
 ```
 
 We redo the same test for the kernel density estimator:
-```{r}
+```{r message=FALSE}
 microbenchmark(
-  fCPP <- kernelDensity(X, xgrid = xg, bw = bw),
-  fR <- kernelDensityR(X, xgrid = xg, bw = bw),
-times = 5, unit = "ms", check = "equal")
+  fCPP <- kernelDensity(X, xout = xg, bw = bw),
+  fR <- kernelDensityR(X, xout = xg, bw = bw),
+times = 5, unit = "ms", check = "equivalent")
 all.equal(fR, fCPP, tolerance = 1e-16)
 ```
 
 The difference between the two different kernels is better visible in 3D:
-```{r}
-fCPPunif <- kernelDensity(X, xgrid = xg, bw = bw * sqrt(3), kernel = "uniform")
-fCPPtrng <- kernelDensity(X, xgrid = xg, bw = bw * sqrt(3), kernel = "triangular")
-fCPPepan <- kernelDensity(X, xgrid = xg, bw = bw * sqrt(5), kernel = "epanechnikov")
+```{r message=FALSE}
+fCPPunif <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "uniform")
+fCPPtrng <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "triangular")
+fCPPepan <- kernelDensity(X, xout = xg, bw = bw * sqrt(5), kernel = "epanechnikov")
 par(mfrow = c(2, 2), mar = c(0.5, 0.5, 2, 0.5))
 persp(xg0, xg0, matrix(fCPP, nrow = ng), theta = 120, phi = 20, main = "Gaussian", xlab = "X1", ylab = "X2", zlab = "Density")
 persp(xg0, xg0, matrix(fCPPunif, nrow = ng), theta = 120, phi = 20, main = "Uniform", xlab = "X1", ylab = "X2", zlab = "Density")
@@ -274,7 +272,7 @@ persp(xg0, xg0, matrix(fCPPepan, nrow = ng), theta = 120, phi = 20, main = "Epan
 ```
 
 Now, we run a quick benchmark to see how the problem scales with the sample size and the dimension of the data. These evaluations take longer, therefore, we can use the built-in `system.time` because the CPU overead is negligible:
-```{r}
+```{r message=FALSE}
 ns <- c(125, 500)
 dims <- c(2, 6)
 nd <- expand.grid(n = ns, dim = dims)
@@ -291,7 +289,8 @@ MVtimings <- cbind(nd, MVtimings)
 print(MVtimings, 2)
 ```
 
-Finally, we can visualise the kernel regression estimator with various kernels and degrees, and robustness operations (described in the original Cleveland 1979 LOESS paper). Since the true functional dependence of $Y$ on $X$ is a sine wave, we expect the second-degree local estimator to perform the best.
+Finally, we can visualise the kernel regression estimator with various kernels and degrees, and robustness operations (described in the original Cleveland 1979 LOESS paper). TODO: add reference.
+Since the true functional dependence of $Y$ on $X$ is a sine wave, we expect the second-degree local estimator to perform the best.
 
 Here, instead of choosing the bandwidth using the rule of thumb, we plot the cross-validation function (assuming that the bandwidth should be the same across all dimensions):
 ```{r}
@@ -308,10 +307,10 @@ legend("topright", paste("Degree", 0:2), lwd = 2, lty = 1, col = 1:3, bty = "n")
 ```
 
 To avoid the low-density region, we focus on a smaller range of regressor values, $[0, 8]$:
-```{r}
+```{r message=FALSE}
 xg0 <- seq(0, 8, length.out = ng)
 xg <- expand.grid(X1 = xg0, X2 = xg0)
-yhat <- sapply(1:3, function(i) kernelSmooth(x = X,  y = Y, xgrid = xg, bw = bw.opt[i], degree = i-1))
+yhat <- sapply(1:3, function(i) kernelSmooth(x = X,  y = Y, xout = xg, bw = bw.opt[i], degree = i-1))
 par(mfrow = c(2, 2), mar = c(0.2, 0.2, 2, 0.2))
 for (i in 1:3) {
   p <- persp(xg0, xg0, matrix(yhat[, i], ng, ng), ticktype = "detailed",
@@ -321,11 +320,15 @@ for (i in 1:3) {
 } 
 ```
 
-We can judge the fit quality by the percentage of explained variance (the issue of over-fitting with small bandwidths has been mitigated via cross-validation) using the available observations as the grid.
+We can judge the fit quality by the percentage of explained variance (the issue of over-fitting with small bandwidths has been mitigated via cross-validation) using the available observations as the grid. This comparison is valid only because the noise is homoskedastic in this simulation, which makes the unconditional error variance interpretable. In real-life applications, consider other quality-of-fit measures.
 
-```{r}
+```{r message=FALSE}
 ys <- sapply(1:3, function(i) kernelSmooth(x = X,  y = Y, bw = bw.opt[i], degree = i-1))
 colnames(ys) <- paste("Degree", 0:2)
 print(cor(cbind(Y, ys))[1, 2:4], 3)
 ```
+
+## Sparsity
+
+TODO
 

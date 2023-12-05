@@ -7,16 +7,22 @@
 kernelSmooth(
   x,
   y,
-  xgrid = NULL,
+  xout = NULL,
+  weights = NULL,
   bw = NULL,
-  kernel = c("gaussian", "uniform", "triangular", "epanechnikov"),
+  kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
   order = 2,
   convolution = FALSE,
+  chunks = 0,
   PIT = FALSE,
   LOO = FALSE,
   degree = 0,
   trim = function(x) 0.01/length(x),
   robust.iterations = 0,
+  robust = c("bisquare", "huber"),
+  deduplicate.x = TRUE,
+  deduplicate.xout = TRUE,
+  no.dedup = FALSE,
   return.grid = FALSE
 )
 }
@@ -27,10 +33,15 @@ explanatory variables.}
 
 \item{y}{A numeric vector of dependent variable values.}
 
-\item{xgrid}{A vector or a matrix of data points with \code{ncol(xgrid) = ncol(x)}
+\item{xout}{A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
 at which the user desires to compute the weights, density, or predictions.
 In other words, this is the requested evaluation grid.
 If \code{NULL}, then \code{x} itself is used as the grid.}
+
+\item{weights}{A numeric vector of observation weights (typically counts) to
+perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
+all calculations, the total number of observations is assumed to be the
+sum of \code{weights}.}
 
 \item{bw}{Bandwidth for the kernel: a scalar or a vector of the same length as \code{ncol(x)}.
 Since it is the crucial parameter in many applications, a warning is thrown if the bandwidth
@@ -45,12 +56,13 @@ are positive everywhere. Orders 4 and 6 produce some negative values, which redu
 \item{convolution}{Logical: if FALSE, returns the usual kernel. If TRUE, returns
 the convolution kernel that is used in density cross-validation.}
 
-\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
-  of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
-  be an integer vector of indices of columns to which the PIT should be applied.
+\item{chunks}{Integer: the number of chunks to split the task into (limits
+RAM usage but increases overhead). \code{0} = auto-select (making sure that
+no matrix has more than 2^27 elements).}
 
-Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
-internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.}
+\item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+be an integer vector of indices of columns to which the PIT should be applied.}
 
 \item{LOO}{Logical: If \code{TRUE}, the leave-one-out estimator is returned.}
 
@@ -59,13 +71,35 @@ locally linear (Cleveland's LOESS), 2 for locally quadratic (use with care, less
 
 \item{trim}{Trimming function for small weights to speed up locally weighted regression (if \code{degree} is 1 or 2).}
 
-\item{robust.iterations}{The number of robustifying iterations (due to Cleveland, 1979). If greater than 0, \code{xgrid} is ignored.}
+\item{robust.iterations}{The number of robustifying iterations (due to Cleveland, 1979). If greater than 0, \code{xout} is ignored.}
 
-\item{return.grid}{If \code{TRUE}, prepends \code{xgrid} to the return results.
+\item{robust}{Character: "huber" for Huber's local regression weights, "bisquare" for more robust bi-square ones}
+
+\item{deduplicate.x}{Logical: if TRUE, full duplicates in the input \code{x}
+and \code{y} are counted and transformed into weights; subsetting indices
+to reconstruct the duplicated data set from the unique one are also returned.}
+
+\item{deduplicate.xout}{Logical: if TRUE, full duplicates in the input \code{xout}
+are counted; subsetting indices to reconstruct the duplicated data set from
+the unique one are returned.}
+
+\item{no.dedup}{Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
+to FALSE (shorthand).}
+
+\item{return.grid}{If \code{TRUE}, prepends \code{xout} to the return results.
 
 Standardisation is recommended for the purposes of numerical stability (sometimes
   \code{lm()} might choke when the dependent variable takes very large absolute
-  values and its square is used).}
+  values and its square is used).
+
+Note: if \code{x} and \code{xout} are different but robust iterations were requested,
+  the robustification can take longer. TODO: do not estimate on (x, grid),
+  do the calculation with Kfull straight away.
+
+Note: if \code{LOO} is used, it makes sense to de-duplicate observations first.
+  By default, this behaviour is not enforced in this function, but when it is
+  called in cross-validation routines, the de-duplication is forced. It makes
+  no sense to zero out once observation out of many repeated.}
 }
 \value{
 A vector of predicted values or, if \code{return.grid} is \code{TRUE},
@@ -73,4 +107,50 @@ A vector of predicted values or, if \code{return.grid} is \code{TRUE},
 }
 \description{
 Local kernel smoother
+}
+\examples{
+set.seed(1)
+x <- sort(rt(1000, df = 5)) # Observed values
+g <- seq(-7, 7, 0.1) # Grid for evaluation
+f <- \(x) 1 + x + sin(x) # True E(Y | X) = f(X)
+y <- f(x) + rt(1000, df = 4)
+# 3 estimators: locally constant + 2nd-order kernel,
+# locally constant + 4th-order kernel, locally linear robust
+b2lc <- bw.CV(x, y = y, kernel = "quartic")
+b4lc <- bw.CV(x, y = y, kernel = "quartic", order = 4, deduplicate.x = FALSE)
+b2ll <- bw.CV(x, y = y, kernel = "quartic", degree = 1, robust.iterations = 1,
+              try.grid = TRUE, start.bw = 2.1356, verbose = TRUE, deduplicate.x = FALSE)
+m2lc <- kernelSmooth(x, y, g, bw = b2lc, kernel = "quartic", no.dedup = TRUE)
+m4lc <- kernelSmooth(x, y, g, bw = b4lc, kernel = "quartic", order = 4, no.dedup = TRUE)
+m2ll <- kernelSmooth(x, y, g, bw = b2ll, kernel = "quartic",
+                     degree = 1, robust.iterations = 1, no.dedup = TRUE)
+plot(x, y, xlim = c(-7, 7), col = "#00000088")
+lines(g, f(g), col = "white", lwd = 5); lines(g, f(g))
+lines(g, m2lc, col = 2); lines(g, m4lc, col = 3); lines(g, m2ll, col = 4)
+# De-duplication facilities for faster operations
+set.seed(1)  # Creating a data set with many duplicates
+n.uniq <- 1000
+n <- 4000
+inds <- sort(ceiling(runif(n, 0, n.uniq)))
+x.uniq <- sort(rnorm(n.uniq))
+y.uniq <- 1 + x.uniq + sin(x.uniq*2) + rnorm(n.uniq)
+x <- x.uniq[inds]
+y <- y.uniq[inds]
+xout <- x.uniq[sort(ceiling(runif(n.uniq*3, 0, n.uniq)))]
+w <- runif(n)
+data.table::setDTthreads(1) # For measuring the pure gains and overhead
+RcppParallel::setThreadOptions(numThreads = 1)
+kr1 <- kernelSmooth(x, y, xout, w, bw = 0.2)
+kr2 <- kernelSmooth(x, y, xout, w, bw = 0.5, no.dedup = TRUE)
+stat1 <- attr(kr1, "duplicate.stats")
+stat2 <- attr(kr2, "duplicate.stats")
+print(stat1[3:5]) # De-duplication time -- worth it
+print(stat2[3:5]) # Without de-duplication, slower
+unname(prod((1 - stat1[1:2])) / (stat1[5] / stat2[5])) # > 1 = better time
+# savings than expected, < 1 = worse time savings than expected
+all.equal(as.numeric(kr1), as.numeric(kr2))
+max(abs(kr1 - kr2)) # Should be around machine epsilon or less
+
+# Example in 2 dimensions
+# TODO
 }

@@ -1,3 +1,15 @@
+# smoothemplik 0.0.10
+- Added support for weighted kernel density and regression observation
+- Added support for sparse weight matrices via `sparseKernelWeightsCPP` to save memory
+- Added observation de-duplication to speed up the non-parametric functions
+- Added low-level C++ parallelisation and chunking to limit maximum RAM use (via RcppParallel)
+- Added leave-one-out kernel smoothing support for custom output grids
+- Reworked mixed kernel density and regression workflow making use of the block data structure
+- Fixed the bug that eliminated time savings in multicore mixed estimation
+- Fixed the bug in DCV where duplicated observations were not merged (now the LOO is the TRUE LOO: duplicates of the same observation are also left out)
+- Improved the initial value choice for cross-validation (using a log-scale grid around the rule-of-thumb value)
+- Sped up C++ kernel functions with RcppArmadillo (20--50% speed gains through better iterations, code structure, and condition checks)
+
 # smoothemplik 0.0.9
 
 - Added a vignette on non-parametric methods
@@ -5,7 +17,7 @@
 - Auto-detect cross-validation type (density or least-squares) based on the input
 - Changed the default behaviour of Silverman's rule of thumb: use a robust estimator of SD (IQR/1.34)
 - Prepared a stub for discontinuous densities
-- Preparing moving the gradient-related functions to a new package
+- Moving the gradient-related functions to a new package, `pnd`
 
 # smoothemplik 0.0.8
 
