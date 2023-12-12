@@ -18,7 +18,7 @@
 #' @export
 matrix2LaTeX <- function(x, d = 3) {
   if (is.null(dim(x))) x <- t(as.matrix(x))
-  for (i in 1:nrow(x)) cat(gsub("-", "$-$", paste(.trail0(x[i, ], d), collapse = " & ")), "\\\\\n")
+  for (i in seq_len(nrow(x))) cat(gsub("-", "$-$", paste(.trail0(x[i, ], d), collapse = " & ")), "\\\\\n")
   return(invisible(NULL))
 }
 
@@ -68,4 +68,3 @@ linesWithHalo <- function(x, y, nhalo = 32, hscale = 0.01, vscale = 0.01, col.ha
 #'
 #' @return A list of the same format as the output of \code{\link{maximiseSEL}}.
 .fail <- function() return(list(par = c(NA, NA), value = NA, restricted = c(FALSE, FALSE), code = NA, iterations = NA, xtimes = c(0, 0)))
-

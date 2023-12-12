@@ -242,8 +242,6 @@ lb.design2.theor <- function(p = 0.6,
 getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc = c(1, 1), params.reduc = c(0, 1), sigma2x = c(16, 1), pix = c(0.25, 0.9)),
                               do.SE = TRUE, do.restr = TRUE, do.CI = TRUE) {
   data <- generateDataDiscrete(n = design$n, p = design$p, params.reduc = design$params.reduc, sigma2x = design$sigma2x, pix = design$pix, seed = seed)
-  # plot(data$X, data$Ystar, cex = 0.75)
-  # points(data$X, data$Y, pch = 16, col = "red")
   data.VS <- data[as.logical(data$D), ]
   tic0 <- Sys.time()
   mod1sobs <- stats::lm(Z ~ X, data = data.VS)
@@ -271,7 +269,9 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
       se.lik <- unname(sqrt(diag(vcov.vs)))
       warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
     }
-  } else se.lik <- NULL
+  } else {
+    se.lik <- NULL
+  }
   rm(mod1sobs, m)
   # Inefficient complete-case SEL with RoT bandwidth
   el.complete <- mod2sobs
@@ -285,7 +285,9 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   proflik1 <- function(theta1) {
     if (abs(theta1) > 1e6) return(NA)
     ret <- tryCatch(stats::nlm(f = function(x) frestr(theta0 = x, theta1 = theta1), p = mean(data.VS$Y) - theta1 * mean(data.VS$Z), gradtol = 1e-8, steptol = 1e-8, stepmax = se.lik[1] / 5), error = function(e) return(list(code = 5)))
-    if (!(ret$code %in% c(4, 5))) return(ret$minimum) else {
+    if (!(ret$code %in% c(4, 5))) {
+      return(ret$minimum)
+    } else {
       ret <- tryCatch(stats::optim(fn = function(x) frestr(theta0 = x, theta1 = theta1), par = mean(data.VS$Y) - theta1 * mean(data.VS$Z), gr = NULL, method = "BFGS", control = list(reltol = 1e-8))$value, error = function(e) return(NA))
       return(ret)
     }
@@ -307,7 +309,9 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
     restr1 <- stats::optim(fn = function(x) frestr(theta0 = 1, theta1 = x), par = theta1c, method = "BFGS", gr = NULL, control = list(reltol = 1e-8))
     restr1 <- list(minimum = restr1$value, estimate = restr1$par, gradient = NA, code = restr1$convergence, iterations = unname(restr1$counts[2]))
   }
-  } else restr0 <- restr1 <- NULL
+  } else {
+    restr0 <- restr1 <- NULL
+  }
 
   cat("Seed ", .lead0(seed, 4), ", ineff. estim. with I(Xi = Xj) (1/6), theta1 = ", sprintf("%1.3f", el.complete[2]), "\n")
   if (do.restr) cat("Seed ", .lead0(seed, 4), ", ineff. estim. with theta1 = 1 (2/6), theta0 = ", sprintf("%1.3f", restr0$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr0$minimum, 1)), "\n",
@@ -320,13 +324,25 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   qs <- stats::qchisq(1 - ps, df = 1) / 2
   start.mult <- stats::qnorm(1 - ps/2)
   rCI <- lCI <- vector("list", length(ps))
-  rCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p), lower = el.complete[2] + 0.95*start.mult[1]*se.lik[2], upper = el.complete[2] + 1.1*start.mult[1]*se.lik[2], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-  if(is.na(rCI[[1]]$root)) rCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p), lower = el.complete[2] + 0.1*start.mult[1]*se.lik[2], upper = el.complete[2] + 0.11*start.mult[1]*se.lik[2], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-  lCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p), lower = el.complete[2] - 1.1*start.mult[1]*se.lik[2], upper = el.complete[2] - 0.95*start.mult[1]*se.lik[2], extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
-  if(is.na(lCI[[1]]$root)) lCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p), lower = el.complete[2] - 0.11*start.mult[1]*se.lik[2], upper = el.complete[2] - 0.10*start.mult[1]*se.lik[2], extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  rCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p),
+                                      lower = el.complete[2] + 0.95*start.mult[1]*se.lik[2], upper = el.complete[2] + 1.1*start.mult[1]*se.lik[2],
+                                      extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  if(is.na(rCI[[1]]$root)) rCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p),
+                                                               lower = el.complete[2] + 0.1*start.mult[1]*se.lik[2], upper = el.complete[2] + 0.11*start.mult[1]*se.lik[2],
+                                                               extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  lCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p),
+                                      lower = el.complete[2] - 1.1*start.mult[1]*se.lik[2], upper = el.complete[2] - 0.95*start.mult[1]*se.lik[2],
+                                      extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  if(is.na(lCI[[1]]$root)) lCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1(p),
+                                                               lower = el.complete[2] - 0.11*start.mult[1]*se.lik[2], upper = el.complete[2] - 0.10*start.mult[1]*se.lik[2],
+                                                               extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
   for (i in 2:4) {
-    rCI[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - proflik1(p), lower = rCI[[i-1]]$root, f.lower = rCI[[i-1]]$f.root - qs[i-1] + qs[i], upper = el.complete[2] + (rCI[[i-1]]$root - el.complete[2]) / start.mult[i-1] * start.mult[i], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-    lCI[[i]] <- tryCatch(stats::uniroot(f = function(p) {qs[i] - proflik1(p)}, upper = lCI[[i-1]]$root, f.upper = lCI[[i-1]]$f.root - qs[i-1] + qs[i], lower = el.complete[2] + (lCI[[i-1]]$root - el.complete[2]) / start.mult[i-1] * start.mult[i], extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
+    rCI[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - proflik1(p), lower = rCI[[i-1]]$root, f.lower = rCI[[i-1]]$f.root - qs[i-1] + qs[i],
+                                        upper = el.complete[2] + (rCI[[i-1]]$root - el.complete[2]) / start.mult[i-1] * start.mult[i],
+                                        extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+    lCI[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - proflik1(p), upper = lCI[[i-1]]$root, f.upper = lCI[[i-1]]$f.root - qs[i-1] + qs[i],
+                                        lower = el.complete[2] + (lCI[[i-1]]$root - el.complete[2]) / start.mult[i-1] * start.mult[i],
+                                        extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
   }
   rCI <- unlist(lapply(rCI, "[[", "root"))
   lCI <- unlist(lapply(lCI, "[[", "root"))
@@ -340,19 +356,16 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   pihat[pihat > 1 - 1 / nrow(data)] <- 1 - 1 / nrow(data)
   data$XZ <- data$X * 2 + data$Z
   ystarhat <- kernelDiscreteDensitySmooth(x = data$XZ, y = data$DY)$y / pihat
-  # truepi <- pix[data$X + 1]
-  # ystarhattrue <- kernelDiscreteDensitySmooth(x = data$XZ, y = data$DY)$y / truepi
-  # plot(data$X, data$D, pch = 16, col = "#00000055")
-  # lines(data$X, pihat)
-  # lines(data$X, truepi, lty = 2)
 
   # If there are weak instruments in the VS, then using el.complete as starting values is dangerous!
   # Getting a better first-stage projection is key, then
   start.efficient <- if (weak.VS) unname(stats::lm(data$Y ~ stats::lm(Z ~ X, data = data)$fitted.values)$coefficients) else unname(el.complete)
   nlm.step.max <- sqrt(sum(diag(vcov.vs)))
-  el.opt <- tryCatch(stats::nlm(function(theta) -cemplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, p = start.efficient, gradtol = 1e-8, steptol = 1e-8, stepmax = nlm.step.max), error = function(e) return(list(code = 5)))
+  el.opt <- tryCatch(stats::nlm(function(theta) -cemplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr,
+    p = start.efficient, gradtol = 1e-8, steptol = 1e-8, stepmax = nlm.step.max), error = function(e) return(list(code = 5)))
   if (el.opt$code %in% c(4, 5)) {
-    el.opt <- stats::optim(fn = function(theta) -cemplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr, par = start.efficient, method = "BFGS", gr = NULL, control = list(reltol = 1e-8))
+    el.opt <- stats::optim(fn = function(theta) -cemplik(g.unconditional.eff(theta, data = data, pihat = pihat, ystarhat = ystarhat))$logelr,
+      par = start.efficient, method = "BFGS", gr = NULL, control = list(reltol = 1e-8))
     el.opt <- list(minimum = el.opt$value, estimate = el.opt$par, gradient = NA, code = el.opt$convergence, iterations = unname(el.opt$counts[2]))
   }
   el.efficient <- el.opt$estimate
@@ -373,7 +386,9 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
       se.lik.eff <- sqrt(diag(vcov.eff))
       warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
     }
-  } else se.lik.eff <- NULL
+  } else {
+    se.lik.eff <- NULL
+  }
   if (do.restr) {
     frestr.eff <- function(theta0 = 1, theta1 = 1) {
     r <- -cemplik(g.unconditional.eff(c(theta0, theta1), data = data, pihat = pihat, ystarhat = ystarhat))$logelr
@@ -389,7 +404,9 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
     restr1.eff <- stats::optim(fn = function(x) frestr.eff(theta0 = 1, theta1 = x), par = theta1c, method = "BFGS", gr = NULL, control = list(reltol = 1e-8))
     restr1.eff <- list(minimum = restr1.eff$value, estimate = restr1.eff$par, gradient = NA, code = restr1.eff$convergence, iterations = unname(restr1.eff$counts[2]))
   }
-  } else restr0.eff <- restr1.eff <- NULL
+  } else {
+    restr0.eff <- restr1.eff <- NULL
+  }
   cat("Seed ", .lead0(seed, 4), ", effic. estim. with I(Xi = Xj) (4/6), theta1 = ", sprintf("%1.3f", el.efficient[2]), "\n")
   if (do.restr) cat("Seed ", .lead0(seed, 4), ", effic. estim. with theta1 = 1 (5/6), theta0 = ", sprintf("%1.3f", restr0.eff$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr0.eff$minimum, 1)), "\n",
       "Seed ", .lead0(seed, 4), ", effic. estim. with theta0 = 1 (6/6), theta1 = ", sprintf("%1.3f", restr1.eff$estimate), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(restr1.eff$minimum, 1)), "\n", sep = "")
@@ -399,21 +416,34 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
   proflik1.eff <- function(theta1) {
     if (abs(theta1) > 1e6) return(NA)
     p0 <- mean(data.VS$Y) - theta1 * mean(data.VS$Z)
-    # p0 <- (mean(data$X * data$D * (data$DY - ystarhat) / pihat) + mean(data$X * ystarhat) - theta1 * mean(data$X * data$Z)) / mean(data$X)
     ret <- tryCatch(stats::nlm(f = function(x) frestr.eff(theta0 = x, theta1 = theta1), p = p0, gradtol = 1e-8, steptol = 1e-8, stepmax = se.lik.eff[1] / 5), error = function(e) return(list(code = 5)))
-    if (!(ret$code %in% c(4, 5))) return(ret$minimum) else {
+    if (!(ret$code %in% c(4, 5))) {
+      return(ret$minimum)
+    } else {
       ret <- tryCatch(stats::optim(fn = function(x) frestr.eff(theta0 = x, theta1 = theta1), par = p0, gr = NULL, method = "BFGS", control = list(reltol = 1e-8))$value, error = function(e) return(NA))
       return(ret)
     }
   }
   rCI.eff <- lCI.eff <- vector("list", length(ps))
-  rCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p), lower = el.efficient[2] + 0.95*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] + 1.1*start.mult[1]*se.lik.eff[2], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-  if (is.na(rCI.eff[[1]]$root)) rCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p), lower = el.efficient[2] + 0.10*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] + 0.11*start.mult[1]*se.lik.eff[2], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-  lCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p), lower = el.efficient[2] - 1.1*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] - 0.95*start.mult[1]*se.lik.eff[2], extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
-  if (is.na(rCI.eff[[1]]$root)) lCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p), lower = el.efficient[2] - 0.11*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] - 0.10*start.mult[1]*se.lik.eff[2], extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  rCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p),
+                                          lower = el.efficient[2] + 0.95*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] + 1.1*start.mult[1]*se.lik.eff[2],
+                                          extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  if (is.na(rCI.eff[[1]]$root)) rCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p),
+                                                                        lower = el.efficient[2] + 0.10*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] + 0.11*start.mult[1]*se.lik.eff[2],
+                                                                        extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  lCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p),
+                                          lower = el.efficient[2] - 1.1*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] - 0.95*start.mult[1]*se.lik.eff[2],
+                                          extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
+  if (is.na(rCI.eff[[1]]$root)) lCI.eff[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - proflik1.eff(p),
+                                                                        lower = el.efficient[2] - 0.11*start.mult[1]*se.lik.eff[2], upper = el.efficient[2] - 0.10*start.mult[1]*se.lik.eff[2],
+                                                                        extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
   for (i in 2:4) {
-    rCI.eff[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - proflik1.eff(p), lower = rCI.eff[[i-1]]$root, f.lower = rCI.eff[[i-1]]$f.root - qs[i-1] + qs[i], upper = el.efficient[2] + (rCI.eff[[i-1]]$root - el.efficient[2]) / start.mult[i-1] * start.mult[i], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-    lCI.eff[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - proflik1.eff(p), upper = lCI.eff[[i-1]]$root, f.upper = lCI.eff[[i-1]]$f.root - qs[i-1] + qs[i], lower = el.efficient[2] + (lCI.eff[[i-1]]$root - el.efficient[2]) / start.mult[i-1] * start.mult[i], extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
+    rCI.eff[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - proflik1.eff(p), lower = rCI.eff[[i-1]]$root, f.lower = rCI.eff[[i-1]]$f.root - qs[i-1] + qs[i],
+                                            upper = el.efficient[2] + (rCI.eff[[i-1]]$root - el.efficient[2]) / start.mult[i-1] * start.mult[i],
+                                            extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+    lCI.eff[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - proflik1.eff(p), upper = lCI.eff[[i-1]]$root, f.upper = lCI.eff[[i-1]]$f.root - qs[i-1] + qs[i],
+                                            lower = el.efficient[2] + (lCI.eff[[i-1]]$root - el.efficient[2]) / start.mult[i-1] * start.mult[i],
+                                            extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
   }
   rCI.eff <- unlist(lapply(rCI.eff, "[[", "root"))
   lCI.eff <- unlist(lapply(lCI.eff, "[[", "root"))
@@ -425,13 +455,14 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
     CI.complete <- matrix(c(lCI, rCI), ncol = 2)
     CI.efficient <- matrix(c(lCI.eff, rCI.eff), ncol = 2)
     row.names(CI.complete) <- row.names(CI.efficient) <- paste0("q", c(90, 95, 97.5, 99))
-  } else CI.complete <- CI.efficient <- NULL
+  } else {
+    CI.complete <- CI.efficient <- NULL
+  }
 
   times <- as.numeric(c(difftime(tic1, tic0, units = "secs"), difftime(tic2, tic1, units = "secs"), difftime(tic3, tic2, units = "secs"), difftime(tic4, tic3, units = "secs")))
 
   return(list(
-    # ols.obs = mod2sobs,
-    el.complete = el.complete, # el.truepi = el.truepi,
+    el.complete = el.complete,
     el.complete.restr0 = c(const = restr0$estimate, Z = 1),
     el.complete.restr1 = c(const = 1, Z = restr1$estimate),
     LR.complete = c(bothEQ1 = LR.complete, slopeEQ1 = if (do.restr) -restr0$minimum else NULL, interceptEQ1 = if (do.restr) -restr1$minimum else NULL),
@@ -449,17 +480,28 @@ getCoefELDiscrete <- function(seed, design = list(n = 500, p = 0.6, params.struc
 
 #' Estimation of one model via SEL
 #'
-#' @param start.mod A list that must contain the following elements: \code{coefficients} (initial values), \code{vcov} (a plausible guess about the variance-covariance of the estimator; used when teremining the optimiser step), and \code{residuals} (true residuals for the validation sample, i.e. subset: data$D == 1)
+#' @param start.mod A list that must contain the following elements: \code{coefficients}
+#'   (initial values), \code{vcov} (a plausible guess about the variance-covariance of the estimator;
+#'   used when teremining the optimiser step), and \code{residuals} (true residuals
+#'   for the validation sample, i.e. subset: data$D == 1)
 #' @param data A data frame on which the linear model is estimated.
 #' @param sel.bw SEL smoothing bandwidth.
-#' @param eff.control NULL for the VS estimator, or a list passed to \code{rho.full.sample} that may contain any of the following: \code{pi.hat}, \code{helper}, \code{helper.predicted}, \code{pi.bw}, \code{helper.bw}, \code{helper.degree}, \code{PIT}.
-#' @param do.SE Logical: should the standard errors be computed numerically via SEL Hessian inversion? Will be overriden with \code{TRUE} if \code{CI.lev} is not \code{NULL} since the intervals rely on standard errors.
-#' @param do.restr # Estimate models under constraints where on of the coefficients is equal to the true value?
-#' @param CI.lev A numberic vector of probabilities for confidence intervale; a good value is c(0.9, 0.95, 0.99). If \code{NULL}, the confidence intervals are not returned.
-#' @param try.ellipse Logical: should the optimiser safeguard against potential local optima (in very small samples) in some likely places based on the VCOV matrix?
+#' @param eff.control NULL for the VS estimator, or a list passed to \code{rho.full.sample}
+#'   that may contain any of the following: \code{pi.hat}, \code{helper},
+#'   \code{helper.predicted}, \code{pi.bw}, \code{helper.bw}, \code{helper.degree}, \code{PIT}.
+#' @param do.SE Logical: should the standard errors be computed numerically via
+#'   SEL Hessian inversion? Will be overriden with \code{TRUE} if \code{CI.lev}
+#'   is not \code{NULL} since the intervals rely on standard errors.
+#' @param do.restr # Estimate models under constraints where one of the coefficients is equal to the true value?
+#' @param CI.lev A numberic vector of probabilities for confidence intervale;
+#'   a good value is c(0.9, 0.95, 0.99). If \code{NULL}, the confidence intervals are not returned.
+#' @param try.ellipse Logical: should the optimiser safeguard against potential
+#'   local optima (in very small samples) in some likely places based on the VCOV matrix?
 #' @param ... Passed to maximiseSEL
 #'
-#' @return A list with model type, SEL estimates, SEL-based variance-covariance matrix (if \code{do.SE}), constrained estimates and ELR test statistics (if \code{do.restr}), ELR-based confidence intervals (if CI.lev is not NULL), and smoothing bandwidths.
+#' @return A list with model type, SEL estimates, SEL-based variance-covariance
+#'   matrix (if \code{do.SE}), constrained estimates and ELR test statistics
+#'   (if \code{do.restr}), ELR-based confidence intervals (if CI.lev is not NULL), and smoothing bandwidths.
 #' @export
 #'
 #' @examples
@@ -475,29 +517,35 @@ estimateOneModelDesign1 <- function(start.mod,
 ) {
   if (!is.null(CI.lev)) do.SE <- TRUE
   data.VS <- data[as.logical(data$D), ]
-  eff.controls <- list(pi.hat = NULL, pi.bw = bw.rot(data$X), helper.bw = bw.rot(data$X), helper = "gstar", helper.predicted = NULL, helper.degree = 1, PIT = TRUE)
-  if (is.list(eff.control) & length(eff.control) > 0) {
+  eff.controls <- list(pi.hat = NULL, pi.bw = bw.rot(data$X), helper.bw = bw.rot(data$X),
+                       helper = "gstar", helper.predicted = NULL, helper.degree = 1, PIT = TRUE)
+  if (is.list(eff.control) && length(eff.control) > 0) {
     eff.controls[names(eff.control)] <- eff.control
-    rho <- function(thetarho) rho.full.sample(theta = thetarho, data = data, pi.hat = eff.controls$pi.hat, helper = eff.controls$helper, helper.predicted = eff.controls$helper.predicted, pi.bw = eff.controls$pi.bw, helper.bw = eff.controls$helper.bw, helper.degree = eff.controls$helper.degree, PIT = eff.controls$PIT)
+    rho <- function(thetarho) rho.full.sample(theta = thetarho, data = data, pi.hat = eff.controls$pi.hat,
+                                              helper = eff.controls$helper, helper.predicted = eff.controls$helper.predicted,
+                                              pi.bw = eff.controls$pi.bw, helper.bw = eff.controls$helper.bw,
+                                              helper.degree = eff.controls$helper.degree, PIT = eff.controls$PIT)
     model.type <- "full-sample-efficient"
   } else {
     rho <- function(thetarho) rho.complete.case(theta = thetarho, data = data)
     model.type <- "validation-sample-inefficient"
   }
   sel.weights <- getSELWeights(data$X, bw = sel.bw)
-  if (try.ellipse & !is.null(dim(start.mod$coefficients))) { # Adding candidate points for optimisation
+  if (try.ellipse && !is.null(dim(start.mod$coefficients))) { # Adding candidate points for optimisation
     extra.points <- sampleEllipse(centre = start.mod$coefficients[1, ], vcov = start.mod$vcov, radius = sqrt(stats::qchisq(c(0.75, 0.9, 0.99), df = 2)))
     start.mod$coefficients <- rbind(start.mod$coefficients, do.call(rbind, extra.points))
   }
+  start.point <- start.mod$coefficients
   if (!is.null(dim(start.mod$coefficients)[1])) { # If there are multiple candidate values
     vals <- apply(start.mod$coefficients, 1, function(p) tryCatch(maximiseSEL(rho = rho, restricted.params = p, sel.weights = sel.weights, ...),  error = .fail))
     vals <- unlist(lapply(vals, "[[", "value"))
     best.point <- which.max(vals)
     start.point <- start.mod$coefficients[best.point, ]
-  } else start.point <- start.mod$coefficients
+  }
   sel <- tryCatch(maximiseSEL(rho = rho, start.values = start.point, sel.weights = sel.weights, ...),  error = .fail)
   restr.both  <- tryCatch(maximiseSEL(rho = rho, restricted.params = c(1, 1), sel.weights = sel.weights, ...),  error = .fail)
 
+  vcovar <- se <- NULL
   if (do.SE) {
     margs <- list(eps = 1e-4, d = 1e-2)
     vcovar <- solve(-numDeriv::hessian(function(th) smoothEmplik(rho, sel.weights, thetarho = th), x = sel$par, method.args = margs))
@@ -515,12 +563,12 @@ estimateOneModelDesign1 <- function(start.mod,
       warning("Using a MUCH smaller initial step (d=0.0001) for Hessian computation.")
     }
     colnames(vcovar) <- rownames(vcovar) <- names(se) <- names(start.point)
-  } else vcovar <- se <- NULL
+  }
 
   stepmax0 <- if (do.SE) se[1] / 3 else sqrt(diag(start.mod$vcov)[1]) / 3
   stepmax1 <- if (do.SE) se[2] / 3 else sqrt(diag(start.mod$vcov)[2]) / 3
 
-  if (do.restr | !is.null(CI.lev)) {
+  if (do.restr || !is.null(CI.lev)) {
     # Getting the semiparametrically efficient estimator under constraints
     U2 <- start.mod$residuals^2
     VarUX <- kernelSmooth(data.VS$X, U2, bw = bw.CV(x = data.VS$X, y = U2))
@@ -533,8 +581,10 @@ estimateOneModelDesign1 <- function(start.mod,
   if (do.restr) {
     theta0c <- (mean(Yp * Cp) - 1 * mean(Cp * Zp)) / mean(Cp^2)
     theta1c <- (mean(Yp * Zp) - 1 * mean(Cp * Zp)) / mean(Zp^2)
-    restr0 <- maximiseSEL(rho = rho, start.values = theta0c, restricted.params = c(NA, 1), sel.weights = sel.weights, optmethod = "nlm", nlm.step.max = stepmax0, ...)
-    restr1 <- maximiseSEL(rho = rho, start.values = theta1c, restricted.params = c(1, NA), sel.weights = sel.weights, optmethod = "nlm", nlm.step.max = stepmax1, ...)
+    restr0 <- maximiseSEL(rho = rho, start.values = theta0c, restricted.params = c(NA, 1),
+                          sel.weights = sel.weights, optmethod = "nlm", nlm.step.max = stepmax0, ...)
+    restr1 <- maximiseSEL(rho = rho, start.values = theta1c, restricted.params = c(1, NA),
+                          sel.weights = sel.weights, optmethod = "nlm", nlm.step.max = stepmax1, ...)
     LR0 <- 2 * (sel$value - restr0$value)
     LR1 <- 2 * (sel$value - restr1$value)
   } else {
@@ -548,30 +598,42 @@ estimateOneModelDesign1 <- function(start.mod,
       theta0r <- (mean(Yp * Cp) - theta1 * mean(Cp * Zp)) / mean(Cp^2)
       2*(sel$value - maximiseSEL(rho = rho, start.values = theta0r, restricted.params = c(NA, theta1), sel.weights = sel.weights, optmethod = "nlm", nlm.step.max = stepmax0, ...)$value)
     }
-    #
-    # plot(data.VS$X, data.VS$Y - 1 - 1 * data.VS$Z)
-    # xs <- seq(-2, 5, length.out = 11)
-    # ys <- sapply(xs, LR2)
-    # plot(xs, ys, type = "l")
+
     ps <- 1 - CI.lev
     qs <- stats::qchisq(1 - ps, df = 1)
     start.mult <- stats::qnorm(1 - ps/2)
     rCI <- lCI <- vector("list", length(ps))
-    rCI[[1]] <-                          tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p), lower = sel$par[2] + 0.95*start.mult[1]*se[2], upper = sel$par[2] + 1.10*start.mult[1]*se[2], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-    if(is.na(rCI[[1]]$root)) rCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p), lower = sel$par[2] + 0.10*start.mult[1]*se[2], upper = sel$par[2] + 0.11*start.mult[1]*se[2], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-    lCI[[1]] <-                          tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p), lower = sel$par[2] - 1.10*start.mult[1]*se[2], upper = sel$par[2] - 0.95*start.mult[1]*se[2], extendInt = "upX", tol = 1e-8),   error = function(e) return(list(root = NA)))
-    if(is.na(lCI[[1]]$root)) lCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p), lower = sel$par[2] - 0.11*start.mult[1]*se[2], upper = sel$par[2] - 0.10*start.mult[1]*se[2], extendInt = "upX", tol = 1e-8),   error = function(e) return(list(root = NA)))
+    rCI[[1]] <-                          tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p),
+                                                                 lower = sel$par[2] + 0.95*start.mult[1]*se[2], upper = sel$par[2] + 1.10*start.mult[1]*se[2],
+                                                                 extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+    if(is.na(rCI[[1]]$root)) rCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p),
+                                                                 lower = sel$par[2] + 0.10*start.mult[1]*se[2], upper = sel$par[2] + 0.11*start.mult[1]*se[2],
+                                                                 extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+    lCI[[1]] <-                          tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p),
+                                                                 lower = sel$par[2] - 1.10*start.mult[1]*se[2], upper = sel$par[2] - 0.95*start.mult[1]*se[2],
+                                                                 extendInt = "upX", tol = 1e-8),   error = function(e) return(list(root = NA)))
+    if(is.na(lCI[[1]]$root)) lCI[[1]] <- tryCatch(stats::uniroot(f = function(p) qs[1] - LR2(p),
+                                                                 lower = sel$par[2] - 0.11*start.mult[1]*se[2], upper = sel$par[2] - 0.10*start.mult[1]*se[2],
+                                                                 extendInt = "upX", tol = 1e-8),   error = function(e) return(list(root = NA)))
     if (length(CI.lev) > 1) {
       for (i in 2:length(CI.lev)) {
-        rCI[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - LR2(p), lower = rCI[[i-1]]$root, f.lower = rCI[[i-1]]$f.root - qs[i-1] + qs[i], upper = sel$par[2] + (rCI[[i-1]]$root - sel$par[2]) / start.mult[i-1] * start.mult[i], extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
-        lCI[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - LR2(p), upper = lCI[[i-1]]$root, f.upper = lCI[[i-1]]$f.root - qs[i-1] + qs[i], lower = sel$par[2] + (lCI[[i-1]]$root - sel$par[2]) / start.mult[i-1] * start.mult[i], extendInt = "upX", tol = 1e-8),   error = function(e) return(list(root = NA)))
+        rCI[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - LR2(p),
+                                            lower = rCI[[i-1]]$root, f.lower = rCI[[i-1]]$f.root - qs[i-1] + qs[i],
+                                            upper = sel$par[2] + (rCI[[i-1]]$root - sel$par[2]) / start.mult[i-1] * start.mult[i],
+                                            extendInt = "downX", tol = 1e-8), error = function(e) return(list(root = NA)))
+        lCI[[i]] <- tryCatch(stats::uniroot(f = function(p) qs[i] - LR2(p),
+                                            upper = lCI[[i-1]]$root, f.upper = lCI[[i-1]]$f.root - qs[i-1] + qs[i],
+                                            lower = sel$par[2] + (lCI[[i-1]]$root - sel$par[2]) / start.mult[i-1] * start.mult[i],
+                                            extendInt = "upX", tol = 1e-8), error = function(e) return(list(root = NA)))
       }
     }
     rCI <- unlist(lapply(rCI, "[[", "root"))
     lCI <- unlist(lapply(lCI, "[[", "root"))
     CI <- cbind(lCI, rCI)
     rownames(CI) <- as.character(CI.lev)
-  } else CI <- NULL
+  } else {
+    CI <- NULL
+  }
 
   return(list(model.type = model.type, sel = sel, vcov = vcovar,
               restricted = list(`R:theta=(1,1)` = restr.both, `R:theta1=1` = restr0, `R:theta0=1` = restr1),
@@ -593,7 +655,10 @@ estimateOneModelDesign1 <- function(start.mod,
 #' @param weak.instrument.f A scalar indicating the threshold F statistic: if the first-stage F is less than that, discard the simulation. Set to 0 to allow all simulations regardless of the instrument strength.
 #' @param ... Passed to estimateOneModelDesign1.
 #'
-#' @return A list with seed used, design parameters to recreate the data set, 2SLS estimates, weak instrument diagnostics, optimal IV estimates, VS SEL estimates and, if proper smoothing parameters were passed, efficient SEL estimates, and time taken to compute the latter two.
+#' @return A list with seed used, design parameters to recreate the data set,
+#'   2SLS estimates, weak instrument diagnostics, optimal IV estimates, VS SEL
+#'   estimates and, if proper smoothing parameters were passed, efficient SEL
+#'   estimates, and time taken to compute the latter two.
 #' @export
 #'
 #' @examples
@@ -606,7 +671,7 @@ getCoefSELContinuous <- function(seed, design = list(),
                                  ...
 ) {
   this.design <- list(n = 500, sigma2X = function(x) sigma2cragg(x, r = -1/3, v = 2), propensity = function(x) propensityScore(x, lower = 0.95, upper = 0.25, r = 0.1, sd = 0.5, spec = 5))
-  if (is.list(design) & length(design) > 0) this.design[names(design)] <- design
+  if (is.list(design) && length(design) > 0) this.design[names(design)] <- design
   data <- generateData(n = this.design$n, distfun = stats::runif, propensity = this.design$propensity, sigma2X = this.design$sigma2X, seed = seed)
   data.VS <- data[as.logical(data$D), ]
   tic0 <- Sys.time()
@@ -625,16 +690,16 @@ getCoefSELContinuous <- function(seed, design = list(),
   ))
   # An initial model based on Newey's 1993 efficient instruments.
   mod.init <- lmEff(y = data.VS$Y, incl = NULL, endog = data.VS$Z, excl = data.VS$X, iterations = 2, coef.names = c("(Intercept)", "Z"))
-  # cat("Seed", .lead0(seed, 4), "starting values:", sprintf("%1.3f", mod.init$coefficients), "\n")
 
   models.VS <- vector("list", length(sel.bw))
-  for (j in 1:length(sel.bw)) {
+  for (j in seq_along(sel.bw)) {
     start.mod <- mod.init
     if (j > 1) start.point <- tryCatch(models.VS[[j-1]]$sel$par, error = function(e) return(NA)) else start.point <- mod.init$coefficients
+    tryel <- FALSE
     if (!all(is.finite(start.point))) {
       start.point <- mod.init$coefficients # If there is no numeric value in the previous iteration, try the optimal 2SLS
       tryel <- TRUE # And a more thorough initial value search should be carried out
-    } else tryel <- FALSE
+    }
     if (j == 1) tryel <- TRUE
     start.mod$coefficients <- start.point
     start.mod$coefficients <- rbind(start.mod$coefficients, mod2s.VS)
@@ -646,10 +711,11 @@ getCoefSELContinuous <- function(seed, design = list(),
   if (CV) { # Cross-validated bw for pi
     pi.bw <- tryCatch(bw.CV(x = data$X, y = data$D), error = function(e) {cat("Seed", seed, "CV error:\n"); print(e); return(bw.CV(data$X))})
     u <- data.VS$Y - as.numeric(cbind(1, data.VS$Z) %*% models.VS[[1]]$sel$par)
-    helper.bw <- tryCatch(bw.CV(x = as.matrix(data.VS[ , c("X", "Z")]), y = u, same = TRUE), error = function(e) {cat("Seed", seed, "CV error:\n"); print(e); return(bw.CV(as.matrix(data.VS[ , c("X", "Z")]), same = TRUE))})
+    helper.bw <- tryCatch(bw.CV(x = as.matrix(data.VS[, c("X", "Z")]), y = u, same = TRUE), error = function(e) {cat("Seed", seed, "CV error:\n"); print(e); return(bw.CV(as.matrix(data.VS[, c("X", "Z")]), same = TRUE))})
   }
 
-  if ((length(pi.bw) > 0) & (length(helper.bw) > 0) & (length(helper) > 0) & (length(degree) > 0)) {
+  models.eff <- NULL
+  if ((length(pi.bw) > 0) && (length(helper.bw) > 0) && (length(helper) > 0) && (length(degree) > 0)) {
     hyperpar.df <- expand.grid(sel.bw = sel.bw, pi.bw = pi.bw, helper.bw = helper.bw, helper = helper, degree = degree)
     hyperpar.num <- as.matrix(as.data.frame(lapply(hyperpar.df, as.numeric)))
     hyperpar.sd <- apply(hyperpar.num, 2, stats::sd)
@@ -657,9 +723,11 @@ getCoefSELContinuous <- function(seed, design = list(),
     hyperpar.df[, c("theta0", "theta1")] <- NA
     models.eff <- vector("list", nrow(hyperpar.df))
     tryel <- TRUE # Always try ellipse search at the first iteration
-    for (j in 1:nrow(hyperpar.df)) {
+    for (j in seq_len(nrow(hyperpar.df))) {
       start.mod <- mod.init
-      if (j == 2 & all(is.finite(models.eff[[1]]$sel$par))) start.mod$coefficients <- models.eff[[1]]$sel$par else if (j > 2) {
+      if (j == 2 && all(is.finite(models.eff[[1]]$sel$par))) {
+        start.mod$coefficients <- models.eff[[1]]$sel$par
+      } else if (j > 2) {
         j.where.theta.notNA <- which(!is.na(hyperpar.df$theta1))
         done.so.far <- matrix(hyperpar.num[j.where.theta.notNA, ], ncol = 5)
         done.so.far <- sweep(done.so.far, 2, hyperpar.sd, "/")
@@ -669,12 +737,23 @@ getCoefSELContinuous <- function(seed, design = list(),
           if (all(is.finite(models.eff[[closest.model]]$sel$par))) start.mod$coefficients <- models.eff[[j.where.theta.notNA[closest.model]]]$sel$par
           tryel <- !all(is.finite(models.eff[[closest.model]]$sel$par)) # If all went smooth, no advanced initial value search is required
         }
-      } else start.mod$coefficients <- rbind(start.mod$coefficients, mod2s.VS, models.VS[[1]]$sel$par)
-      models.eff[[j]] <- estimateOneModelDesign1(start.mod = start.mod, data = data, sel.bw = hyperpar.df$sel.bw[j], eff.control = list(pi.bw = hyperpar.df$pi.bw[j], helper.bw = hyperpar.df$helper.bw[j], helper = as.character(hyperpar.df$helper[j]), helper.degree = hyperpar.df$degree[j], PIT = TRUE), try.ellipse = tryel, ...)
+      } else {
+        start.mod$coefficients <- rbind(start.mod$coefficients, mod2s.VS, models.VS[[1]]$sel$par)
+      }
+      ec <- list(pi.bw = hyperpar.df$pi.bw[j], helper.bw = hyperpar.df$helper.bw[j],
+                 helper = as.character(hyperpar.df$helper[j]), helper.degree = hyperpar.df$degree[j], PIT = TRUE)
+      models.eff[[j]] <- estimateOneModelDesign1(start.mod = start.mod, data = data, sel.bw = hyperpar.df$sel.bw[j], eff.control = ec, try.ellipse = tryel, ...)
       hyperpar.df[j, c("theta0", "theta1")] <- models.eff[[j]]$sel$par
-      cat("Seed ", .lead0(seed, 4), ", SEL bw = ", .trail0(hyperpar.df$sel.bw[j], 3),  ", ^theta_ef = ", paste(.trail0(models.eff[[j]]$sel$par, 3), collapse = " "), " [b_pi = ", .trail0(hyperpar.df$pi.bw[j], 3), ", b_mu = ", .trail0(hyperpar.df$helper.bw[j], 3), ", help = ", as.character(hyperpar.df$helper[j]), ", deg = ", hyperpar.df$degree[j], "]", " (", j, "/", nrow(hyperpar.df), ") {closest: ", if (j > 2) j.where.theta.notNA[closest.model] else "", "}\n", sep = "")
+      cat("Seed ", .lead0(seed, 4), ", SEL bw = ", .trail0(hyperpar.df$sel.bw[j], 3),
+          ", ^theta_ef = ", paste(.trail0(models.eff[[j]]$sel$par, 3), collapse = " "),
+          " [b_pi = ", .trail0(hyperpar.df$pi.bw[j], 3),
+          ", b_mu = ", .trail0(hyperpar.df$helper.bw[j], 3),
+          ", help = ", as.character(hyperpar.df$helper[j]),
+          ", deg = ", hyperpar.df$degree[j], "]",
+          " (", j, "/", nrow(hyperpar.df), ") {closest: ",
+          if (j > 2) j.where.theta.notNA[closest.model] else "", "}\n", sep = "")
     }
-  } else models.eff <- NULL
+  }
 
   tic2 <- Sys.time()
 
@@ -698,10 +777,9 @@ doTheRestSELContinuous <- function(SELmodel, do.SE = TRUE, do.restr = TRUE, CI.l
                                    ) {
   num.VS  <- length(SELmodel$models.VS)
   num.eff <- length(SELmodel$models.eff)
-  if ((num.VS > 0) | (num.eff > 0)) {
+  if ((num.VS > 0) || (num.eff > 0)) {
     data <- generateData(n = SELmodel$design$n, distfun = stats::runif, propensity = SELmodel$design$propensity, sigma2X = SELmodel$design$sigma2X, seed = SELmodel$seed)
     data.VS <- data[as.logical(data$D), ]
-    tic0 <- Sys.time()
     mod1s.VS <- stats::lm(Z ~ X, data = data.VS)
     mod2s.VS <- unname(stats::lm(data.VS$Y ~ mod1s.VS$fitted.values)$coefficients)
     mod.init <- lmEff(y = data.VS$Y, incl = NULL, endog = data.VS$Z, excl = data.VS$X, iterations = 2, coef.names = c("(Intercept)", "Z"))
@@ -712,7 +790,7 @@ doTheRestSELContinuous <- function(SELmodel, do.SE = TRUE, do.restr = TRUE, CI.l
       submodel <- SELmodel$models.VS[[i]]
       this.do.SE <- is.null(submodel$vcov) & do.SE # Do we need to do anything? If something has been computed already, skip
       this.do.restr <- any(sapply(submodel$restricted, is.null)) & do.restr
-      this.CI.lev <- if (is.null(submodel$CI) & (!is.null(CI.lev))) CI.lev else NULL
+      this.CI.lev <- if (is.null(submodel$CI) && (!is.null(CI.lev))) CI.lev else NULL
       mod.init$coefficients <- submodel$sel$par
 
       if (isTRUE(all(is.finite(mod.init$coefficients)))) {
@@ -723,7 +801,7 @@ doTheRestSELContinuous <- function(SELmodel, do.SE = TRUE, do.restr = TRUE, CI.l
           if (this.do.SE) cat("Standard errors:       (", paste(.trail0(sqrt(diag(this.mod$vcov)), 4), collapse = " "), ")\n", sep = "")
           if (this.do.restr) cat("Restricted true slope: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta1=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[2], 1)), "\n",
                                  "Restricted true const: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta0=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[3], 1)), "\n", sep = "")
-          if(!is.null(this.CI.lev)) cat("Confidence interval points:", .trail0(c(this.mod$CI[length(CI.lev):1, 1], this.mod$CI[1:length(CI.lev), 2]), 4), "\n")
+          if(!is.null(this.CI.lev)) cat("Confidence interval points:", .trail0(c(this.mod$CI[rev(seq_along(CI.lev)), 1], this.mod$CI[seq_along(CI.lev), 2]), 4), "\n")
         }
       }
     }
@@ -734,7 +812,7 @@ doTheRestSELContinuous <- function(SELmodel, do.SE = TRUE, do.restr = TRUE, CI.l
       submodel <- SELmodel$models.eff[[i]]
       this.do.SE <- is.null(submodel$vcov) & do.SE # Do we need to do anything?
       this.do.restr <- any(sapply(submodel$restricted, is.null)) & do.restr
-      this.CI.lev <- if (is.null(submodel$CI) & (!is.null(CI.lev))) CI.lev else NULL
+      this.CI.lev <- if (is.null(submodel$CI) && (!is.null(CI.lev))) CI.lev else NULL
       this.eff.control <- submodel$eff.control
       mod.init$coefficients <- submodel$sel$par
 
@@ -746,7 +824,7 @@ doTheRestSELContinuous <- function(SELmodel, do.SE = TRUE, do.restr = TRUE, CI.l
           if (this.do.SE) cat("Standard errors:       (", paste(.trail0(sqrt(diag(this.mod$vcov)), 4), collapse = " "), ")\n", sep = "")
           if (this.do.restr) cat("Restricted true slope: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta1=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[2], 1)), "\n",
                                  "Restricted true const: ^theta = ", paste(.trail0(this.mod$restricted$`R:theta0=1`$par, 4), collapse = " "), ", p(LR) = ", sprintf("%1.3f", stats::pchisq(this.mod$LR[3], 1)), "\n", sep = "")
-          if(!is.null(this.CI.lev)) cat("Confidence interval points:", .trail0(c(this.mod$CI[length(CI.lev):1, 1], this.mod$CI[1:length(CI.lev), 2]), 4), "\n")
+          if(!is.null(this.CI.lev)) cat("Confidence interval points:", .trail0(c(this.mod$CI[rev(seq_along(CI.lev)), 1], this.mod$CI[seq_along(CI.lev), 2]), 4), "\n")
         }
       }
     }
@@ -780,7 +858,6 @@ g.unconditional.eff <- function(theta, data, pihat, ystarhat) {
   Ztheta <- as.numeric(cbind(1, data$Z) %*% theta)
   Dg <- data$Y - Ztheta
   Dg[is.na(data$Y)] <- 0
-  DY <- data$DY
   mu <- ystarhat - Ztheta
   rho <- (Dg - data$D * mu) / pihat + mu
   cbind(rho, rho * data$X)
@@ -874,7 +951,6 @@ rho.full.sample <- function(theta, data,
     pi.hat <- kernelSmooth(x = X0, y = data$D, bw = pi.bw, degree = 0)
     pi.hat[pi.hat < 1 / nrow(data)] <- 1 / nrow(data)
     pi.hat[pi.hat > 1 - 1 / nrow(data)] <- 1 - 1 / nrow(data)
-    # warning(paste0("No ^pi estimator was passed, estimated the propensity score with ", if (is.null(pi.bw)) "RoT" else round(pi.bw, 3), " bandwidth!"))
   }
   if (is.null(helper.predicted)) {
     ZX <- as.matrix(data[, c("Z", "X")])
@@ -882,7 +958,7 @@ rho.full.sample <- function(theta, data,
     if (helper %in% c("Ystar", "gstar")) {
       ZX.VS <- ZX[as.logical(data$D), ]
       if (PIT) {
-        ZX.support <- do.call(cbind, lapply(1:ncol(ZX), function(i) pit(x = ZX.VS[, i], xout = ZX[, i])))
+        ZX.support <- do.call(cbind, lapply(seq_len(ncol(ZX)), function(i) pit(x = ZX.VS[, i], xout = ZX[, i])))
       } else {
         ZX.support <- ZX
       }
@@ -903,7 +979,6 @@ rho.full.sample <- function(theta, data,
     } else if (helper == "Dg") {
       mu.hat    <- kernelSmooth(x = ZX,    y = Dg,      xout = NULL,       bw = helper.bw, degree = helper.degree) / pi.hat
     }
-    # warning("No Y* estimator was passed, estimated Y* with", if (is.null(helper.bw)) "RoT" else round(helper.bw, 3), "bandwidth!")
   } else { # A helper was passed
     if (helper == "mu") mu.hat <- helper.predicted else stop("The predicted helper should be 'mu'.")
   }
@@ -928,9 +1003,6 @@ sampleEllipse <- function(centre, vcov, radius, angles = rep(seq(-45, 45, 15), 2
   } else {
     ellipse <- lapply(radius, function(r) t(centre + r * t(circle.coords %*% Q[, order])))
   }
-  # points(ellipse[, 1], ellipse[, 2], pch = 16, cex = 0.5)
-  # for (i in 1:length(angles)) lines(c(centre[1], ellipse[i, 1]), c(centre[2], ellipse[i, 2]))
-  # text(ellipse[, 1], ellipse[, 2], labels = as.character(round(angles)), cex = 0.6)
   return(ellipse)
 }
 
@@ -951,7 +1023,7 @@ generateGeneric <- function(n = 10000,
   nexog <- nXin + nXex
   varXin <- if (nXin > 0) matrix(corXin, ncol = nXin, nrow = nXin) + diag(nXin) * (1 - corXin) else NULL
   varXex <- if (nXex > 0) matrix(corXex, ncol = nXex, nrow = nXex) + diag(nXex) * (1 - corXex) else NULL
-  covXinXex <- if (nXin > 0 & nXex > 0) matrix(corXinXex, ncol = nXex, nrow = nXin) else NULL
+  covXinXex <- if (nXin > 0 && nXex > 0) matrix(corXinXex, ncol = nXex, nrow = nXin) else NULL
   tnull <- function(x) if (is.null(x)) NULL else t(x)
   varX <- rbind(cbind(varXin, covXinXex), cbind(tnull(covXinXex), varXex))
   X <- matrix(stats::rnorm(n * nexog), ncol = nexog, nrow = n)
@@ -989,19 +1061,15 @@ generateGeneric <- function(n = 10000,
   }
   VarU.X <- apply(X, 1,  sigma2X)
   Usked <- U * sqrt(VarU.X) * 1.5
-  # boxplot(VarU.X ~ X[, cat.ind[1]])
-  # boxplot(VarU.X ~ X[, discr.ind[1]])
   # Grouping instruments by endogenous variable; some are going to be more relevant than others
   corresp.Xex.Z <- if (nZ > 1) as.integer(cut(1:nXex, breaks = nZ, labels = 1:nZ)) else rep(1, nXex)
   Z <- do.call(cbind, lapply(1:nZ, function(i) (if (nXin > 0) rowMeans(Xin) else 0) + 1 * rowSums(Xex[, corresp.Xex.Z == i, drop = FALSE]) + 0.1 * rowSums(Xex[, corresp.Xex.Z != i, drop = FALSE]) + V[, i] * sqrt(2 + sum(corresp.Xex.Z == i))
                              )) # The variance of the reuced-form error is proportional to the sum of the absolute values of the coefficients; the variance of the regressors is more or less the same
-  # summary(lm(Z ~ cbind(Xin, Xex)))
   # Now making the variance of Z close to unity
   Z <- sweep(Z, 2, apply(Z, 2, stats::sd), "/")
   colnames(Z) <- paste0("Z", 1:nZ)
 
   Ystar <- 1 + (if (nXin > 0) rowSums(Xin) else 0) + rowSums(Z) + Usked # Structural equation
-  # summary(lm(Ystar ~ Xin + Z))
   # The propensity score in this design will be simple: since all regressors are symmetrically distributed around zero,
   # it be proportional to the share of positive observations (between 0.95 if everything is negative to 0.70 if everything is positive)
   # The skedastic function is higher on the upper end, so the missingness will appear more frequently there
@@ -1049,14 +1117,12 @@ generateCMRData <- function(n = 10000,
   }
   VarU.X <- apply(X, 1,  sigma2X)
   Usked <- U * sqrt(VarU.X)
-  # boxplot(VarU.X ~ X[, cat.ind[1]])
-  # boxplot(VarU.X ~ X[, discr.ind[1]])
 
   Ystar <- 1 + rowSums(X) + Usked # Structural equation
   # The propensity score in this design will be simple: since all regressors are symmetrically distributed around zero,
   # it be proportional to the share of positive observations (between 0.95 if everything is negative to 0.70 if everything is positive)
   # The skedastic function is higher on the upper end, so the missingness will appear more frequently there
-  # summary(lm(Ystar ~ Xin + Z))
+
   # The propensity score in this design will be simple: since all regressors are symmetrically distributed around zero,
   # it be proportional to the share of positive observations (between 0.95 if everything is negative to 0.70 if everything is positive)
   # The skedastic function is higher on the upper end, so the missingness will appear more frequently there

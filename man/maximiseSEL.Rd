@@ -21,9 +21,12 @@ maximiseSEL(
 
 \item{verbose}{If TRUE, reports optimisation progress, otherwise remains silent.}
 
-\item{optmethod}{A string indicating the optimisation method: "nlm" (the default, invoking \code{stats::nlm}) is slightly quicker, and if it fails, "BFGS" is used}
+\item{optmethod}{A string indicating the optimisation method: "nlm" (the default,
+invoking \code{stats::nlm}) is slightly quicker, and if it fails, "BFGS" is used.}
 
-\item{nlm.step.max}{Passed to \code{nlm} if \code{optmethod == "nlm"}; in case of convergence issues, can be reduced, but if it is too small and 5 \code{nlm} iterations are done with the maximum step size, optimisation is re-done via BFGS.}
+\item{nlm.step.max}{Passed to \code{nlm} if \code{optmethod == "nlm"}; in case
+of convergence issues, can be reduced, but if it is too small and 5 \code{nlm} iterations
+are done with the maximum step size, optimisation is re-done via BFGS.}
 
 \item{maxit}{Maximum number of numerical optimiser steps. If it has not converged in this number of steps, fail gracefully with a meaningfull return.}
 

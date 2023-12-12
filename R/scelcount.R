@@ -89,14 +89,16 @@ cemplik <- function(z, ct = NULL, mu = NULL,
 
   # Initialising at lambda = 0
   init <- mllog(rep(1, n), eps = eps, M = M, order = order, der = 2) # i.e. fn and derivatives at lam = 0
-  init <- init * ct # sweep(init, 1, ct, "*") # Weights appear OUTSIDE of mllog
+  init <- init * ct # Multiply every column: weights appear OUTSIDE of mllog
   # If the initial lambda is supplied, compare lam = 0 with it and pick the best
   if (!is.null(lam)) {
     init1 <- mllog(1 + z %*% lam, eps = eps, M = M, order = order, der = 2)
-    init1 <- init1 * ct # sweep(init1, 1, ct, "*")
+    init1 <- init1 * ct
     if (sum(init1[, 1]) < sum(init[, 1])) { # Minimising --> lower is better
       init <- init1
-    } else lam <- rep(0, d) # Ignore the supplied lambda
+    } else {
+      lam <- rep(0, d) # Ignore the supplied lambda
+    }
   }
   if (is.null(lam)) lam <- rep(0, d)
 
@@ -113,7 +115,7 @@ cemplik <- function(z, ct = NULL, mu = NULL,
 
     # Get Newton step
     rootllpp <- sqrt(oldvals[, 3]) # sqrt 2nd deriv of -llog lik
-    zt <- z * rootllpp # sweep(z, 1, rootllpp, "*")
+    zt <- z * rootllpp # Multiplying each column is faster
     yt <- oldvals[, 2] / rootllpp
     step <- -svdlm(zt[nonz, ], yt[nonz]) #  SVD is more reliable than step <- -lm( yt~zt-1 )$coef
     # Also, we kick out the ones with ct=0 to avoid unnecessary NaNs
@@ -122,7 +124,7 @@ cemplik <- function(z, ct = NULL, mu = NULL,
     while (!backtrack) {
       newlam <- lam + tt*step
       newvals <- mllog(1 + z %*% newlam, eps = eps, M = M, order = order, der = 2)
-      newvals <- newvals * ct # sweep(newvals, 1, ct, "*")
+      newvals <- newvals * ct
       fnew <- sum(newvals[, 1])
       targ <- fold + ALPHA * tt * sum(gold*step) + BACKEPS # (BACKEPS for round-off, should not be needed)
       if (fnew <= targ) { # Backtracking has converged
@@ -132,7 +134,9 @@ cemplik <- function(z, ct = NULL, mu = NULL,
         gold <- apply(z*oldvals[, 2], 2, sum)
         # take the step
         lam <- newlam
-      } else tt <- tt * BETA
+      } else {
+        tt <- tt * BETA
+      }
     }
 
     # Newton decrement and gradient norm
@@ -171,15 +175,15 @@ ctracelr <- function(z, ct, mu0, mu1, N = 5, verbose = FALSE, ...) {
   d <- ncol(z)
 
   ans <- matrix(0, N + 1, d + 1 + d + 4)
-  colnames(ans)[1:d] = paste("z", 1:d, sep = ".")
-  colnames(ans)[d+1] = "logelr"
-  colnames(ans)[d+1 + 1:d] = paste("lambda", 1:d, sep = ".")
+  colnames(ans)[1:d] <- paste("z", 1:d, sep = ".")
+  colnames(ans)[d+1] <- "logelr"
+  colnames(ans)[d+1 + 1:d] <- paste("lambda", 1:d, sep = ".")
   colnames(ans)[2*d+ 2:5] <- c("conv", "iter", "decr", "gnorm")
 
   for (i in 0:N) {
     mui <- (i*mu1 + (N-i)*mu0) / N
     ansi <- cemplik(z = z, ct = ct, mu = mui, ...)
-    ans[i + 1, ] = c(mui, ansi$logelr, ansi$lam, ansi$converged, ansi$iter, ansi$ndec, ansi$gradnorm)
+    ans[i + 1, ] <- c(mui, ansi$logelr, ansi$lam, ansi$converged, ansi$iter, ansi$ndec, ansi$gradnorm)
     if (verbose) cat("Point ", i, "/", N, ", ", if (ansi$converged == 0) "NOT " else "", "converged",
                      ", log(ELR) = ", ansi$logelr, "\n", sep = "")
   }
@@ -234,7 +238,7 @@ mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE) 
     if (any(hi)) f[hi] <- logTaylor(x[hi], a = M,   k = order, r = r)
     return(f)
   })
-  if ((der == 0) & flatten1d) out <- as.vector(out)
+  if ((der == 0) && flatten1d) out <- as.vector(out)
 
   return(-out)
 }
@@ -246,7 +250,8 @@ mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE) 
 #'
 #' Empirical likelihood's Newton steps are of least-squares type.
 #' Denote \eqn{X^+} to be the generalised inverse of X. If SVD algorithm failures are encountered,
-#' it sometimes helps to try \code{svd(t(X))} and translate back. First check to ensure that \code{X} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.
+#' it sometimes helps to try \code{svd(t(X))} and translate back. First check to ensure that
+#' \code{X} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.
 #'
 #' @return A matrix of coefficients.
 #' @export
@@ -263,9 +268,9 @@ svdlm <- function(X, y) {
   dinv <- 1 / d
   dinv[lo] <- 0
   # nrow is necessary if dinv is 1x1 to avoid getting the identity matrix of size floor(dinv)
-  Xplus <- svdX$v %*% diag(dinv, nrow = length(dinv)) %*% t(svdX$u)
+  X.plus <- svdX$v %*% diag(dinv, nrow = length(dinv)) %*% t(svdX$u)
 
-  return(Xplus %*% matrix(y, ncol = 1))
+  return(X.plus %*% matrix(y, ncol = 1))
 }
 
 #' r-th derivative of the kth-order Taylor expansion of log(x)
@@ -304,7 +309,7 @@ logTaylor <- function(x, a = 1, k = 4, r = 0) {
   taylor <- sapply(r:k, function(n) { # Terms of the Taylor expansion
     if (n == r) { # Lowest order: constant
       if (r == 0) return(rep(log(a), l)) # Original function = the only special term
-      return(rep(-1/(-a)^r * gamma(n), l))
+      return(rep(-1 / (-a)^r * gamma(n), l))
     }
     mult <- if (r == 0) 1 else prod(n:(n-r+1)) # Multiplier from the polynomial power
     sgn <- if (n%%2 == 1) 1 else -1
@@ -313,4 +318,3 @@ logTaylor <- function(x, a = 1, k = 4, r = 0) {
   if (l == 1) taylor <- matrix(taylor, nrow = 1) # If sapply is not a matrix
   rowSums(taylor)
 }
-

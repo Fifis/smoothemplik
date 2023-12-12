@@ -1,13 +1,13 @@
 # smoothemplik
 
-R package for estimation via Smooth Empirical Likelihood
+R package for estimation via Smoothed Empirical Likelihood.
 
-Functionality for the following articles:
+This package provides direct functionality for the following articles:
 
 * Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data* (Vol. 39, pp. 137–171). Emerald Publishing Limited. https://doi.org/10.1108/S0731-905320190000039010
 * Cosma, A., Kostyrka, A. V., & Tripathi, G. (2023). Missing endogenous variables in conditional moment restriction models. *In progress.*
 
-Based on:
+The theory behind the method is provided in the following articles:
 
 * Tripathi, G., & Kitamura, Y. (2003). Testing conditional moment restrictions. *The Annals of Statistics, 31(6)*, 2059–2095.  https://doi.org/10.1214/aos/1074290337
 * Kitamura, Y., Tripathi, G., & Ahn, H. (2004). Empirical likelihood‐based inference in conditional moment restriction models. *Econometrica, 72(6)*, 1667–1714. https://doi.org/10.1111/j.1468-0262.2004.00550.x
@@ -18,8 +18,10 @@ Very preliminary and incomplete! Do not circulate!
 
 ### High priority
 
+* Check with the linter!
 * De-duplicate at kernel weights already (via .prepareKernel), return the attribute!
 * bw.CV bug: bw.CV(x, y = y, kernel = "quartic", order = 4) and bw.CV(x, y = y, kernel = "quartic")
+* LOO estimation: instead of dropping unique (X, Y) observations, leave each conditioning points (only X)
 * Add weight support to kernelDiscreteDensitySmooth
 * Add RcppParallel::setThreadOptions(numThreads = "auto") as the 1st line of parallel-capable functions, use setDTthreads also
 * Write test cases for C++ functions with and without speed-ups
@@ -39,6 +41,7 @@ Very preliminary and incomplete! Do not circulate!
 
 ### Medium priority
 
+* In `kernelMixedSmooth`: if LOO, do not de-duplicate `xout`, copy it from `arg$x` (currently mitigated via `deduplicate.xout = FALSE`)
 * Check: if the kernel is finite-support and bandwidth is smaller than the largest gap between two observations, then
 * Like in the SEL application: de-duplicate the input matrix, replace with weights; allow the user to disable it
 * Merging cells: allow arbitrary variables (including continuous ones) for proximity.

@@ -13,7 +13,8 @@ svdlm(X, y)
 
 Empirical likelihood's Newton steps are of least-squares type.
 Denote \eqn{X^+} to be the generalised inverse of X. If SVD algorithm failures are encountered,
-it sometimes helps to try \code{svd(t(X))} and translate back. First check to ensure that \code{X} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.}
+it sometimes helps to try \code{svd(t(X))} and translate back. First check to ensure that
+\code{X} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.}
 }
 \value{
 A matrix of coefficients.

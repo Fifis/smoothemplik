@@ -55,7 +55,7 @@ bw.rot <- function(x, kernel = c("gaussian", "uniform", "triangular", "epanechni
   vk <- switch(kernel, gaussian = 1, uniform = 1/3, triangular = 1/6, epanechnikov = 1/5, quartic = 1/7) # Variance of the kernel
   rk <- switch(kernel, gaussian = 1/sqrt(4*pi), uniform = 1/2, triangular = 2/3, epanechnikov = 3/5, quartic = 5/7)^d # Roughness of the kernel
   rdnorm2 <- (0.5*d + 0.25*d^2) / (2*sqrt(pi))^d
-  p <- 1/(d+4)
+  p <- 1 / (d+4)
   AK <- (d*rk / vk^2 / rdnorm2)^p # (4.15 from Silverman, 1986)
 
   if (!discontinuous) {
@@ -109,7 +109,9 @@ bw.rot <- function(x, kernel = c("gaussian", "uniform", "triangular", "epanechni
 #' points(pit(x1, x2), ecdf(x1)(x2), pch = 16, col = "#CC000088", cex = 0.9)
 pit <- function(x, xout = NULL) {
   x.transformed <- stats::ecdf(x)(x) - 0.5 / length(x)
-  if (is.null(xout)) return(x.transformed) else {
+  if (is.null(xout)) {
+    return(x.transformed)
+  } else {
     if (isTRUE(all.equal(x, xout, tolerance = .Machine$double.eps))) return(x.transformed)
     x.uniq.sorted <- sort(unique(x))
     ecdf.uniq.sorted <- sort(x.transformed[!duplicated(x)])
@@ -120,7 +122,7 @@ pit <- function(x, xout = NULL) {
     xout.list <- split(xout, xout.cut)
     ecdf.uniq01 <- c(0, ecdf.uniq.sorted, 1)
     xout.list.uniq <- lapply(xout.list, function(x) sort(unique(x)))
-    xout.spaced <- lapply(1:(length(xout.list.uniq)), function(i) {
+    xout.spaced <- lapply(seq_len(length(xout.list.uniq)), function(i) {
       xg <- xout.list.uniq[[i]]
       l <- length(xg)
       if (l > 0) return(seq(ecdf.uniq01[i], ecdf.uniq01[i+1], length.out = l+2)[c(-1, -l-2)]) else return(NULL)
@@ -207,7 +209,7 @@ pit <- function(x, xout = NULL) {
 ) {
   kernel <- kernel[1]
   if (!(order %in% c(2, 4, 6))) stop("The kernel order muse be 2, 4, or 6.")
-  if (convolution & order > 2) stop("At this moment, convolution kernels have been implemented for kernel order 2 only.")
+  if (convolution && order > 2) stop("At this moment, convolution kernels have been implemented for kernel order 2 only.")
   if (no.dedup) deduplicate.x <- deduplicate.xout <- FALSE
 
   if (is.data.frame(x)) x <- as.matrix(x)
@@ -248,10 +250,13 @@ pit <- function(x, xout = NULL) {
       if (!is.null(y)) {
         y <- xy$x[, ncol(xy$x)]
         x <- xy$x[, -ncol(xy$x), drop = FALSE]
-      } else
+      } else {
         x <- xy$x
+      }
       weights <- unname(sapply(split(weights, x.matches), sum)) # Adding up weights
-    } else deduplicate.x <- FALSE # No duplicates found = no action needed
+    } else {
+      deduplicate.x <- FALSE # No duplicates found = no action needed
+    }
   }
 
   if (xout.not.given) {
@@ -270,7 +275,9 @@ pit <- function(x, xout = NULL) {
       if (duplicate.stats[2] > 0) {
         xout.matches <- xy$id
         xout <- xy$x
-      } else deduplicate.xout <- FALSE
+      } else {
+        deduplicate.xout <- FALSE
+      }
     }
   }
 
@@ -464,7 +471,7 @@ kernelDensity <- function(x,
 #'
 #' Note: if \code{x} and \code{xout} are different but robust iterations were requested,
 #'   the robustification can take longer. TODO: do not estimate on (x, grid),
-#'   do the calculation with Kfull straight away.
+#'   do the calculation with K.full straight away.
 #'
 #' Note: if \code{LOO} is used, it makes sense to de-duplicate observations first.
 #'   By default, this behaviour is not enforced in this function, but when it is
@@ -479,7 +486,7 @@ kernelDensity <- function(x,
 #' set.seed(1)
 #' x <- sort(rt(1000, df = 5)) # Observed values
 #' g <- seq(-7, 7, 0.1) # Grid for evaluation
-#' f <- \(x) 1 + x + sin(x) # True E(Y | X) = f(X)
+#' f <- function(x) 1 + x + sin(x) # True E(Y | X) = f(X)
 #' y <- f(x) + rt(1000, df = 4)
 #' # 3 estimators: locally constant + 2nd-order kernel,
 #' # locally constant + 4th-order kernel, locally linear robust
@@ -544,7 +551,7 @@ kernelSmooth <- function(x,
   if (!(degree %in% 0:2)) stop("kernelSmooth: degree must be 0, 1, or 2.")
   robust <- robust[1]
   if (!(robust %in% c("huber", "bisquare"))) stop("kernelSmooth: 'robust' must be Huber (less robust) or 'bisquare' (redescending, robust).")
-  if (LOO & !is.null(xout)) {
+  if (LOO && !is.null(xout)) {
     warning("kernelSmooth: Leave-One-Out estimation requested, but a custom xout passed! Ignoring it.")
     xout <- NULL
   }
@@ -569,7 +576,7 @@ kernelSmooth <- function(x,
     order <- arg$order
 
     robW <- switch(robust, huber = function(x) ifelse(abs(x) < 1.345, 1, 1.345 / abs(x)),
-                   bisquare = function(x) ifelse(abs(x) < 4.685, (1-(x/4.685)^2)^2, 0))
+                   bisquare = function(x) ifelse(abs(x) < 4.685, (1 - (x/4.685)^2)^2, 0))
 
     is.exact <- isTRUE(all.equal(x, xout))
     # No PIT here because arg$x is already transformed
@@ -581,11 +588,11 @@ kernelSmooth <- function(x,
     needs.full <- (!is.exact) & robust.iterations > 0
     if (needs.full) { # for final weights on x & xout because they are not equal
       # No PIT here because arg$x is already transformed
-      Kfull <- kernelWeights(x = x, bw = bw, kernel = kernel, order = order, convolution = convolution)
-      Kfull <- sweep(Kfull, 2, weights, "*")
-      if (LOO) diag(Kfull) <- 0
-      Kfull <- Kfull / rowSums(Kfull)
-      w.full.list <- apply(Kfull, 1, sparseVectorToList, trim = trim)
+      K.full <- kernelWeights(x = x, bw = bw, kernel = kernel, order = order, convolution = convolution)
+      K.full <- sweep(K.full, 2, weights, "*")
+      if (LOO) diag(K.full) <- 0
+      K.full <- K.full / rowSums(K.full)
+      w.full.list <- apply(K.full, 1, sparseVectorToList, trim = trim)
     }
 
     m <- apply(x, 2, stats::median) # Standardising for LM fit stability
@@ -600,7 +607,7 @@ kernelSmooth <- function(x,
     WOLS <- function(nonzw, robustw = NULL) {
       dimb <- ncol(xs)+1
       # If there are no non-zero neighbours or one point has too much influence, declare failure
-      if (length(nonzw$idx) == 1 | any(nonzw$ct > 0.999)) return(rep(NA, dimb))
+      if (length(nonzw$idx) == 1 || any(nonzw$ct > 0.999)) return(rep(NA, dimb))
       wreg <- sqrt(nonzw$ct)
       if (!is.null(robustw)) wreg <- wreg * sqrt(robustw[nonzw$idx])
       xw <- cbind(1, xs[nonzw$idx, , drop = FALSE]) * wreg
@@ -625,7 +632,7 @@ kernelSmooth <- function(x,
     if (!needs.full) {
       # First stage: if no robust iterations were requested, just do the job
       # If robust iterations were requested and x = xout, do the first iteration
-      coefhat <- do.call(rbind, lapply(seq_along(w.list), \(i) WOLS(w.list[[i]])))
+      coefhat <- do.call(rbind, lapply(seq_along(w.list), function(i) WOLS(w.list[[i]])))
       result <- rowSums(coefhat * cbind(1, xouts))
       bad <- findBadRows(coefhat) # Print warnings
     } else {
@@ -633,7 +640,7 @@ kernelSmooth <- function(x,
       # must be estimated first
       deltak <- rep(1, length(w.full.list))
       for (i in 1:robust.iterations) {
-        coefhat.full <- do.call(rbind, lapply(seq_along(w.full.list), \(i) WOLS(w.full.list[[i]], deltak)))
+        coefhat.full <- do.call(rbind, lapply(seq_along(w.full.list), function(i) WOLS(w.full.list[[i]], deltak)))
         result.full <- rowSums(coefhat.full * cbind(1, xs))
         bad <- findBadRows(coefhat.full)
         resid <- y - result.full
@@ -641,7 +648,7 @@ kernelSmooth <- function(x,
         deltak <- robW(resid / ss / 6) # Robust LOESS weights from Cleveland 1979
       }
       # Now that robust observation weights have been computed, do OLS on a grid
-      coefhat <- do.call(rbind, lapply(1:length(w.list), function(i) WOLS(w.list[[i]], deltak)))
+      coefhat <- do.call(rbind, lapply(seq_len(length(w.list)), function(i) WOLS(w.list[[i]], deltak)))
       result  <- rowSums(coefhat * cbind(1, xouts))
     }
   }
@@ -660,7 +667,7 @@ kernelSmooth <- function(x,
   if (degree == 0) bad <- which(!is.finite(result)) # This belongs after the restoration of duplicates
   if (any(is.nan(result)))
     warning("Some smoothed values are NaN, which happens (among other reasons) when the sum of smoothing weights is exactly zero. Try increasing the bandwidth.")
-  if ((!any(is.nan(result))) & any(!is.finite(result)))
+  if ((!any(is.nan(result))) && any(!is.finite(result)))
     warning("Some smoothed values are NA or Inf, which is really strange. Check the inputs or debug this function: run debugonce(kernelSmooth) and retry the last call.")
 
   attr(result, "duplicate.stats") <- ds
@@ -793,7 +800,7 @@ kernelMixedDensity <- function(x, by, xout = NULL, byout = NULL, weights = NULL,
 #' \dontrun{
 #' if (.Platform$OS.type != "windows") {
 #' # A function to carry out the same estimation in multiple cores
-#' pFun <- \(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
+#' pFun <- function(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
 #'          weights = rep(w, 2), by = rep(by, 2),
 #'          bw = 1, degree = 0, parallel = TRUE, cores = n)
 #' system.time(pFun(1))  # 0.6--0.7 s
@@ -814,30 +821,39 @@ kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NUL
 ) {
   type <- type[1]
   dot.args <- list(...)
-  if (is.null(y) & type == "smooth") stop("Supply the mandatory 'y' argument to obtain a kernel regression smoother.")
-  by <- as.integer(factor(by))
+  if (is.null(y) && type == "smooth") stop("Supply the mandatory 'y' argument to obtain a kernel regression smoother.")
+  if (any(by != round(by))) stop("'by' must be an integer (consider using 'as.integer').")
   if (length(by) != NROW(x)) stop("The length of 'byout' must be the same as NROW(xout) (because they correspond to the same observations).")
   if (is.null(xout)) xout <- x # This is not a redundancy; .prepareKernel must receive full data for de-duplication
   if (is.null(byout)) byout <- by
   if (length(byout) != NROW(xout)) stop("The length of 'byout' must be the same as NROW(xout) (because they correspond to the same observations).")
-  xtab <- table(by)
-  xouttab <- table(byout)
-  if (!all(names(xouttab) %in% names(xtab))) stop("The 'byout' prediction categories have new values not present in the input training data.")
-  if (any(xtab < 2)) warning("Some categories have only 1 observation; the distribution is degenerate. At least 2 obs. per category are needed.")
+  if (!all(unique(byout) %in% unique(by))) stop("The unique 'byout' prediction categories have new values not present in the input training data.")
+  by2 <- as.integer(factor(c(by, byout)))
+  by <- by2[seq_along(by)]
+  byout <- by2[(length(by)+1):length(by2)]
+
+  if (any(table(by) < 2)) warning("Some categories have only 1 observation; the distribution is degenerate. At least 2 obs. per category are needed.")
 
   arg <- .prepareKernel(x = cbind(x, by), y = y, xout = cbind(xout, byout),
                         weights = weights, bw = 1, PIT = PIT,
                         deduplicate.x = deduplicate.x, deduplicate.xout = deduplicate.xout, no.dedup = no.dedup)
   arg$by <- as.integer(arg$x[, ncol(arg$x)])
-  arg$byout <- as.integer(arg$xout[, ncol(arg$xout)])
+  arg$byout <- if (!isTRUE(dot.args$LOO)) as.integer(arg$xout[, ncol(arg$xout)]) else arg$by
   arg$x <- arg$x[, -ncol(arg$x), drop = FALSE]
-  arg$xout <- arg$xout[, -ncol(arg$xout), drop = FALSE]
+  arg$xout <- if (!isTRUE(dot.args$LOO)) arg$xout[, -ncol(arg$xout), drop = FALSE] else arg$x
+  if (isTRUE(dot.args$LOO) && arg$deduplicate.x) {
+    arg$deduplicate.xout <- TRUE
+    arg$xout.matches <- arg$x.matches
+    arg$duplicate.stats["dup.rate.xout"] <- arg$duplicate.stats["dup.rate.x"]
+    arg$duplicate.stats["seconds.xout"] <- 0
+  }
+  # This arg$xout be ignored later, but is necessary to create the de-duplicated output with the same number of observations
   n <- sum(arg$weights)
 
   res <- rep(NA_real_, nrow(arg$xout))
   k <- max(arg$by) # Number of partitions
-  s.list <- lapply(1L:k, \(i) arg$by == i)
-  sout.list <- lapply(1L:k, \(i) arg$byout == i)
+  s.list <- lapply(1L:k, function(i) arg$by == i)
+  sout.list <- lapply(1L:k, function(i) arg$byout == i)
   innerFun <- function(i) {
     s <- s.list[[i]]
     sout <- sout.list[[i]]
@@ -848,11 +864,13 @@ kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NUL
     if (NROW(xout.sub) < 1) return(NULL) # If the new data do not have these values, skip
     res.sub <- switch(type,
                       density = kernelDensity(x = x.sub,            weights = w.sub, xout = xout.sub, no.dedup = TRUE, ...) * (sum(w.sub) / n),
-                      smooth  = kernelSmooth( x = x.sub, y = y.sub, weights = w.sub, xout = if (!isTRUE(dot.args$LOO)) xout.sub else NULL, no.dedup = TRUE, ...))
+                      smooth  = kernelSmooth(x  = x.sub, y = y.sub, weights = w.sub, xout = if (!isTRUE(dot.args$LOO)) xout.sub else NULL, no.dedup = TRUE, ...))
+    # Initially, xout is set to x in case LOO is requested; this produces de-duplicated xout and byout of correct size
+    # NULL is passed to kernelSmooth in the case of LOO CV to avoid warnings (does not affect the result)
     return(res.sub)
   }
   if (cores > k) cores <- k
-  res.list <- if (parallel & cores > 1) parallel::mclapply(X = 1L:k, FUN = innerFun, mc.preschedule = preschedule, mc.cores = cores) else lapply(1L:k, innerFun)
+  res.list <- if (parallel && cores > 1) parallel::mclapply(X = 1L:k, FUN = innerFun, mc.preschedule = preschedule, mc.cores = cores) else lapply(1L:k, innerFun)
   for (i in 1L:k) res[sout.list[[i]]] <- res.list[[i]] # Same order as before
 
   if (arg$deduplicate.xout) res <- res[arg$xout.matches]
@@ -893,12 +911,14 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
     if (many.bw) {
       if (!is.vector(bw)) bw <- lapply(seq_len(nrow(bw)), function(i) bw[i, ]) # If the input is a matrix, split it into a list
       # Otherwise, [mc]lapply will happily eat a vector
-    } else bw <- list(bw) # If there is only one bw, make it a list
+    } else {
+      bw <- list(bw) # If there is only one bw, make it a list
+    }
   }
   CV <- function(b) {
     # A sub-function to compute the CV for one BW, parallelisable
     if (any(b <= 0)) return(Inf)
-    if (!one.dim & length(b) == 1) b <- rep(b, ncol(x))
+    if (!one.dim && length(b) == 1) b <- rep(b, ncol(x))
     K0 <- matrix(kernelWeights(x = 0, bw = b, kernel = arg$kernel, order = arg$order), nrow = 1, ncol = ncol(arg$x))
     # No PIT here because arg$x is already transformed
     KK <- kernelWeights(x = arg$x, bw = b, kernel = arg$kernel, order = arg$order, convolution = TRUE, deduplicate.x = arg$deduplicate.x) # Easy Gaussian convolution!
@@ -969,14 +989,16 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
     if (many.bw) {
       if (!is.vector(bw)) bw <- lapply(seq_len(nrow(bw)), function(i) bw[i, ]) # If the input is a matrix, split it into a list
       # Otherwise, [mc]lapply will happily eat a vector
-    } else bw <- list(bw) # If there is only one bw, make it a list
+    } else {
+      bw <- list(bw) # If there is only one bw, make it a list
+    }
   }
   ASE <- function(b) { # Accepts the already-deduplicated data
     if (any(b <= 0)) return(Inf)
-    muhat_i <- kernelSmooth(x = arg$x, y = arg$y, bw = b, weights = arg$weights, kernel = arg$kernel,
+    muhat.i <- kernelSmooth(x = arg$x, y = arg$y, bw = b, weights = arg$weights, kernel = arg$kernel,
                             order = arg$order, degree = degree, LOO = TRUE, chunks = chunks,
                             robust.iterations = robust.iterations, no.dedup = TRUE)
-    m <- sum((arg$y - muhat_i)^2 * arg$weights) / n
+    m <- sum((arg$y - muhat.i)^2 * arg$weights) / n
     if (!is.finite(m)) m <- Inf
     return(m)
   }
@@ -1065,7 +1087,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   xgaps <- apply(arg$x, 2, function(a) max(diff(sort(a))))
   start.bw <- pmax(start.bw, xgaps)
   if (verbose) cat("Rule-of-thumb bandwidth:", start.bw, "...\n")
-  if (same & ncol(arg$x) > 1) start.bw <- stats::quantile(start.bw, 0.75) # To the over-smoothing side
+  if (same && ncol(arg$x) > 1) start.bw <- stats::quantile(start.bw, 0.75) # To the over-smoothing side
   ctrl <- dot.args[["control"]]
   method <- if (is.null(dot.args[["method"]])) "BFGS" else dot.args[["method"]]
   optim.control <- switch(method, BFGS = list(reltol = tol, REPORT = 1, trace = if (verbose) 2 else 0),
@@ -1075,12 +1097,15 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   f0 <- suppressWarnings(f.to.min(start.bw))
   # A quick grid search to avoid multi-modality
   if (try.grid) {
-    bgrid <- lapply(-3:6, \(p) start.bw * 1.25^p)
-    CVgrid <- sapply(bgrid, f.to.min)
-    if (any(is.finite(CVgrid))) {
-      start.bw <-  bgrid[[which.min(CVgrid)]]
-      f0 <- CVgrid[which.min(CVgrid)]
-    } else bgrid[[10]] # The largest one
+    bgrid <- lapply(-3:6, function(p) start.bw * 1.25^p)
+    CV.grid <- sapply(bgrid, f.to.min)
+    if (any(is.finite(CV.grid))) {
+      start.bw <-  bgrid[[which.min(CV.grid)]]
+      f0 <- CV.grid[which.min(CV.grid)]
+    } else {
+      start.bw <- bgrid[[10]] # The largest one
+      f0 <- CV.grid[[10]]
+    }
   }
   if (verbose) cat("After a quick grid evaluation, starting bandwidth search at", start.bw, "...\n")
   if (!is.finite(f0)) {
@@ -1088,10 +1113,10 @@ bw.CV <- function(x, y = NULL, weights = NULL,
       if (verbose) cat("Bandwidth (", paste0(start.bw, collapse = ", "), ") too small, increasing by 20%...\n", sep = "")
       start.bw <- start.bw * 1.2
       f0 <- suppressWarnings(f.to.min(start.bw))
-      if (is.finite(f0)) break;
+      if (is.finite(f0)) break
     }
   }
-  opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = method, control = optim.control), error = \(e) return(e))
+  opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = method, control = optim.control), error = function(e) return(e))
   if (inherits(opt.result, "error")) {
     warning("'optim' failed to optimise the bandwidth. Returning a very rough rule-of-thumb value. Reason:")
     cat(as.character(opt.result), "\n")
@@ -1208,7 +1233,7 @@ kernelFun <- function(x,
       quartic = 15/16 * (1 - x^2)^2 * (x < 1),
       gaussian = stats::dnorm(x)
     )
-    if (order > 2 & kernel != "uniform") {
+    if (order > 2 && kernel != "uniform") {
       polynomial <- abc[1] + abc[2] * x^2 + abc[3] * x^4
       k <- k * polynomial
     }
@@ -1218,7 +1243,7 @@ kernelFun <- function(x,
                   uniform = 1 / 4 * (2 - x) * (x < 2),
                   triangular = 1 / 6 * ((3 * x^3 - 6 * x^2 + 4) * (x <= 1) + (8 - 12 * x + 6 * x^2 - x^3) * (x > 1 & x < 2)),
                   epanechnikov = 3 / 160 * (2 - x)^3 * (x^2 + 6*x + 4) * (x < 2),
-                  quartic = 5 / 3584 * (2 - x)^5 * (16 + (2*x + x^2)*(20 + 8*x + x^2)) * (x < 2),
+                  quartic = 5 / 3584 * (2 - x)^5 * (16 + (2*x + x^2) * (20 + 8*x + x^2)) * (x < 2),
                   gaussian = stats::dnorm(x, sd = sqrt(2))
       )
     } else if (order == 4) {
@@ -1247,4 +1272,3 @@ kernelFun <- function(x,
   k <- k / adj.factor
   return(k)
 }
-

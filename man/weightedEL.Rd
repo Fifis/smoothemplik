@@ -32,13 +32,16 @@ due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise 
 
 \item{n.orig}{An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).}
 
-\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
+(similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
 
-\item{truncto}{Counts under \code{weight.tolerance} will be set to this value. In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
+\item{truncto}{Counts under \code{weight.tolerance} will be set to this value.
+In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
 
 \item{uniroot.control}{A list passed to the \code{uniroot}.}
 
-\item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned. Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
+\item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned.
+Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
 
 \item{verbose}{Logical: if \code{TRUE}, prints warnings.}
 }
@@ -65,7 +68,8 @@ A list with the following elements:
 }
 }
 \description{
-Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm. Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}
+Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
+Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}.
 The names of the elements in the returned list are consistent with Art B. Owen's original R code.
 }
 \details{

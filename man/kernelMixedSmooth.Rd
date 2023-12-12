@@ -105,7 +105,7 @@ all.equal(km1, km2)
 \dontrun{
 if (.Platform$OS.type != "windows") {
 # A function to carry out the same estimation in multiple cores
-pFun <- \(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
+pFun <- function(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
          weights = rep(w, 2), by = rep(by, 2),
          bw = 1, degree = 0, parallel = TRUE, cores = n)
 system.time(pFun(1))  # 0.6--0.7 s

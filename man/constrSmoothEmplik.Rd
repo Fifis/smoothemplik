@@ -7,9 +7,12 @@
 constrSmoothEmplik(par.free = NULL, par.fixed = NULL, ...)
 }
 \arguments{
-\item{par.free}{A numeric vector of *only the free parameters* passed to \code{rho}. In case of constrained optimisation, must be shorter than the number of parameters in the model.}
+\item{par.free}{A numeric vector of *only the free parameters* passed to \code{rho}.
+In case of constrained optimisation, must be shorter than the number of parameters in the model.}
 
-\item{par.fixed}{A numeric vector of the same length as \code{par.free}: numeric values should be in the places where the values are to be kept fixed, and NA where the free parameters should be. Use NULL or a vector of NA's for unrestricted optimisation.}
+\item{par.fixed}{A numeric vector of the same length as \code{par.free}:
+numeric values should be in the places where the values are to be kept fixed,
+and NA where the free parameters should be. Use NULL or a vector of NA's for unrestricted optimisation.}
 
 \item{...}{Passed to \code{\link{smoothEmplik}}.}
 }

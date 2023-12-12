@@ -80,7 +80,7 @@ kernelWeightsR <- function(x, xout = NULL, bw = 1, kfun = stats::dnorm) {
   if (is.null(xout)) xout <- x
   if (is.null(dim(xout))) xout <- as.matrix(xout)
   d <- ncol(x)
-  if (d > 1 & length(bw) == 1) bw <- rep(bw, d)
+  if (d > 1 && length(bw) == 1) bw <- rep(bw, d)
   pk <- kernelWeights1R(x = x[, 1], xout = xout[, 1], bw = bw[1], kfun = kfun)
   if (d > 1) { # Accumulating the product kernel
     for (i in 2:d)
@@ -98,7 +98,7 @@ The Parzen--Rosenblatt density estimator a rescaled sum of the kernel functions:
 kernelDensityR <- function(x, xout = NULL, bw = 1, kfun = stats::dnorm) {
   x1d <- is.null(dim(x))
   n <- if (x1d) length(x) else nrow(x)
-  if (isTRUE(ncol(x) > 1) & length(bw) == 1) bw <- rep(bw, ncol(x))
+  if (isTRUE(ncol(x) > 1) && length(bw) == 1) bw <- rep(bw, ncol(x))
   pk <- kernelWeightsR(x = x, xout = xout, bw = bw, kfun = kfun)
   return(rowSums(pk) / (n * prod(bw)))
 }
@@ -255,7 +255,7 @@ We redo the same test for the kernel density estimator:
 microbenchmark(
   fCPP <- kernelDensity(X, xout = xg, bw = bw),
   fR <- kernelDensityR(X, xout = xg, bw = bw),
-times = 5, unit = "ms", check = "equivalent")
+  times = 5, unit = "ms", check = "equivalent")
 all.equal(fR, fCPP, tolerance = 1e-16)
 ```
 
@@ -277,7 +277,7 @@ ns <- c(125, 500)
 dims <- c(2, 6)
 nd <- expand.grid(n = ns, dim = dims)
 
-MVtimings <- t(sapply(1:nrow(nd), function(i) {
+timings <- t(sapply(seq_len(nrow(nd)), function(i) {
   set.seed(1)
   X <- matrix(rchisq(nd$n[i] * nd$dim[i], 3))
   b <- bw.rot(X)
@@ -285,8 +285,8 @@ MVtimings <- t(sapply(1:nrow(nd), function(i) {
   aCPP <- system.time(kernelDensity(X, bw = b))["elapsed"]
   c(R = aR, CPP = aCPP)
 }))
-MVtimings <- cbind(nd, MVtimings)
-print(MVtimings, 2)
+timings <- cbind(nd, timings)
+print(timings, 2)
 ```
 
 Finally, we can visualise the kernel regression estimator with various kernels and degrees, and robustness operations (described in the original Cleveland 1979 LOESS paper). TODO: add reference.
@@ -314,8 +314,8 @@ yhat <- sapply(1:3, function(i) kernelSmooth(x = X,  y = Y, xout = xg, bw = bw.o
 par(mfrow = c(2, 2), mar = c(0.2, 0.2, 2, 0.2))
 for (i in 1:3) {
   p <- persp(xg0, xg0, matrix(yhat[, i], ng, ng), ticktype = "detailed",
-                     main = paste0("Degree ", i-1), theta = 30, phi = 25,
-                     xlab = "X1", ylab = "X2", zlab = "Y", zlim = range(yhat, Y))
+             main = paste0("Degree ", i-1), theta = 30, phi = 25,
+             xlab = "X1", ylab = "X2", zlab = "Y", zlim = range(yhat, Y))
   points(trans3d(X[, 1], X[, 2], Y, p), col = 2)
 } 
 ```
@@ -331,4 +331,3 @@ print(cor(cbind(Y, ys))[1, 2:4], 3)
 ## Sparsity
 
 TODO
-

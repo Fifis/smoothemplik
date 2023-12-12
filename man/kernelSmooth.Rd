@@ -94,7 +94,7 @@ Standardisation is recommended for the purposes of numerical stability (sometime
 
 Note: if \code{x} and \code{xout} are different but robust iterations were requested,
   the robustification can take longer. TODO: do not estimate on (x, grid),
-  do the calculation with Kfull straight away.
+  do the calculation with K.full straight away.
 
 Note: if \code{LOO} is used, it makes sense to de-duplicate observations first.
   By default, this behaviour is not enforced in this function, but when it is
@@ -112,7 +112,7 @@ Local kernel smoother
 set.seed(1)
 x <- sort(rt(1000, df = 5)) # Observed values
 g <- seq(-7, 7, 0.1) # Grid for evaluation
-f <- \(x) 1 + x + sin(x) # True E(Y | X) = f(X)
+f <- function(x) 1 + x + sin(x) # True E(Y | X) = f(X)
 y <- f(x) + rt(1000, df = 4)
 # 3 estimators: locally constant + 2nd-order kernel,
 # locally constant + 4th-order kernel, locally linear robust

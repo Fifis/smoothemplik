@@ -38,3 +38,7 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 inst/doc
+
+# Other files
+.lintr
+.directory

@@ -30,7 +30,12 @@ smoothEmplik(
 
 \item{data}{A data object on which the moment function is computed.}
 
-\item{sel.weights}{Either a matrix with valid kernel smoothing weights with rows adding up to 1, or a list of kernel weights for smoothing where the sum of each element is 1 (must be returned by \code{sparseVectorToList}), or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}. If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must be a function that computes the kernel weights for the data set.}
+\item{sel.weights}{Either a matrix with valid kernel smoothing weights with rows adding up to 1,
+or a list of kernel weights for smoothing where the sum of each element is 1
+(must be returned by \code{sparseVectorToList}), or a function that computes
+the kernel weights based on the \code{data} argument passed to \code{...}.
+If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must
+be a function that computes the kernel weights for the data set.}
 
 \item{trim}{A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.}
 
@@ -52,11 +57,14 @@ of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, 
 the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists.
 If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.}
 
-\item{chunks}{The number of chunks into which the weight matrix is split. Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks (resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.}
+\item{chunks}{The number of chunks into which the weight matrix is split.
+Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks
+(resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.}
 
 \item{print.progress}{If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.}
 
-\item{bad.value}{Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).}
+\item{bad.value}{Replace non-finite individual SEL values with this value.
+May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).}
 
 \item{attach.attributes}{If \code{"none"}, returns just the sum of expected likelihoods;
 otherwise, attaches certain attributes for diagnostics:

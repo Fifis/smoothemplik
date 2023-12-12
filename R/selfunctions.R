@@ -1,6 +1,7 @@
 #' Empirical likelihood for one-dimensional vectors
 #'
-#' Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm. Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}
+#' Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
+#' Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}.
 #' The names of the elements in the returned list are consistent with Art B. Owen's original R code.
 #' @param z The data vector.
 #' @param ct The count variable that indicates the multiplicity ob observations. Can be fractional. Very small counts below the tolerance threshold are zeroed.
@@ -9,10 +10,13 @@
 #' @param SEL If FALSE, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 #' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
 #' @param n.orig An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).
-#' @param weight.tolerance Weight tolerance for counts to improve numerical stability (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
-#' @param truncto Counts under \code{weight.tolerance} will be set to this value. In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
+#' @param weight.tolerance Weight tolerance for counts to improve numerical stability
+#'   (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
+#' @param truncto Counts under \code{weight.tolerance} will be set to this value.
+#'   In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
 #' @param uniroot.control A list passed to the \code{uniroot}.
-#' @param return.weights Logical: if TRUE, individual EL weights are computed and returned. Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
+#' @param return.weights Logical: if TRUE, individual EL weights are computed and returned.
+#'   Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
 #' @param verbose Logical: if \code{TRUE}, prints warnings.
 #'
 #' @details
@@ -131,7 +135,7 @@ weightedEL <- function(z, mu = 0,
   exitcode <- 5
 
   # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z)
-  if (min(z) < 0 & max(z) > 0) {
+  if (min(z) < 0 && max(z) > 0) {
     negz <- z < 0
     comp <- (ct / N - 1 - shift) / z
     minlambda <- max(comp[!negz])
@@ -141,9 +145,9 @@ weightedEL <- function(z, mu = 0,
     con[names(uniroot.control)] <- uniroot.control
 
     dllik <- function(lambda) return(sum(ct * z / (1 + lambda * z + shift)))
-    lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt = "yes"), # If there is a warning, we still return the object
+    lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt = "yes"),
       warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
-      error = function(e) return(NULL)
+      error = function(e) return(NULL) # If there is a warning, we still return the object
     )
     if (!is.null(lambda)) { # Some result with or without a warning as the second element of the list
       if ("warning" %in% class(lambda[[2]])) {
@@ -160,7 +164,7 @@ weightedEL <- function(z, mu = 0,
       exitcode <- 0
       tol <- sqrt(.Machine$double.eps)
       if (abs(f.root) > tol) exitcode <- 1
-      if (abs(lam - maxlambda) < tol | abs(lam - minlambda) < tol) exitcode <- exitcode + 2
+      if (abs(lam - maxlambda) < tol || abs(lam - minlambda) < tol) exitcode <- exitcode + 2
     } else {
       exitcode <- 4
     }
@@ -171,9 +175,12 @@ weightedEL <- function(z, mu = 0,
                "Lambda is very close to the boundary and FOC not met!",
                "Root finder returned an error!",
                "mu is not strictly in the convex hull of z (spanning condition fail)!")
-  if (verbose & exitcode > 0) warning(err.msg[exitcode])
+  if (verbose && exitcode > 0) warning(err.msg[exitcode])
 
-  return(list(logelr = logelr, lam = lam, wts = wts, converged = converged, iter = iter, bracket = int, estim.prec = estim.prec, f.root = f.root, exitcode = exitcode))
+  return(list(logelr = logelr, lam = lam, wts = wts,
+              converged = converged, iter = iter,
+              bracket = int, estim.prec = estim.prec, f.root = f.root,
+              exitcode = exitcode))
 }
 
 #' Smoothed Empirical Likelihood function value
@@ -183,7 +190,12 @@ weightedEL <- function(z, mu = 0,
 #' @param rho The moment function depending on parameters and data (and potentially other parameters). Must return a numeric vector.
 #' @param theta A parameter at which the moment function is evaluated.
 #' @param data A data object on which the moment function is computed.
-#' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1, or a list of kernel weights for smoothing where the sum of each element is 1 (must be returned by \code{sparseVectorToList}), or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}. If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must be a function that computes the kernel weights for the data set.
+#' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1,
+#'   or a list of kernel weights for smoothing where the sum of each element is 1
+#'   (must be returned by \code{sparseVectorToList}), or a function that computes
+#'   the kernel weights based on the \code{data} argument passed to \code{...}.
+#'   If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must
+#'   be a function that computes the kernel weights for the data set.
 #' @param trim A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.
 #' @param weight.tolerance Passed to \code{weightedEL} (uses the same default value).
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).
@@ -198,9 +210,12 @@ weightedEL <- function(z, mu = 0,
 #' of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then,
 #' the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists.
 #' If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.
-#' @param chunks The number of chunks into which the weight matrix is split. Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks (resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.
+#' @param chunks The number of chunks into which the weight matrix is split.
+#'   Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks
+#'   (resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.
 #' @param print.progress If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.
-#' @param bad.value Replace non-finite individual SEL values with this value. May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).
+#' @param bad.value Replace non-finite individual SEL values with this value.
+#'   May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).
 #' @param attach.attributes If \code{"none"}, returns just the sum of expected likelihoods;
 #' otherwise, attaches certain attributes for diagnostics:
 #' \code{"ELRs"} for expected likelihoods,
@@ -245,7 +260,7 @@ smoothEmplik <- function(rho,
       for (i in 1:n) {
         w <- suppressWarnings(as.numeric(sel.weights(i, data)))
         empliklist[[i]] <- weightedEL(rho.series, ct = w, SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs)
-        if (print.progress) {if (i %% floor(n / 50) == 0) utils::setTxtProgressBar(pb, i)}
+        if (print.progress && (i %% floor(n / 50) == 0)) utils::setTxtProgressBar(pb, i)
       }
     if (print.progress) close(pb)
     } else {
@@ -259,19 +274,29 @@ smoothEmplik <- function(rho,
         }
         chunk.labels <- cut(1:n, breaks = chunks, labels = 1:chunks)
         chunk.list <- split(1:n, chunk.labels)
-      } else stop("smoothEmplik: Wrong value of the memory.saving argument.")
+      } else {
+        stop("smoothEmplik: Wrong value of the memory.saving argument.")
+      }
       if (print.progress) pb <- utils::txtProgressBar(min = 0, max = chunks, style = 3)
       for (k in 1:chunks) {
         inds <- chunk.list[[k]]
-        if (k == 1 & memory.saving == "none" & (is.matrix(sel.weights) | is.list(sel.weights))) {
+        if (k == 1 && memory.saving == "none" && (is.matrix(sel.weights) || is.list(sel.weights))) {
           w <- sel.weights
-        } else w <- suppressWarnings(sel.weights(chunk.list[[k]], data))
+        } else {
+          w <- suppressWarnings(sel.weights(chunk.list[[k]], data))
+        }
 
         # If w is a sparse matrix, it can be converted into a list to save memory (helps in most cases)
-        ELiFunc <- if (is.list(w)) function(i) weightedEL(rho.series[w[[i]]$idx], ct = w[[i]]$ct, SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs) else if (is.matrix(w)) function(i) weightedEL(rho.series, ct = w[i, ], SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs) else {
-          if (memory.saving == "none") stop("smoothEmplik: sel.weights must be a list or a matrix of weights for every observation of the data set, or a function returning a matrix or a list (favouring CPU over memory).") else stop("smoothEmplik: sel.weights must be a function returning a matrix or a list (favouring memory over CPU).")
+        ELiFunc <- if (is.list(w)) {
+          function(i) weightedEL(rho.series[w[[i]]$idx], ct = w[[i]]$ct, SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs)
+        } else if (is.matrix(w)) {
+          function(i) weightedEL(rho.series, ct = w[i, ], SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs)
+        } else {
+          if (memory.saving == "none")
+            stop("smoothEmplik: sel.weights must be a list or a matrix of weights for every observation of the data set, or a function returning a matrix or a list (favouring CPU over memory).") else
+              stop("smoothEmplik: sel.weights must be a function returning a matrix or a list (favouring memory over CPU).")
         }
-        empliklist[inds] <- if (parallel & cores > 1) parallel::mclapply(X = seq_along(inds), FUN = ELiFunc, mc.cores = cores) else lapply(seq_along(inds), ELiFunc)
+        empliklist[inds] <- if (parallel && cores > 1) parallel::mclapply(X = seq_along(inds), FUN = ELiFunc, mc.cores = cores) else lapply(seq_along(inds), ELiFunc)
         if (print.progress) utils::setTxtProgressBar(pb, k)
       }
       if (print.progress) close(pb)
@@ -284,12 +309,12 @@ smoothEmplik <- function(rho,
   log.SELR <- sum(trim * log.ELR.values)
   ret <- log.SELR
   if (isTRUE(attach.attributes == "none")) return(ret)
-  if ("ELRs" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "ELRs") <- log.ELR.values
-  if ("residuals" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "residuals") <- rho.series
-  if ("lam" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "lam") <- unlist(lapply(empliklist, "[[", "lam"))
-  if ("nabla" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "nabla") <- unlist(lapply(empliklist, "[[", "f.root"))
-  if ("converged" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "converged") <- unlist(lapply(empliklist, "[[", "converged"))
-  if ("exitcode" %in% attach.attributes | isTRUE(attach.attributes == "all")) attr(ret, "exitcode") <- unlist(lapply(empliklist, "[[", "exitcode"))
+  if ("ELRs" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "ELRs") <- log.ELR.values
+  if ("residuals" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "residuals") <- rho.series
+  if ("lam" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "lam") <- unlist(lapply(empliklist, "[[", "lam"))
+  if ("nabla" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "nabla") <- unlist(lapply(empliklist, "[[", "f.root"))
+  if ("converged" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "converged") <- unlist(lapply(empliklist, "[[", "converged"))
+  if ("exitcode" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "exitcode") <- unlist(lapply(empliklist, "[[", "exitcode"))
   if (attach.probs) attr(ret, "probabilities") <- lapply(empliklist, "[[", "wts")
   return(ret)
 }
@@ -300,8 +325,11 @@ smoothEmplik <- function(rho,
 #' The fixed parameter vector must have full length, and have NA's in places where the free parameters should go.
 #' Then, the free parameter values will be inserted in places with NA, and the entire vector passed to smoothEmplik.
 #'
-#' @param par.free A numeric vector of *only the free parameters* passed to \code{rho}. In case of constrained optimisation, must be shorter than the number of parameters in the model.
-#' @param par.fixed A numeric vector of the same length as \code{par.free}: numeric values should be in the places where the values are to be kept fixed, and NA where the free parameters should be. Use NULL or a vector of NA's for unrestricted optimisation.
+#' @param par.free A numeric vector of *only the free parameters* passed to \code{rho}.
+#'   In case of constrained optimisation, must be shorter than the number of parameters in the model.
+#' @param par.fixed A numeric vector of the same length as \code{par.free}:
+#'   numeric values should be in the places where the values are to be kept fixed,
+#'   and NA where the free parameters should be. Use NULL or a vector of NA's for unrestricted optimisation.
 #' @param ... Passed to \code{\link{smoothEmplik}}.
 #'
 #' @return A scalar with the constrained (or, if \code{par.fixed = NULL}, unconstrained SEL.)
@@ -314,7 +342,7 @@ constrSmoothEmplik <- function(par.free = NULL,
 ) {
   if (is.null(par.free)) { # No free parameters supplied
     theta <- par.fixed
-  } else if (isTRUE(all(is.na(par.fixed))) | is.null(par.fixed)) { # All free parameters
+  } else if (isTRUE(all(is.na(par.fixed))) || is.null(par.fixed)) { # All free parameters
     theta <- par.free
   } else { # Some free, some fixed parameters
     theta <- par.fixed
@@ -329,8 +357,11 @@ constrSmoothEmplik <- function(par.free = NULL,
 #' @param start.values Initial values for unrestricted parameters.
 #' @param restricted.params Fixed parameter values used for constrained optimisation, hypothesis testing, power and size calculations etc.
 #' @param verbose If TRUE, reports optimisation progress, otherwise remains silent.
-#' @param optmethod A string indicating the optimisation method: "nlm" (the default, invoking \code{stats::nlm}) is slightly quicker, and if it fails, "BFGS" is used
-#' @param nlm.step.max Passed to \code{nlm} if \code{optmethod == "nlm"}; in case of convergence issues, can be reduced, but if it is too small and 5 \code{nlm} iterations are done with the maximum step size, optimisation is re-done via BFGS.
+#' @param optmethod A string indicating the optimisation method: "nlm" (the default,
+#'   invoking \code{stats::nlm}) is slightly quicker, and if it fails, "BFGS" is used.
+#' @param nlm.step.max Passed to \code{nlm} if \code{optmethod == "nlm"}; in case
+#'   of convergence issues, can be reduced, but if it is too small and 5 \code{nlm} iterations
+#'   are done with the maximum step size, optimisation is re-done via BFGS.
 #' @param maxit Maximum number of numerical optimiser steps. If it has not converged in this number of steps, fail gracefully with a meaningfull return.
 #' @param ... Passed to \code{\link{constrSmoothEmplik}} or, in case all parameters are fixed, \code{\link{smoothEmplik}}.
 #'
@@ -355,14 +386,14 @@ maximiseSEL <- function(start.values = NULL,
   tic0 <- Sys.time()
 
   # Case 1: If all parameters are restricted, just evaluate the SEL at the given point
-  if (!is.null(restricted.params) & all(is.finite(restricted.params))) {
+  if (!is.null(restricted.params) && all(is.finite(restricted.params))) {
     SEL <- smoothEmplik(theta = restricted.params, ...)
     diff.opt <- as.numeric(difftime(Sys.time(), tic0, units = "secs"))
     return(list(par = restricted.params, value = SEL, restricted = rep(TRUE, length(restricted.params)), code = 0, xtimes = c(initial = 0, opt = diff.opt)))
   }
 
   # Case 2: # If the model is estimated without restrictions; safeguarging against logical(0)
-  if (isTRUE(all(is.na(restricted.params))) | is.null(restricted.params)) {
+  if (isTRUE(all(is.na(restricted.params))) || is.null(restricted.params)) {
     restricted <- rep(FALSE, length(start.values))
   } else {
     restricted <- !is.na(restricted.params)
@@ -475,12 +506,14 @@ jitterText <- function(x, y, labels, times = 16, radius = 0.1, bgcol = "#FFFFFF8
 #' m1 <- AER::ivreg(y ~ endog | excl)
 #' m2 <- lmEff(y, incl, endog, excl, iterations = 0)
 lmEff <- function(y, incl = NULL, endog = NULL, excl = NULL, bw = NULL, iterations = 2, coef.names = NULL) {
-  if (is.null(incl) & is.null(endog) & is.null(excl)) stop("There is no model; no variables on the RHS!")
+  if (is.null(incl) && is.null(endog) && is.null(excl)) stop("There is no model; no variables on the RHS!")
   IV <- cbind(1, incl, excl)
   IV0 <- cbind(incl, excl)
   if (!is.null(endog)) {
     if (is.vector(endog)) endog <- as.matrix(endog)
-    if (is.null(excl)) stop("There must be excluded instruments!") else {
+    if (is.null(excl)) {
+      stop("There must be excluded instruments!")
+    } else {
       if (is.vector(excl)) excl <- as.matrix(excl)
       if (ncol(endog) > ncol(excl)) stop("There must be more excluded instruments than endogenous variables!")
     }
@@ -488,7 +521,9 @@ lmEff <- function(y, incl = NULL, endog = NULL, excl = NULL, bw = NULL, iteratio
     Xhat <- stats::lm.fit(x = IV, y = endog)$fitted.values
     Xhat <- cbind(incl, Xhat)
     colnames(Xhat) <- c(names(incl), names(endog))
-  } else Xhat <- incl
+  } else {
+    Xhat <- incl
+  }
   mod <- stats::lm(y ~ Xhat)
   if (iterations < 1) {
     warning("No iterations for optimal instrument estimation; returning the vanilla inefficient IV estimator with the wrong VCOV!")
@@ -498,8 +533,6 @@ lmEff <- function(y, incl = NULL, endog = NULL, excl = NULL, bw = NULL, iteratio
       e2 <- as.numeric(y - cbind(1, incl, endog) %*% mod$coefficients)^2
       if (is.null(bw0)) bw <- bw.CV(x = IV0, y = e2, degree = 0, robust.iterations = 0)
       mod.var <- kernelSmooth(x = IV0, y = e2, bw = bw, degree = 0)
-      # plot(IV0[, 1], e2)
-      # points(IV0[, 1], mod.var, cex = 0.7, col = "red", pch = 16)
       mod <- stats::lm(y ~ Xhat, weights = 1 / mod.var)
     }
   }
@@ -509,6 +542,7 @@ lmEff <- function(y, incl = NULL, endog = NULL, excl = NULL, bw = NULL, iteratio
   U <- as.numeric(y - cbind(1, incl, endog) %*% mod$coefficients)
   return(list(coefficients = mod$coefficients, vcov = v, residuals = U))
 }
+# TODO: rewrite this function, make it comparable to ivreg
 
 
 #' Construct memory-efficient weights for estimation
@@ -559,14 +593,16 @@ defineValidSupport <- function(res, data, var.names, type = c("spanning", "cells
   na  <- switch(type, spanning = ch %in% "All NA", cellsize = rep(FALSE, length(group.counts)))
 
   if (verbose) {
-    if (type == "spanning" & any(bad)) {
+    if (type == "spanning" && any(bad)) {
       cat("The spanning condition necessary for SEL does not hold for ", sum(ch == "Fail"), " groups (", sum(group.counts[ch == "Fail"]), " observations) in the data set.\n", sep = "")
       cat("Additionally, ", sum(ch == "Weak"), " groups (", sum(group.counts[ch == "Weak"]), " observations) are in the groups with fewer than ",  min.obs, " obs. of opposite sign, creating potential numerical instabilities.\n", sep = "")
-    } else if (type == "cellsize" & any(bad)) {
+    } else if (type == "cellsize" && any(bad)) {
       cat("The minimum cell size (", min.obs, ") condition does not hold for ", sum(bad), " groups (", sum(group.counts[bad]), " observations) in the data set.\n", sep = "")
-    } else if (min.obs <= 1) cat("No restrictions requested, skipping the check and returning the group indices as they are!\n")
+    } else if (min.obs <= 1) {
+      cat("No restrictions requested, skipping the check and returning the group indices as they are!\n")
+    }
   }
-  if ((type == "spanning" & all(ch == "OK")) | (type == "cellsize" & all(!bad)) | min.obs <= 1) {
+  if ((type == "spanning" && all(ch == "OK")) || (type == "cellsize" && all(!bad)) || min.obs <= 1) {
     return(spl)
   } else {
     if (any(bad)) {
@@ -587,7 +623,7 @@ defineValidSupport <- function(res, data, var.names, type = c("spanning", "cells
       })
       group.distances <- do.call(rbind, group.distances)
       diag(group.distances) <- Inf
-      # image(sqrt(group.distances), asp = 1) # Look at this for debugging to see if there is any internal structure
+      # Visualise group.distances for debugging to see if there is any internal structure
       # Now we declare that the distances between bad groups are infinite
       # so that the matches were sought only in the good ones
       group.distances[bad.cats, bad.cats] <- Inf
@@ -595,7 +631,6 @@ defineValidSupport <- function(res, data, var.names, type = c("spanning", "cells
       group.distances[bad.cats, na.cats] <- Inf
       group.distances[na.cats, bad.cats] <- Inf
 
-      # image(sqrt(group.distances), asp = 1)
       bad.cats.closest <- apply(group.distances[bad.cats, , drop = FALSE], 1, which.min)
 
       spl.new <- spl
@@ -631,7 +666,7 @@ smoothEmplikDiscrete <- function(rho,
     return(suppressWarnings(weightedEL(x, SEL = TRUE, weight.tolerance = weight.tolerance)))
   }
 
-  if (parallel & cores > 1) { # Returns a list, one item for each conditioning vector point
+  if (parallel && cores > 1) { # Returns a list, one item for each conditioning vector point
     empliklist <- parallel::mclapply(rho.list, SELi, mc.cores = cores)
   } else { # If no parallelisation or the memory is scarce
     empliklist <- lapply(rho.list, SELi)
@@ -661,11 +696,6 @@ smoothEmplikMixed <- function(rho, theta, data,
                               ...) {
   if (is.null(by)) stop("You forgot to supply the factor or integer variable 'by' indicating the unique values of the conditioning set.")
 
-  # if (parallel.in & parallel.out) {
-  #   warning("Cannot parallelise at both levels, setting inner parallelisation to FALSE.")
-  #   parallel.in <- FALSE
-  # }
-
   rho.series <- rho(theta, data, ...)
   n <- length(rho.series)
   if (is.null(weight.tolerance)) weight.tolerance <- 0.01 / n
@@ -685,19 +715,16 @@ smoothEmplikMixed <- function(rho, theta, data,
       if (all(is.na(xj))) return(list(logelr = 0, lam = 0, wts = rep(1 / length(xj), length(xj)), converged = TRUE, iter = 0, bracket = c(0, 0), estim.prec = NA, f.root = NA, exitcode = 0))
       suppressWarnings(weightedEL(z = xj, ct = wj, SEL = TRUE, weight.tolerance = weight.tolerance))
     }
-    empliklist <- if (parallel.in & cores > 1) parallel::mclapply(1:length(x), SEL.b.j, mc.cores = cores) else lapply(1:length(x), SEL.b.j)
+    empliklist <- if (parallel.in && cores > 1) parallel::mclapply(seq_along(x), SEL.b.j, mc.cores = cores) else lapply(seq_along(x), SEL.b.j)
     logsemplik <- sum(trim.list[[i]] * unlist(lapply(empliklist, "[[", "logelr")))
     if (!is.finite(logsemplik)) logsemplik <- bad.value
     attr(logsemplik, "SELR") <- unlist(lapply(empliklist, "[[", "logelr"))
     return(logsemplik)
   }
 
-  SEL <- if (parallel.out & cores > 1) parallel::mclapply(1:length(rho.list), SEL.block, mc.cores = cores) else lapply(1:length(rho.list), SEL.block)
+  SEL <- if (parallel.out && cores > 1) parallel::mclapply(seq_along(rho.list), SEL.block, mc.cores = cores) else lapply(seq_along(rho.list), SEL.block)
   SSEL <- sum(unlist(SEL)) * (1 - 2 * as.numeric(minus))
   attr(SSEL, "SELs") <- unlist(lapply(SEL, attr, which = "SELR"))
 
   return(SSEL)
 }
-
-
-

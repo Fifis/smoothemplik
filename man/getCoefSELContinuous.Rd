@@ -39,7 +39,10 @@ getCoefSELContinuous(
 \item{...}{Passed to estimateOneModelDesign1.}
 }
 \value{
-A list with seed used, design parameters to recreate the data set, 2SLS estimates, weak instrument diagnostics, optimal IV estimates, VS SEL estimates and, if proper smoothing parameters were passed, efficient SEL estimates, and time taken to compute the latter two.
+A list with seed used, design parameters to recreate the data set,
+  2SLS estimates, weak instrument diagnostics, optimal IV estimates, VS SEL
+  estimates and, if proper smoothing parameters were passed, efficient SEL
+  estimates, and time taken to compute the latter two.
 }
 \description{
 Simulate and estimate one model with one seed and many hyper-parameters
