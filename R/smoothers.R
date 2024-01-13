@@ -153,12 +153,27 @@ pit <- function(x, xout = NULL) {
 
 #' Check the data for kernel estimation
 #'
-#' @inheritParams kernelWeights
+#' @param x A numeric vector, matrix, or data frame containing observations. For density, the
+#'   points used to compute the density. For kernel regression, the points corresponding to
+#'   explanatory variables.
+#' @param y Optional: a vector of dependent variable values.
+#' @param xout A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
+#'   at which the user desires to compute the weights, density, or predictions.
+#'   In other words, this is the requested evaluation grid.
+#'   If \code{NULL}, then \code{x} itself is used as the grid.
 #' @param weights A numeric vector of observation weights (typically counts) to
 #'   perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
 #'   all calculations, the total number of observations is assumed to be the
 #'   sum of \code{weights}.
-#' @param y Optional: a vector of dependent variable values.
+#' @param bw Bandwidth for the kernel: a scalar or a vector of the same length as \code{ncol(x)}.
+#'   Since it is the crucial parameter in many applications, a warning is thrown if the bandwidth
+#'   is not supplied, and then, Silverman's rule of thumb (via \code{bw.row()}) is applied
+#'   to *every dimension* of \code{x}.
+#' @param kernel Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).
+#' @param order An integer: 2, 4, or 6. Order-2 kernels are the standard kernels that
+#'   are positive everywhere. Orders 4 and 6 produce some negative values, which reduces bias but may hamper density estimation.
+#' @param convolution Logical: if FALSE, returns the usual kernel. If TRUE, returns
+#'   the convolution kernel that is used in density cross-validation.
 #' @param sparse Logical: TODO (ignored)
 #' @param deduplicate.x Logical: if TRUE, full duplicates in the input \code{x}
 #'   and \code{y} are counted and transformed into weights; subsetting indices
@@ -168,6 +183,9 @@ pit <- function(x, xout = NULL) {
 #'   the unique one are returned.
 #' @param no.dedup Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
 #'   to FALSE (shorthand).
+#' @param PIT If TRUE, the Probability Integral Transform (PIT) is applied to all columns
+#'   of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
+#'   be an integer vector of indices of columns to which the PIT should be applied.
 #'
 #' @description
 #' Checks if the order is 2, 4, or 6, transforms the objects into matrices,
@@ -306,30 +324,17 @@ pit <- function(x, xout = NULL) {
 
 #' Kernel-based weights
 #'
-#' @param x A numeric vector, matrix, or data frame containing observations. For density, the
-#'   points used to compute the density. For kernel regression, the points corresponding to
-#'   explanatory variables.
-#' @param xout A vector or a matrix of data points with \code{ncol(xout) = ncol(x)}
-#'   at which the user desires to compute the weights, density, or predictions.
-#'   In other words, this is the requested evaluation grid.
-#'   If \code{NULL}, then \code{x} itself is used as the grid.
-#' @param bw Bandwidth for the kernel: a scalar or a vector of the same length as \code{ncol(x)}.
-#'   Since it is the crucial parameter in many applications, a warning is thrown if the bandwidth
-#'   is not supplied, and then, Silverman's rule of thumb (via \code{bw.row()}) is applied
-#'   to *every dimension* of \code{x}.
-#' @param kernel Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).
-#' @param order An integer: 2, 4, or 6. Order-2 kernels are the standard kernels that
-#'   are positive everywhere. Orders 4 and 6 produce some negative values, which reduces bias but may hamper density estimation.
-#' @param convolution Logical: if FALSE, returns the usual kernel. If TRUE, returns
-#'   the convolution kernel that is used in density cross-validation.
+#' @inheritParams .prepareKernel
 #' @param sparse Logical: TODO (should be ignored?)
-#' @param PIT If TRUE, the Probability Integral Transform (PIT) is applied to all columns
-#'   of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May
-#'   be an integer vector of indices of columns to which the PIT should be applied.
-#' @inherit .prepareKernel params deduplicate.x deduplicate.xout no.dedup
 #'
 #' Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
 #' internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.
+#'
+#' Technical remark: if the kernel is Gaussian, then, the ratio of the tail density
+#' to the maximum value (at 0) is less than mach.eps/2 when abs(x) > 2*sqrt(106*log(2)) ~ 8.572.
+#' This has implications the relative error of the calculation: even the
+#' kernel with full support (theoretically) may fail to produce numerically distinct
+#' values if the argument values are more than ~8.5 standard deviations away from the mean.
 #'
 #' @return A matrix of weights of dimensions nrow(xout) x nrow(x).
 #' @export
@@ -687,6 +692,19 @@ kernelSmooth <- function(x,
 #' @export
 #'
 #' @examples
+#' set.seed(1)
+#' x <- sort(rnorm(1000))
+#' p <- 0.5*pnorm(x) + 0.25 # Propensity score
+#' d <- as.numeric(runif(1000) < p)
+#' # g = discrete version of x for binning
+#' g <- as.numeric(as.character(cut(x, -4:4, labels = -4:3+0.5)))
+#' dhat.x <- kernelSmooth(x = x, y = d, bw = 0.4, no.dedup = TRUE)
+#' dhat.g <- kernelDiscreteDensitySmooth(x = g, y = d)
+#' dhat.comp <- kernelDiscreteDensitySmooth(g, d, compact = TRUE)
+#' plot(x, p, ylim = c(0, 1), bty = "n", type = "l", lty = 2)
+#' points(x, dhat.x, col = "#00000044")
+#' points(dhat.comp, col = 2, pch = 16, cex = 2)
+#' lines(dhat.comp$x, dhat.comp$fhat, col = 4, pch = 16, lty = 3)
 kernelDiscreteDensitySmooth <- function(x,
                                         y = NULL,
                                         compact = FALSE,
@@ -738,6 +756,23 @@ kernelDiscreteDensitySmooth <- function(x,
 #' @export
 #'
 #' @examples
+#' # Estimating 3 densities on something like a panel
+#' set.seed(1)
+#' n <- 200
+#' x <- c(rnorm(n), rchisq(n, 4)/4, rexp(n, 1))
+#' by <- rep(1:3, each = n)
+#' xgrid <- seq(-3, 6, 0.1)
+#' out <- expand.grid(x = xgrid, by = 1:3)
+#' fhat <- kernelMixedDensity(x = x, xout = out$x, by = by, byout = out$by)
+#' plot(xgrid, dnorm(xgrid)/3, type = "l", bty = "n", lty = 2, ylim = c(0, 0.35),
+#'      xlab = "", ylab = "Density")
+#' lines(xgrid, dchisq(xgrid*4, 4)*4/3, lty = 2, col = 2)
+#' lines(xgrid, dexp(xgrid, 1)/3, lty = 2, col = 3)
+#' for (i in 1:3) {
+#'   lines(xgrid, fhat[out$by == i], col = i, lwd = 2)
+#'   rug(x[by == i], col = i)
+#' }
+#' legend("top", c("00", "10", "01", "11"), col = 2:5, lwd  = 2)
 kernelMixedDensity <- function(x, by, xout = NULL, byout = NULL, weights = NULL, parallel = FALSE, cores = 1, preschedule = TRUE, ...) {
   .kernelMixed(x = x, by = by, xout = xout, byout = byout, weights = weights, type = "density", parallel = parallel, cores = cores, preschedule = preschedule, ...)
 }
@@ -894,6 +929,10 @@ kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NUL
 #'
 #' @export
 #' @examples
+#' set.seed(1)
+#' x <- rlnorm(100)
+#' bws <- exp(seq(-2, 1.5, 0.1))
+#' plot(bws, DCV(x, bws), log = "x", bty = "n", main = "Density CV")
 DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order = 2,
                 PIT = FALSE, chunks = 0, no.dedup = FALSE) {
   arg <- .prepareKernel(x = x, weights = weights, bw = bw[1],
@@ -919,14 +958,21 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
     # A sub-function to compute the CV for one BW, parallelisable
     if (any(b <= 0)) return(Inf)
     if (!one.dim && length(b) == 1) b <- rep(b, ncol(x))
-    K0 <- matrix(kernelWeights(x = 0, bw = b, kernel = arg$kernel, order = arg$order), nrow = 1, ncol = ncol(arg$x))
     # No PIT here because arg$x is already transformed
-    KK <- kernelWeights(x = arg$x, bw = b, kernel = arg$kernel, order = arg$order, convolution = TRUE, deduplicate.x = arg$deduplicate.x) # Easy Gaussian convolution!
+    # Term 1: int ^f(x)^2 dx
+    KK <- kernelWeights(x = arg$x, bw = b, kernel = arg$kernel, order = arg$order, convolution = TRUE, deduplicate.x = arg$deduplicate.x)
     KK <- sweep(KK, 2, arg$weights, "*")
-    term1 <- sum(KK) / (n^2 * prod(b))
-    # Computing the LOO estimator efficiently: fhat_i(x) = n/(n-1) * fhat(x) - 1/((n-1)*b^s) * K((X[i] - x)/b)
+    pb <- prod(b)
+    term1 <- sum(KK) / (n^2 * pb)
+    # Computing the LOO estimator efficiently:
+    # fhat_i(X[i]) = 1 / (n-1) / prod(b) sum_{j != i} K(X[j] - X[i], b)
+    # (n-1) fhat_i(X[i]) = 1 / prod(b) [-K(0) + sum_{j} K(X[j] - X[i], b)]
+    # (n-1) fhat_i(X[i]) = n fhat(X[i]) - K(0) / prod(b)
+    # fhat_i(X[i]) = n/(n-1) fhat(X[i]) - K(0) / prod(b) / (n-1)
+    # n-1 gets replaced with n - w[i] in case of weights
+    K0   <- as.numeric(kernelWeights(x = matrix(0, ncol = length(b)), bw = b, kernel = arg$kernel, order = arg$order, no.dedup = TRUE))
     fhat <- kernelDensity(x = arg$x, weights = arg$weights, bw = b, kernel = arg$kernel, order = arg$order, chunks = chunks, deduplicate.x = arg$deduplicate.x)
-    fhat.LOO <- (n * fhat - K0) / (n - 1)
+    fhat.LOO <- (n*fhat - K0/pb) / (n - arg$weights)
     term2 <- -2 * mean(fhat.LOO)
     return(term1 + term2)
   }
@@ -1032,6 +1078,8 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
 #' @param tol Relative tolerance used by the optimiser as the stopping criterion.
 #' @param try.grid Logical: if true, 10 different bandwidths around the rule-of-thumb
 #'   one are tried with multiplier \code{1.2^(-3:6)}
+#' @param ndeps Numerical-difference epsilon. Puts a lower bound on the result: the estimated optimal bw
+#'   cannot be less than this value.
 #' @param verbose Logical: print out the optimiser return code for diagnostics?
 #' @param attach.attributes Logical: if TRUE, returns the output of `optim()` for diagnostics.
 #' @param control List: extra arguments to pass to the control-argument list of `optim`.
@@ -1068,7 +1116,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
                   chunks = 0,
                   robust.iterations = 0, degree = 0,
                   start.bw = NULL, same = FALSE,
-                  tol = 1e-4, try.grid = TRUE,
+                  tol = 1e-4, try.grid = TRUE, ndeps = 1e-5,
                   verbose = FALSE, attach.attributes = FALSE,
                   control = list(),
                   ...) {
@@ -1081,17 +1129,27 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   arg.list <- list(x = arg$x, weights = arg$weights, kernel = arg$kernel, order = arg$order,
                    chunks = chunks, same = same, no.dedup = TRUE) # Processed data to pass further
   if (CV == "LSCV") arg.list <- c(arg.list, list(y = arg$y), degree = degree, robust.iterations = robust.iterations)
-  f.to.min <- if (is.null(y)) function(b) do.call(DCV, c(arg.list, list(b = b))) else
-    function(b) do.call(LSCV, c(arg.list, list(b = b)))
+  if (is.null(y)) {
+    f.to.min <- function(b) {
+      if (isTRUE(any(b <= ndeps))) return(rep(NA, length(b)))
+      do.call(DCV, c(arg.list, list(b = b)))
+    }
+  } else {
+    f.to.min <- function(b) {
+      if (isTRUE(any(b <= ndeps))) return(rep(NA, length(b)))
+      do.call(LSCV, c(arg.list, list(b = b)))
+    }
+  }
   if (is.null(start.bw)) start.bw <- bw.rot(arg$x, kernel = arg$kernel, na.rm = TRUE) * 1.5
   xgaps <- apply(arg$x, 2, function(a) max(diff(sort(a))))
+  if (verbose) cat("Rule-of-thumb bw: (", paste0(start.bw, collapse = ", "), "); max. gap between obs.: (",
+                   paste0(xgaps, collapse = ", "), "). Taking the maximum as the starting point.\n", sep = "")
   start.bw <- pmax(start.bw, xgaps)
-  if (verbose) cat("Rule-of-thumb bandwidth:", start.bw, "...\n")
   if (same && ncol(arg$x) > 1) start.bw <- stats::quantile(start.bw, 0.75) # To the over-smoothing side
   ctrl <- dot.args[["control"]]
   method <- if (is.null(dot.args[["method"]])) "BFGS" else dot.args[["method"]]
-  optim.control <- switch(method, BFGS = list(reltol = tol, REPORT = 1, trace = if (verbose) 2 else 0),
-                          `L-BFGS-B` = list(factr = tol / .Machine$double.eps, REPORT = 1, trace = if (verbose) 5 else 0))
+  optim.control <- switch(method, BFGS = list(reltol = tol, REPORT = 1, trace = if (verbose) 2 else 0, ndeps = rep(ndeps, length(start.bw))),
+                          `L-BFGS-B` = list(factr = tol / .Machine$double.eps, REPORT = 1, trace = if (verbose) 5 else 0, ndeps = rep(ndeps, length(start.bw))))
   if (!is.null(ctrl)) optim.control[names(ctrl)] <- ctrl
   start.bw <- unname(start.bw) # For proper handling of named arguments inside do.call
   f0 <- suppressWarnings(f.to.min(start.bw))
@@ -1118,10 +1176,19 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   }
   opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = method, control = optim.control), error = function(e) return(e))
   if (inherits(opt.result, "error")) {
-    warning("'optim' failed to optimise the bandwidth. Returning a very rough rule-of-thumb value. Reason:")
-    cat(as.character(opt.result), "\n")
+    if (grepl("non-finite finite-difference", opt.result$message)) {
+      warning("CV gradient could not be computed (initial bw at the boundary? the optimiser tries strange values?). Retrying optimisation with the Nelder-Mead method.")
+    } else {
+      warning("Generic optimiser error. Retrying optimisation with the Nelder-Mead method.")
+    }
+    opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = "Nelder-Mead", control = optim.control), error = function(e) return(e))
+  }
+  if (inherits(opt.result, "error")) {
+    warning(paste0("'optim' failed to optimise the bandwidth. Returning a very rough rule-of-thumb value. Reason: ",
+                   as.character(opt.result)))
     return(start.bw)
   }
+
   if (verbose) message(paste0("optim exit code ", opt.result$convergence, ", done in (", paste0(opt.result$counts, collapse = ", "), ") iterations."))
   bw <- opt.result$par
   if (attach.attributes) attr(bw, "optim") <- opt.result[names(opt.result) != "par"]

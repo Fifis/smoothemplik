@@ -170,15 +170,24 @@ cemplik <- function(z, ct = NULL, mu = NULL,
 #' @export
 #'
 #' @examples
-ctracelr <- function(z, ct, mu0, mu1, N = 5, verbose = FALSE, ...) {
+#' # Plot 2.5 from Owen (2001)
+#' earth <- c(
+#'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
+#'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
+#' )
+#' logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 100, verbose = TRUE)
+#' hist(earth, breaks = seq(4.75, 6, 1/8))
+#' plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
+#'      xlab = "Earth density", ylab = "ELR")
+ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
   if (is.vector(z)) z <- matrix(z, ncol = 1)
   d <- ncol(z)
 
   ans <- matrix(0, N + 1, d + 1 + d + 4)
-  colnames(ans)[1:d] <- paste("z", 1:d, sep = ".")
-  colnames(ans)[d+1] <- "logelr"
-  colnames(ans)[d+1 + 1:d] <- paste("lambda", 1:d, sep = ".")
-  colnames(ans)[2*d+ 2:5] <- c("conv", "iter", "decr", "gnorm")
+  colnames(ans) <- c(paste("z", 1:d, sep = "."),
+                     "logelr",
+                     paste("lambda", 1:d, sep = "."),
+                     c("conv", "iter", "decr", "gnorm"))
 
   for (i in 0:N) {
     mui <- (i*mu1 + (N-i)*mu0) / N
@@ -257,6 +266,9 @@ mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE) 
 #' @export
 #'
 #' @examples
+#' b.svd <- svdlm(X = cbind(1, as.matrix(mtcars[, -1])), y = mtcars[, 1])
+#' b.lm  <- coef(lm(mpg ~ ., data = mtcars))
+#' b.lm - as.numeric(b.svd) # Negligible differences
 svdlm <- function(X, y) {
   # Tolerances for generalised inverse via SVD
   RELTOL <- 1e-9

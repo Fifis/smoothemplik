@@ -22,3 +22,18 @@ A list with \code{x}, density estimator (\code{fhat}) and, if \code{y} was provi
 \description{
 Density and/or kernel regression estimator with conditioning on discrete variables
 }
+\examples{
+set.seed(1)
+x <- sort(rnorm(1000))
+p <- 0.5*pnorm(x) + 0.25 # Propensity score
+d <- as.numeric(runif(1000) < p)
+# g = discrete version of x for binning
+g <- as.numeric(as.character(cut(x, -4:4, labels = -4:3+0.5)))
+dhat.x <- kernelSmooth(x = x, y = d, bw = 0.4, no.dedup = TRUE)
+dhat.g <- kernelDiscreteDensitySmooth(x = g, y = d)
+dhat.comp <- kernelDiscreteDensitySmooth(g, d, compact = TRUE)
+plot(x, p, ylim = c(0, 1), bty = "n", type = "l", lty = 2)
+points(x, dhat.x, col = "#00000044")
+points(dhat.comp, col = 2, pch = 16, cex = 2)
+lines(dhat.comp$x, dhat.comp$fhat, col = 4, pch = 16, lty = 3)
+}

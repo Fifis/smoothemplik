@@ -317,7 +317,7 @@ for (i in 1:3) {
              main = paste0("Degree ", i-1), theta = 30, phi = 25,
              xlab = "X1", ylab = "X2", zlab = "Y", zlim = range(yhat, Y))
   points(trans3d(X[, 1], X[, 2], Y, p), col = 2)
-} 
+}
 ```
 
 We can judge the fit quality by the percentage of explained variance (the issue of over-fitting with small bandwidths has been mitigated via cross-validation) using the available observations as the grid. This comparison is valid only because the noise is homoskedastic in this simulation, which makes the unconditional error variance interpretable. In real-life applications, consider other quality-of-fit measures.

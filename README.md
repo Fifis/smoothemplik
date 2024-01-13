@@ -18,10 +18,10 @@ Very preliminary and incomplete! Do not circulate!
 
 ### High priority
 
-* Check with the linter!
 * De-duplicate at kernel weights already (via .prepareKernel), return the attribute!
 * bw.CV bug: bw.CV(x, y = y, kernel = "quartic", order = 4) and bw.CV(x, y = y, kernel = "quartic")
 * LOO estimation: instead of dropping unique (X, Y) observations, leave each conditioning points (only X)
+* CV: implement leave-K-out CV for speed
 * Add weight support to kernelDiscreteDensitySmooth
 * Add RcppParallel::setThreadOptions(numThreads = "auto") as the 1st line of parallel-capable functions, use setDTthreads also
 * Write test cases for C++ functions with and without speed-ups
@@ -42,6 +42,7 @@ Very preliminary and incomplete! Do not circulate!
 ### Medium priority
 
 * In `kernelMixedSmooth`: if LOO, do not de-duplicate `xout`, copy it from `arg$x` (currently mitigated via `deduplicate.xout = FALSE`)
+* All LOO to the C++ density function
 * Check: if the kernel is finite-support and bandwidth is smaller than the largest gap between two observations, then
 * Like in the SEL application: de-duplicate the input matrix, replace with weights; allow the user to disable it
 * Merging cells: allow arbitrary variables (including continuous ones) for proximity.
@@ -54,3 +55,7 @@ Very preliminary and incomplete! Do not circulate!
 * Reproduce the CKT (2019) results with the `shift` argument (i.e. test the shift)
 * Create a summary class for SEL; print numerical gradients of lambdas; print the number of converged inner optimisation problems
 
+## Note for package development
+
+* Check release with lintr::lint_package()
+* Add tests reproducing simple hard-coded examples

@@ -4,7 +4,7 @@
 \alias{ctracelr}
 \title{Compute empirical likelihood on a trajectory}
 \usage{
-ctracelr(z, ct, mu0, mu1, N = 5, verbose = FALSE, ...)
+ctracelr(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...)
 }
 \arguments{
 \item{z}{Passed to \code{cemplik}.}
@@ -26,4 +26,15 @@ A matrix with one row at each mean from mu0 to mu1 and a column for each EL retu
 }
 \description{
 Compute empirical likelihood on a trajectory
+}
+\examples{
+# Plot 2.5 from Owen (2001)
+earth <- c(
+  5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
+  5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
+)
+logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 100, verbose = TRUE)
+hist(earth, breaks = seq(4.75, 6, 1/8))
+plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
+     xlab = "Earth density", ylab = "ELR")
 }

@@ -41,7 +41,16 @@ are positive everywhere. Orders 4 and 6 produce some negative values, which redu
 \item{convolution}{Logical: if FALSE, returns the usual kernel. If TRUE, returns
 the convolution kernel that is used in density cross-validation.}
 
-\item{sparse}{Logical: TODO (should be ignored?)}
+\item{sparse}{Logical: TODO (should be ignored?)
+
+Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
+internally in the built-in \code{loess} function) since the distances now depend on the ordering of data, not the values per se.
+
+Technical remark: if the kernel is Gaussian, then, the ratio of the tail density
+to the maximum value (at 0) is less than mach.eps/2 when abs(x) > 2*sqrt(106*log(2)) ~ 8.572.
+This has implications the relative error of the calculation: even the
+kernel with full support (theoretically) may fail to produce numerically distinct
+values if the argument values are more than ~8.5 standard deviations away from the mean.}
 
 \item{PIT}{If TRUE, the Probability Integral Transform (PIT) is applied to all columns
 of \code{x} via \code{ecdf} in order to map all values into the [0, 1] range. May

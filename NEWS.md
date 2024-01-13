@@ -1,6 +1,10 @@
-# smoothemplik 0.0.11 (2023-MM-DD)
+# smoothemplik 0.0.11 (2024-01-13)
 
 - Added EUPL licence
+- Initialised tests for unit testing
+- Fixed the bug in DCV when weights were not taken into account
+- Removed simulation functions for the paper (to be provided separately)
+- Added examples for most functions
 
 # smoothemplik 0.0.10 (2023-12-05)
 

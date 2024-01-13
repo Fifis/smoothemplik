@@ -59,9 +59,9 @@ A list with the following elements:
 \item{exitcode }{An integer indicating the reason of termination.}
 \describe{
 \item{0:}{success, an interior solution for lambda found.}
-\item{1:}{the value of the derivative is \code{> sqrt(.Machine$double.eps)} (the value of the function at the returned root it not exactly zero, and this is not an issue with the tolerance).}
+\item{1:}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
 \item{2:}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-\item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function is > tolerance, and the result is close to the boundary (< tolerance).}
+\item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
 \item{4:}{an error occurred while calling \code{uniroot}.}
 \item{5:}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
 }
@@ -80,12 +80,12 @@ although the algorithm used in that paper is slower than the one provided by thi
 Since we know that the EL probabilities belong to (0, 1), the interval (bracket) for \eqn{\lambda}{l} search
 can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}:
 \deqn{p_i = c_i/N \cdot (1 + \lambda z_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*z[i] + s)}
-We know that \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
+The probabilities are bounded from above: \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
 \deqn{c_i/N \cdot (1 + \lambda z_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*z[i] + s) < 1}
 \deqn{c_i/N < 1 + \lambda z_i + s}{c[i]/N < 1 + l*z_i + s}
 \deqn{c_i/N - 1 - s < \lambda z_i}{c[i]/N - 1 - s < l*z[i]}
-Two cases are possible: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
-(we do not want to divide by z_i=0). Then,
+Two cases: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
+(cases with \eqn{z_i=0}{z[i] = 0} are trivially excluded because they do not affect the EL). Then,
 \deqn{(c_i/N - 1 - s)/z_i > \lambda,\ \forall i: z_i<0}{(c[i]/N - 1 - s)/z[i] > l,  such i that z[i]<0}
 \deqn{(c_i/N - 1 - s)/z_i < \lambda,\ \forall i: z_i>0}{(c[i]/N - 1 - s)/z[i] < l,  such i that z[i]>0}
 or
@@ -95,8 +95,9 @@ which implies
 \deqn{\lambda < \min_{i: z_i<0} (c_i/N - 1 - s)/z_i}{l < min_{i: z[i]<0} (c_i/N - 1 - s)/z[i]}
 \deqn{\lambda > \max_{i: z_i>0} (c_i/N - 1 - s)/z_i}{l > max_{i: z[i]>0} (c_i/N - 1 - s)/z[i]}
 
-(This derivation contains \emph{s}, which is the extra shift that extends the function to allow mixed conditional an unconditional estimation;
-Owen's formula corresponds to \eqn{c_i}{c[i]} = 1 and \emph{s} = 0.)
+(This derivation contains \emph{s}, which is the extra shift that extends the
+function to allow mixed conditional and unconditional estimation;
+Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
 }
 \examples{
 earth <- c(

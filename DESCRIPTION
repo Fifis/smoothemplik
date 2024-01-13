@@ -1,8 +1,7 @@
 Package: smoothemplik
 Type: Package
 Title: Smoothed Empirical Likelihood
-Version: 0.0.10
-Date: 2023-12-05
+Version: 0.0.11
 Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
         role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï V. Kostyrka <andrei.kostyrka@gmail.com>
@@ -12,11 +11,11 @@ Description: Smoothed Empirical Likelihood for asymtotically efficient
     sampling, and with missing data in endogenous variables.
 License: EUPL
 Encoding: UTF-8
-URL: https://github.com/Fifis/
-Depends: R (>= 3.4.0)
+URL: https://github.com/Fifis/smoothemplik
+BugReports: https://github.com/Fifis/smoothemplik/issues
+Depends: R (>= 3.0.0)
 Imports: 
     parallel,
-    numDeriv,
     Rcpp,
     RcppParallel,
     Rdpack,
@@ -26,7 +25,8 @@ Suggests:
     AER,
     knitr,
     rmarkdown,
-    microbenchmark
+    microbenchmark,
+    testthat (>= 3.0.0)
 RdMacros: Rdpack
 RoxygenNote: 7.2.3
 NeedsCompilation: yes
@@ -34,3 +34,4 @@ LinkingTo:
     Rcpp, RcppArmadillo, RcppParallel
 SystemRequirements: GNU make
 VignetteBuilder: knitr
+Config/testthat/edition: 3

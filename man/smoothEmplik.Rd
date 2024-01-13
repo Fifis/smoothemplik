@@ -84,3 +84,25 @@ A scalar with the SEL value and, if requested, attributes containing the diagnos
 \description{
 Evaluates SEL function for a given moment function at a certain parameter value.
 }
+\examples{
+set.seed(1)
+x <- sort(rlnorm(100))
+# Heteroskedastic DGP
+y <- 1 + 1*x + rnorm(100) * (1 + x + sin(x))
+mod.OLS <- lm(y ~ x)
+rho <- function(theta, ...) y - theta[1] - theta[2]*x  # Moment fn
+w <- kernelWeights(x, PIT = TRUE) # To ensure enough neighbours
+w <- w / rowSums(w)
+image(x, x, w, log = "xy")
+theta.vals <- list(c(1, 1), coef(mod.OLS))
+SEL <- function(b) smoothEmplik(rho = rho, theta = b, sel.weights = w)
+sapply(theta.vals, SEL) # Smoothed empirical likelihood
+# SEL maximisation
+b.SEL <- optim(coef(mod.OLS), SEL, method = "BFGS",
+               control = list(fnscale = -1, reltol = 1e-6))
+print(b.SEL$par) # Closer to the true value (1, 1) than OLS
+plot(x, y)
+abline(1, 1, lty = 2)
+abline(mod.OLS, col = 2)
+abline(b.SEL$par, col = 4)
+}

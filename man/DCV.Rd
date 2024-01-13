@@ -58,3 +58,9 @@ A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.
 \description{
 Density cross-validation
 }
+\examples{
+set.seed(1)
+x <- rlnorm(100)
+bws <- exp(seq(-2, 1.5, 0.1))
+plot(bws, DCV(x, bws), log = "x", bty = "n", main = "Density CV")
+}

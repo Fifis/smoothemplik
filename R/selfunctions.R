@@ -27,12 +27,12 @@
 #' Since we know that the EL probabilities belong to (0, 1), the interval (bracket) for \eqn{\lambda}{l} search
 #' can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}:
 #' \deqn{p_i = c_i/N \cdot (1 + \lambda z_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*z[i] + s)}
-#' We know that \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
+#' The probabilities are bounded from above: \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
 #' \deqn{c_i/N \cdot (1 + \lambda z_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*z[i] + s) < 1}
 #' \deqn{c_i/N < 1 + \lambda z_i + s}{c[i]/N < 1 + l*z_i + s}
 #' \deqn{c_i/N - 1 - s < \lambda z_i}{c[i]/N - 1 - s < l*z[i]}
-#' Two cases are possible: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
-#' (we do not want to divide by z_i=0). Then,
+#' Two cases: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
+#' (cases with \eqn{z_i=0}{z[i] = 0} are trivially excluded because they do not affect the EL). Then,
 #' \deqn{(c_i/N - 1 - s)/z_i > \lambda,\ \forall i: z_i<0}{(c[i]/N - 1 - s)/z[i] > l,  such i that z[i]<0}
 #' \deqn{(c_i/N - 1 - s)/z_i < \lambda,\ \forall i: z_i>0}{(c[i]/N - 1 - s)/z[i] < l,  such i that z[i]>0}
 #' or
@@ -42,8 +42,9 @@
 #' \deqn{\lambda < \min_{i: z_i<0} (c_i/N - 1 - s)/z_i}{l < min_{i: z[i]<0} (c_i/N - 1 - s)/z[i]}
 #' \deqn{\lambda > \max_{i: z_i>0} (c_i/N - 1 - s)/z_i}{l > max_{i: z[i]>0} (c_i/N - 1 - s)/z[i]}
 #'
-#' (This derivation contains \emph{s}, which is the extra shift that extends the function to allow mixed conditional an unconditional estimation;
-#' Owen's formula corresponds to \eqn{c_i}{c[i]} = 1 and \emph{s} = 0.)
+#' (This derivation contains \emph{s}, which is the extra shift that extends the
+#' function to allow mixed conditional and unconditional estimation;
+#' Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
 #'
 #' @return A list with the following elements:
 #' \itemize{
@@ -58,9 +59,9 @@
 #' \item{exitcode }{An integer indicating the reason of termination.}
 #' \describe{
 #' \item{0:}{success, an interior solution for lambda found.}
-#' \item{1:}{the value of the derivative is \code{> sqrt(.Machine$double.eps)} (the value of the function at the returned root it not exactly zero, and this is not an issue with the tolerance).}
+#' \item{1:}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
 #' \item{2:}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-#' \item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function is > tolerance, and the result is close to the boundary (< tolerance).}
+#' \item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
 #' \item{4:}{an error occurred while calling \code{uniroot}.}
 #' \item{5:}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
 #' }
@@ -107,7 +108,7 @@ weightedEL <- function(z, mu = 0,
     ct[ct < weight.tolerance] <- truncto
   }
   nonz <- which(ct > 0)
-  if (length(nonz) < length(z)) { # Not all observations made it
+  if (length(nonz) < length(z)) { # Not all observations are useful
     z <- z[nonz]
     ct <- ct[nonz]
     shift <- shift[nonz]
@@ -231,6 +232,26 @@ weightedEL <- function(z, mu = 0,
 #' @export
 #'
 #' @examples
+#' set.seed(1)
+#' x <- sort(rlnorm(100))
+#' # Heteroskedastic DGP
+#' y <- 1 + 1*x + rnorm(100) * (1 + x + sin(x))
+#' mod.OLS <- lm(y ~ x)
+#' rho <- function(theta, ...) y - theta[1] - theta[2]*x  # Moment fn
+#' w <- kernelWeights(x, PIT = TRUE) # To ensure enough neighbours
+#' w <- w / rowSums(w)
+#' image(x, x, w, log = "xy")
+#' theta.vals <- list(c(1, 1), coef(mod.OLS))
+#' SEL <- function(b) smoothEmplik(rho = rho, theta = b, sel.weights = w)
+#' sapply(theta.vals, SEL) # Smoothed empirical likelihood
+#' # SEL maximisation
+#' b.SEL <- optim(coef(mod.OLS), SEL, method = "BFGS",
+#'                control = list(fnscale = -1, reltol = 1e-6))
+#' print(b.SEL$par) # Closer to the true value (1, 1) than OLS
+#' plot(x, y)
+#' abline(1, 1, lty = 2)
+#' abline(mod.OLS, col = 2)
+#' abline(b.SEL$par, col = 4)
 smoothEmplik <- function(rho,
                          theta,
                          data,
@@ -482,67 +503,6 @@ jitterText <- function(x, y, labels, times = 16, radius = 0.1, bgcol = "#FFFFFF8
 }
 
 
-#' Newey's optimal IV estimator (1993) for linear models
-#'
-#' @param y The vector containing dependent variable values
-#' @param incl A vector or a matrix of included instruments (can be NULL)
-#' @param endog A vector or a matrix of endogenous variables (can be NULL)
-#' @param excl A vector or a matrix of excluded instruments (can be NULL)
-#' @param bw A scalar of a vector or bandwidths to predict sigma2(incl, excl) (can be NULL)
-#' @param iterations Iterations or Newey's weighting procedure; offers some finite-sample (but not asymptotic) improvement if greater than 1
-#' @param coef.names A character vector to assign as the names of the estimated coefficients (useful if some variables are endogenous and their projections inherit uninformative names)
-#'
-#' @return A list with optimal IV estimates, their variance-covariance matrix, and model residuals.
-#' @export
-#'
-#' @examples
-#' d <- generateData(seed = 1, n = 500)
-#' d <- d[as.logical(d$D), ]
-#' incl <- NULL
-#' endog <- d$Z
-#' excl <- d$X
-#' y <- d$Y
-#' lmEff(y, incl, endog, excl)
-#' m1 <- AER::ivreg(y ~ endog | excl)
-#' m2 <- lmEff(y, incl, endog, excl, iterations = 0)
-lmEff <- function(y, incl = NULL, endog = NULL, excl = NULL, bw = NULL, iterations = 2, coef.names = NULL) {
-  if (is.null(incl) && is.null(endog) && is.null(excl)) stop("There is no model; no variables on the RHS!")
-  IV <- cbind(1, incl, excl)
-  IV0 <- cbind(incl, excl)
-  if (!is.null(endog)) {
-    if (is.vector(endog)) endog <- as.matrix(endog)
-    if (is.null(excl)) {
-      stop("There must be excluded instruments!")
-    } else {
-      if (is.vector(excl)) excl <- as.matrix(excl)
-      if (ncol(endog) > ncol(excl)) stop("There must be more excluded instruments than endogenous variables!")
-    }
-    if (is.vector(excl)) excl <- as.matrix(excl)
-    Xhat <- stats::lm.fit(x = IV, y = endog)$fitted.values
-    Xhat <- cbind(incl, Xhat)
-    colnames(Xhat) <- c(names(incl), names(endog))
-  } else {
-    Xhat <- incl
-  }
-  mod <- stats::lm(y ~ Xhat)
-  if (iterations < 1) {
-    warning("No iterations for optimal instrument estimation; returning the vanilla inefficient IV estimator with the wrong VCOV!")
-  } else {
-    bw0 <- bw
-    for (i in 1:iterations) {
-      e2 <- as.numeric(y - cbind(1, incl, endog) %*% mod$coefficients)^2
-      if (is.null(bw0)) bw <- bw.CV(x = IV0, y = e2, degree = 0, robust.iterations = 0)
-      mod.var <- kernelSmooth(x = IV0, y = e2, bw = bw, degree = 0)
-      mod <- stats::lm(y ~ Xhat, weights = 1 / mod.var)
-    }
-  }
-  names(mod$coefficients) <- coef.names
-  v <- stats::vcov(mod)
-  rownames(v) <- colnames(v) <- coef.names
-  U <- as.numeric(y - cbind(1, incl, endog) %*% mod$coefficients)
-  return(list(coefficients = mod$coefficients, vcov = v, residuals = U))
-}
-# TODO: rewrite this function, make it comparable to ivreg
 
 
 #' Construct memory-efficient weights for estimation

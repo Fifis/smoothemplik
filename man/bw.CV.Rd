@@ -18,6 +18,7 @@ bw.CV(
   same = FALSE,
   tol = 1e-04,
   try.grid = TRUE,
+  ndeps = 1e-05,
   verbose = FALSE,
   attach.attributes = FALSE,
   control = list(),
@@ -61,6 +62,9 @@ no matrix has more than 2^27 elements).}
 
 \item{try.grid}{Logical: if true, 10 different bandwidths around the rule-of-thumb
 one are tried with multiplier \code{1.2^(-3:6)}}
+
+\item{ndeps}{Numerical-difference epsilon. Puts a lower bound on the result: the estimated optimal bw
+cannot be less than this value.}
 
 \item{verbose}{Logical: print out the optimiser return code for diagnostics?}
 

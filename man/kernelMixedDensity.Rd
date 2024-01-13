@@ -54,3 +54,22 @@ A numeric vector of the density estimate of the same length as \code{nrow(xout)}
 \description{
 Density with conditioning on discrete and continuous variables
 }
+\examples{
+# Estimating 3 densities on something like a panel
+set.seed(1)
+n <- 200
+x <- c(rnorm(n), rchisq(n, 4)/4, rexp(n, 1))
+by <- rep(1:3, each = n)
+xgrid <- seq(-3, 6, 0.1)
+out <- expand.grid(x = xgrid, by = 1:3)
+fhat <- kernelMixedDensity(x = x, xout = out$x, by = by, byout = out$by)
+plot(xgrid, dnorm(xgrid)/3, type = "l", bty = "n", lty = 2, ylim = c(0, 0.35),
+     xlab = "", ylab = "Density")
+lines(xgrid, dchisq(xgrid*4, 4)*4/3, lty = 2, col = 2)
+lines(xgrid, dexp(xgrid, 1)/3, lty = 2, col = 3)
+for (i in 1:3) {
+  lines(xgrid, fhat[out$by == i], col = i, lwd = 2)
+  rug(x[by == i], col = i)
+}
+legend("top", c("00", "10", "01", "11"), col = 2:5, lwd  = 2)
+}

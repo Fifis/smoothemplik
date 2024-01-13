@@ -22,3 +22,8 @@ A matrix of coefficients.
 \description{
 Least-squares regression via SVD
 }
+\examples{
+b.svd <- svdlm(X = cbind(1, as.matrix(mtcars[, -1])), y = mtcars[, 1])
+b.lm  <- coef(lm(mpg ~ ., data = mtcars))
+b.lm - as.numeric(b.svd) # Negligible differences
+}
