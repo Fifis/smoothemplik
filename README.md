@@ -5,7 +5,7 @@ R package for estimation via Smoothed Empirical Likelihood.
 This package provides direct functionality for the following articles:
 
 * Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data* (Vol. 39, pp. 137–171). Emerald Publishing Limited. https://doi.org/10.1108/S0731-905320190000039010
-* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2023). Missing endogenous variables in conditional moment restriction models. *In progress.*
+* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2024). Missing endogenous variables in conditional moment restriction models. *In progress.*
 
 The theory behind the method is provided in the following articles:
 
