@@ -53,6 +53,9 @@
 #'     \item{gradnorm}{Norm of the gradient of log empirical likelihood.}
 #' }
 #'
+#' @references
+#' \insertAllCited{}
+#'
 #' @examples
 #' earth <- c(
 #'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,

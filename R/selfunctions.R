@@ -561,6 +561,7 @@ jitterText <- function(x, y, labels, times = 16, radius = 0.1, bgcol = "#FFFFFF8
 #' @export
 #'
 #' @examples
+#' getSELWeights(1:5, bw = 2, kernel = "triangular")
 getSELWeights <- function(x, bw = NULL, ..., trim = NULL, renormalise = TRUE) {
   sel.weights <- kernelWeights(x, bw = bw, ...)
   sel.weights <- sel.weights / rowSums(sel.weights)

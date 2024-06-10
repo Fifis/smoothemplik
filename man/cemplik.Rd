@@ -119,3 +119,6 @@ coef.el.constr <- optim(coef.el[1:2], minusPEL, par.am = 3.14)$par
 print(-2 * cemplik(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
 # Exceeds the critical value qchisq(0.95, df = 1)
 }
+\references{
+\insertAllCited{}
+}

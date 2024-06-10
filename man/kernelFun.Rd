@@ -34,7 +34,8 @@ A numeric vector of the same length as input.
 }
 \description{
 Computes 5 most popular kernel functions of orders 2, 4, and 6 with the potential of returning
-an analytical convolution kernel for density cross-validation.
+an analytical convolution kernel for density cross-validation. These kernels appear
+in \insertCite{silverman1986density}{smoothemplik}.
 }
 \examples{
 ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"); names(ks) <- ks
@@ -72,5 +73,5 @@ for (m in 0:6) {
 
 }
 \references{
-\insertCite{silverman1986density}{smoothemplik}
+\insertAllCited{}
 }

@@ -37,8 +37,6 @@ A fail-safe function that would return a nice Silverman-like bandwidth
   suggestion for data for which the standard deviation might be NA or 0.
 }
 \details{
-It is obtained under the assumption that the true density is multivariate normal with zero covariances
-(i.e. a diagonal variance-covariance matrix
 \eqn{\Sigma = \mathrm{\mathop{diag}}(\sigma^2_k)}{\Sigma = diag(\sigma^2_k)}
 with
 \eqn{\det\Sigma = \prod_k \sigma^2_k}{det \Sigma = prod(\sigma^2_k)}
@@ -50,8 +48,17 @@ Then, the formula 4.12 in Silverman (1986) depends only on \eqn{\alpha}{\alpha},
 second derivative of the density. The (i, i)th element of the Hessian of multi-variate normal
 (\eqn{\phi(x_1, \ldots, x_d) = \phi(X)}{\phi(x_1, ..., x_d) = \phi(X)}) is
 \eqn{\phi(X)(x_i^2 - \sigma^2_i)/\sigma_i^4}{\phi(X)(x_i^2 - \sigma^2_i)/\sigma_i^4}.
+
+
+The rule-of-thumb bandwidth is obtained under the assumption that the true
+density is multivariate normal with zero covariances
+(i.e. a diagonal variance-covariance matrix). For details,
+see \insertCite{silverman1986density}{smoothemplik}.
 }
 \examples{
 set.seed(1); bw.rot(stats::rnorm(100)) # Should be 0.3787568 in R version 4.0.4
 set.seed(1); bw.rot(matrix(stats::rnorm(500), ncol = 10)) # 0.4737872 ... 0.7089850
+}
+\references{
+\insertAllCited{}
 }

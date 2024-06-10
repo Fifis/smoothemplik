@@ -3,8 +3,6 @@
 #' A fail-safe function that would return a nice Silverman-like bandwidth
 #'   suggestion for data for which the standard deviation might be NA or 0.
 #'
-#' It is obtained under the assumption that the true density is multivariate normal with zero covariances
-#' (i.e. a diagonal variance-covariance matrix
 #' \eqn{\Sigma = \mathrm{\mathop{diag}}(\sigma^2_k)}{\Sigma = diag(\sigma^2_k)}
 #' with
 #' \eqn{\det\Sigma = \prod_k \sigma^2_k}{det \Sigma = prod(\sigma^2_k)}
@@ -28,7 +26,18 @@
 #'   \code{min(sd(x), IQR(x)/1.34)} to estimate the spread.
 #' @param discontinuous Logical: if the true density is discontinuous (i.e. has
 #'   jumps), then, the formula for the optimal bandwidth for density estimation changes.
+#'
+#' @details
+#' The rule-of-thumb bandwidth is obtained under the assumption that the true
+#' density is multivariate normal with zero covariances
+#' (i.e. a diagonal variance-covariance matrix). For details,
+#' see \insertCite{silverman1986density}{smoothemplik}.
+#'
 #' @return A numeric vector of bandwidths that are a reasonable start optimal non-parametric density estimation of \code{x}.
+#'
+#' @references
+#' \insertAllCited{}
+#'
 #' @examples
 #' set.seed(1); bw.rot(stats::rnorm(100)) # Should be 0.3787568 in R version 4.0.4
 #' set.seed(1); bw.rot(matrix(stats::rnorm(500), ncol = 10)) # 0.4737872 ... 0.7089850
@@ -368,10 +377,10 @@ kernelWeights <- function(x,
   if (!sparse)
     result <- kernelWeightsCPP(x = arg$x, xout = arg$xout, bw = arg$bw, kernel = arg$kernel, order = arg$order, convolution = convolution) else
       result <- sparseKernelWeightsCPP(x = arg$x, xout = arg$xout, bw = arg$bw, kernel = arg$kernel, order = arg$order, convolution = convolution)
-  # Checking if de-duplication was done and re-populating the full matrix if necessary
-  if (arg$deduplicate.x) result <- result[, arg$x.matches]
-  if (arg$deduplicate.xout) result <- result[arg$xout.matches, ]
-  return(result)
+    # Checking if de-duplication was done and re-populating the full matrix if necessary
+    if (arg$deduplicate.x) result <- result[, arg$x.matches]
+    if (arg$deduplicate.xout) result <- result[arg$xout.matches, ]
+    return(result)
 }
 
 
@@ -1200,7 +1209,8 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #' Basic univatiate kernel functions
 #'
 #' Computes 5 most popular kernel functions of orders 2, 4, and 6 with the potential of returning
-#' an analytical convolution kernel for density cross-validation.
+#' an analytical convolution kernel for density cross-validation. These kernels appear
+#' in \insertCite{silverman1986density}{smoothemplik}.
 #'
 #' @param x A numeric vector of values at which to compute the kernel function.
 #' @param kernel Kernel type: uniform, Epanechnikov, triangular, quartic, or Gaussian.
@@ -1217,10 +1227,9 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #' @return A numeric vector of the same length as input.
 #' @importFrom Rdpack reprompt
 #' @export
+#'
 #' @references
-#' \insertCite{silverman1986density}{smoothemplik}
-#'
-#'
+#' \insertAllCited{}
 #'
 #' @examples
 #' ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"); names(ks) <- ks

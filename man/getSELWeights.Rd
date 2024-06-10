@@ -23,3 +23,6 @@ A list with indices of large enough elements.
 \description{
 This function constructs SEL weights with appropriate trimming for numerical stability and optional renormalisation so that the sum of the weights be unity
 }
+\examples{
+getSELWeights(1:5, bw = 2, kernel = "triangular")
+}
