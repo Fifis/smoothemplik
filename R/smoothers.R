@@ -484,6 +484,10 @@ kernelDensity <- function(x,
 #'   \code{lm()} might choke when the dependent variable takes very large absolute
 #'   values and its square is used).
 #'
+#' The robust iterations are carried out, if requested, according to @cleveland1979robust.
+#' Huber weights are never zero; bisquare weights create a more robust re-descending
+#' estimator.
+#'
 #' Note: if \code{x} and \code{xout} are different but robust iterations were requested,
 #'   the robustification can take longer. TODO: do not estimate on (x, grid),
 #'   do the calculation with K.full straight away.

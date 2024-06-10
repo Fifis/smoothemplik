@@ -3,9 +3,12 @@ title: "Using Rcpp to speed up non-parametric estimation in R"
 output:
   rmarkdown::html_vignette:
     toc: true
+    toc_depth: 2
+    number_sections: true
+bibliography: "../inst/REFERENCES.bib"
 author: "Andreï V. Kostyrka, University of Luxembourg"
-date: "Updated: 2023-12-05, compiled: `r Sys.Date()`"
-abstract: "This vignette demonstrates how to carry out non-parametric density and kernel estimation with a high degree of flexibiity and faster than via the straightforward textbook approach."
+date: "Created: 2023-12-05, last modified: 2024-06-10, compiled: `r Sys.Date()`"
+abstract: "This vignette demonstrates how to carry out non-parametric density and kernel estimation with a high degree of flexibility and greater speed than via the straightforward textbook approach."
 keywords: "non-parametric methods, density estimation, kernel smoothing, Nadaraya-Watson, local regression"
 vignette: >
   %\VignetteIndexEntry{Using Rcpp to speed up non-parametric estimation in R}
@@ -17,7 +20,7 @@ vignette: >
 knitr::knit_hooks$set(pngquant = knitr::hook_pngquant)
 knitr::opts_chunk$set(
   dev = "png",
-  dev.args = list(type = "cairo-png"),
+  dev.args = list(type = if (Sys.info()["sysname"] == "Darwin") "quartz" else "cairo-png"),
   fig.width = 640 / 72,
   fig.height = 480 / 72,
   dpi = 72,
@@ -34,37 +37,41 @@ library(smoothemplik)
 
 ## Kernel methods
 
-The most straightforward approach to implement kernel weights, kernel density estimation, and locally constant kernel regression in **R** would be as follows.
+Implementing kernel weights, kernel density estimation, and locally constant kernel regression in **R** is straightforward.
 
-The kernel weights are used in many applications to define a local neighbourhood for a point, i.e. the value of the kernel function:
+Kernel weights define a local neighborhood for a point using the value of the kernel function:
 \[
 w_{ij} := k\left( \frac{X_i - X_j}{b} \right),
 \]
-where $k$ is a function that typically satisfies the following properties:
+where $k$ is a function that typically satisfies these properties:
 
 1. Symmetry: $k(-u) = k(u)$, $u\in \mathbb{R}$;
 1. Unit integral over the reals:  $\int_{\mathbb{R}} k = 1$;
 1. Second order: $\int_{\mathbb{R}} u^2 k(u) \in (0, \infty)$.
 
+All of these properties can be relaxed. 
+Asymmetrical kernels are sometimes used to improve kernel density estimates (KDE) when the data support is bounded.
+The unit integral simplifies calculations and formulæ for densities owing to its built-in normalisation.
+Finally, higher-order kernels reduce bias but may introduce negative values of $k(u)$, which can necessary in some applications (e.\,g.\ @robinson1988root semi-parametric regression with more than 5 non-parametric regressors), but undesirable in others, such as density estimation.
 
-All of these properties can be relaxed. Asymmetrical kernels are sometimes used to improve the behaviour of KDEs when the support of the data is bounded. The integral taken over the real line being equal to one simplifies calculations and formulæ for densities owing to its built-in normalisation. Finally, higher-order kernels are often used to reduce bias at the cost of introducing negative values of $k(u)$, which is necessary in some applications (e.\,g.\ Robinson (1988) semi-parametric regression with more than 5 non-parametric regressors), but undesirable or even impossible in other ones (density estimation, local likelihood computation).
-
-The kernel functions implemented in the `smoothemplik` package are:
+The `smoothemplik` package implements the following kernel functions:
 
 * Uniform: $k(u) = \frac12 \mathbb{I}(|u|\le 1)$;
 * Triangular: $k(u) = \frac12 \mathbb{I}(|u|\le 1)$;
 * Epanechnikov: $k(u) = \frac34 (1-u^2) \mathbb{I}(|u| \le 1)$;
 * Gaussian (default): $k = \varphi(u) := (2\pi)^{-1/2} \exp (-u^2/2)$.
 
-The kernel weights $w_{ij}$ do not add up to unity; for most applications they can be used `as is' to represent the relative importance regardless of their total. However, for density and regression applications, re-scaled weights are necessary.
+Kernel weights $w_{ij}$ do not sum to unity and can be used `as is' for most applications to represent relative importance.
+For density and regression applications, re-scaled weights are necessary.
 
-Multi-variate kernels are defined similarly. For simplicity, we restrict or scope to product kernels only and re-define the kernel weights:
+Multi-variate kernels are defined similarly. For simplicity, we restrict our scope to product kernels and re-define kernel weights accordingly:
 \[
 w_{ij} := \prod_{l=1}^d k\left( \frac{X_i^{(l)} - X_j^{(l)}}{b^{(l)}} \right) := K\left( \frac{X_i - X_j}{b} \right),
 \]
-where $d = \dim X$ is the dimension of the data; the dimension of $b$ is also $d$.
+where $d = \dim X$ is the number of variables and $b$ is a vector of bandwidths with $\dim b = d$.
 
-Computations could be sped up twice for certain applications through exploiting the symmetry of the kernel function; however, in most cases, the grid of evaluation points for non-parametric methods is pre-defined, yielding a non-square weight matrix.
+In certain applications, where the evaluation grid coincides with the support of $X$, the number of computations can be halved due to the symmetry of the kernel function.
+In most cases, the grid of evaluation points for non-parametric methods is pre-defined, yielding a non-square weight matrix.
 
 Univariate kernel weights:
 ```{r}
@@ -72,7 +79,9 @@ Univariate kernel weights:
 kernelWeights1R <- function(x, xout, bw, kfun) kfun(outer(xout, x, "-") / bw)
 ```
 
-Here, type / length checks are skipped because the goal is to show the `Rcpp` solution superiority, not sanitise the inputs for a benchmark function. The hidden function `smoothemplik:::.prepareKernel` does these checks before calling the C++ function.
+For demonstration, we skip type and length checks to highlight the `Rcpp` solution superiority.
+In this vignette, we use inputs for the benchmark functions that need no sanitisation.
+The hidden function `smoothemplik:::.prepareKernel` handles these checks before calling the C++ function.
 
 ```{r}
 kernelWeightsR <- function(x, xout = NULL, bw = 1, kfun = stats::dnorm) {
@@ -90,7 +99,7 @@ kernelWeightsR <- function(x, xout = NULL, bw = 1, kfun = stats::dnorm) {
 }
 ```
 
-The Parzen--Rosenblatt density estimator a rescaled sum of the kernel functions:
+The Parzen--Rosenblatt density estimator is a rescaled sum of the kernel functions:
 \[
 \hat f_X(x) := \frac{1}{nb^{(1)} \cdots b^{(d)}} \sum_{i=1}^n K\left( \frac{X_i - x}{b} \right)
 \]
@@ -113,7 +122,9 @@ For optimal bandwidth calculation, quite often, a Leave-One-One (LOO) variety is
 \[
 \hat m_{-i}(x) := \frac{\sum_{j\ne i} Y_j K((X_j - x)/b)}{\sum_{j\ne i} K((X_j - x)/b)}
 \]
-It can be implemented by setting the weight of the $i$^th observation to zero. Note that LOO estimator makes practical sense only on a grid of original observed points, $\{X_i\}_{i=1}^n$, or its subset.
+It can be implemented by setting the weight of the $i$^th observation to zero.
+
+The LOO estimator makes sense only on a grid of original observed points $\{X_i\}_{i=1}^n$ or its subset.
 
 ```{r}
 kernelSmoothR <- function(x, y, xout = NULL, bw = 1,
@@ -126,15 +137,22 @@ kernelSmoothR <- function(x, y, xout = NULL, bw = 1,
 
 ### Speed-ups
 
-1. The core of the package is built on `RcppArmadillo` for quick vector and matrix manipulations.
-1. All kernel calculations are done in place to save memory; no extra vectors are initialised; the return vector is created at the beginning and gradually substituted based on the chosen kernel. E.\,g. `ax = abs(x)`, replacements are done for `ax`, like `if (ax[i] < 1) ax[i] = 0.75*(1 - ax[i]^2)`, and `ax` itself is returned at the end. The Nadaraya--Watson numerator is also computed in place from the weight matrix, thus saving memory by never using more than one large matrix.
-1. *** TODO: Memory-saving of kernelWeights
-1. Following Silverman (1986, 4.4), we perform the bandwidth scaling $\frac{X_i-x}{b} = \frac{X_i}{b}-\frac{x}{b} = X^*_i - x^*$ to reduce the number or arithmetic operation in the double loop. The scaling factors in the form of $\frac{1}{nb^{(1)} \cdots b^{(d)}}$ are also applied after the final vector or kernel sums is obtained.
-1. Qualitatively different 4th-order kernels were developed to reduce the polynomial degree of the convolution kernels. If a kernel has polynomial degree $p$, is 4th-order analogue has degree $p$ as well, yielding convolution polynomial of degree at most $2p+1$. The traditional approach described in Li \& Racine (2007, section 1.11, p. 34) adds an extra polynomial; for the Epanechnikov kernel, their 4th-order version has degree 4, and convolution, degree $4\cdot 2 + 1 = 9$, whereas our version, consisting of piecewise quadratic polynomials, has degree 2 and convolution degree 5.
+The `smoothemplik` package incorporates multiple optimisations that make non-parametric estimation less demanding in terms of computational power.
+
+1. **RcppArmadillo integration.** The core of the package is built on `RcppArmadillo` for fast vector and matrix manipulations.
+1. **In-place calculations.** All kernel calculations are performed in place to save memory. No extra vectors are initialised; instead, the return vector is created at the beginning and modified based on the chosen kernel. For example, `ax = abs(x)` is modified directly: `if (ax[i] < 1) ax[i] = 0.75*(1 - ax[i]^2)`, and `ax` itself is returned at the end. Similarly, The Nadaraya--Watson numerator is computed in place from the weight matrix, ensuring that there is only one large matrix in the memory.
+1. **TODO:** Memory-saving of `kernelWeights` through sparse matrices
+1. **Bandwidth scaling.** Following Equation 4.4 in @silverman1986density, we perform bandwidth scaling $\frac{X_i-x}{b} = \frac{X_i}{b}-\frac{x}{b} = X^*_i - x^*$. This reduces the number or arithmetic operations in the double loop. Scaling factors in the form $\frac{1}{nb^{(1)} \cdots b^{(d)}}$ are also applied after the final vector or kernel sums is obtained.
+1. **Faster higher-order kernels.** This package includes qualitatively different 4th-order kernels to reduce the polynomial degree of the convolution kernels. If a kernel has polynomial degree $p$, its 4th-order analogue in this package also has degree $p$, resulting in a convolution polynomial of degree at most $2p+1$. The traditional approach, as described in Section 1.11 of @li2007nonparametric, adds an extra polynomial. For instance, the 4th-order version of the the Epanechnikov kernel has a degree of 4, leading to a convolution degree $4\cdot 2 + 1 = 9$. However, a version consisting of piecewise quadratic polynomials can achieve a degree of 2 and a convolution degree of 5, retaining the smoothness properties of the original Epanechnikov kernel.
+
+The vignette illustrating the last point about faster higher-order kernels is in progress.
+
+These optimisations make the `smoothemplik` package a powerful tool for non-parametric estimation, providing significant speed-ups and memory savings compared to other packages like `np`.
 
 ## Univariate kernel estimation
 
-To test the speed gains, we benchmark these obvious solutions with their `Rcpp` counterparts implemented in this package. We draw $n=300$ realisations of the $X \sim\chi^2_3$ random variable, generate $Y := \sin X + U$, where $U\sim\mathcal{N}(0, 1)$ is the error. Define the grid to be 100 points uniformly spaced from 0 to 15. For simplicity, let the chosen bandwidth be $b = 0.4$, There are 3 objectives:
+To test the speed gains, we benchmark these straightforward solutions with their `Rcpp` counterparts implemented in this package. We draw $n=300$ realisations of the $X \sim\chi^2_3$ random variable, generate $Y := \sin X + U$, where $U\sim\mathcal{N}(0, 1)$ is the error.
+We define the grid as 100 points uniformly spaced from 0 to 15. For simplicity, the chosen bandwidth is $b = 0.5$, There are three objectives:
 1. Generate a $100 \times 300$ matrix of kernel weights $w_{ij} = K((X_i - x_j)/b)$;
 1. Estimate the density $f_X(x)$ on the grid;
 1. Estimate the conditional expectation function $m(x) = \mathbb{E}(Y \mid X= x)$ on the grid.
@@ -143,28 +161,28 @@ To test the speed gains, we benchmark these obvious solutions with their `Rcpp` 
 set.seed(1)
 X <- sort(rchisq(300, 3))
 xg <- seq(0, max(X), length.out = 100)
-Y <- sin(X) + rnorm(100)
-bw <- 0.5 # Bandwidth
+Y <- sin(X) + rnorm(300)
+b <- 0.5
 ```
 
-Now, we pit the pure R and Rcpp functions:
+Now, we compare the pure R and Rcpp functions:
 ```{r message=FALSE}
 library(microbenchmark)
 microbenchmark(
-  wCPP <- kernelWeights(X, xout = xg, bw = bw),
-  wR   <- kernelWeightsR(X, xout = xg, bw = bw),
+  wCPP <- kernelWeights(X, xout = xg, bw = b),
+  wR   <- kernelWeightsR(X, xout = xg, bw = b),
   times = 20, unit = "ms", check = "equivalent"
 )
 
 microbenchmark(
-  fCPP <- kernelDensity(X, xout = xg, bw = bw),
-  fR   <- kernelDensityR(X, xout = xg, bw = bw),
+  fCPP <- kernelDensity(X, xout = xg, bw = b),
+  fR   <- kernelDensityR(X, xout = xg, bw = b),
   times = 20, unit = "ms", check = "equivalent"
 )
 
 microbenchmark(
-  mCPP <- kernelSmooth(X, Y, xout = xg, bw = bw),
-  mR   <- kernelSmoothR(X, Y, xout = xg, bw = bw),
+  mCPP <- kernelSmooth(X, Y, xout = xg, bw = b),
+  mR   <- kernelSmoothR(X, Y, xout = xg, bw = b),
   times = 20, unit = "ms", check = "equivalent"
 )
 ```
@@ -176,7 +194,7 @@ all.equal(fR, fCPP, tolerance = 1e-16)
 all.equal(mR, mCPP, tolerance = 1e-16)
 ```
 
-We can visualise the result and see that the discrepancies are tiny
+We can visualise the results and see that the discrepancies are tiny:
 ```{r}
 par(mfrow = c(2, 1), mar = c(4, 4, 2, 3))
 plot(X, Y, bty = "n", main = "Non-parametric regression (black) and density (blue) estimate", las = 1)
@@ -191,9 +209,9 @@ plot(xg, fR - fCPP, bty = "n", ylab = "", xlab = "X",
 Different kernel shapes can be used upon user request (all of them, except for the default Gaussian, have finite support on $[-1, 1]$):
 ```{r message=FALSE}
 par(mfrow = c(1, 1))
-fCPPunif <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "uniform")
-fCPPtrng <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "triangular")
-fCPPepan <- kernelDensity(X, xout = xg, bw = bw * sqrt(5), kernel = "epanechnikov")
+fCPPunif <- kernelDensity(X, xout = xg, bw = b * sqrt(3), kernel = "uniform")
+fCPPtrng <- kernelDensity(X, xout = xg, bw = b * sqrt(3), kernel = "triangular")
+fCPPepan <- kernelDensity(X, xout = xg, bw = b * sqrt(5), kernel = "epanechnikov")
 plot(xg, fCPP, ylim = range(0, fCPP, fCPPunif, fCPPtrng, fCPPepan), xlab = "X",
      type = "l", bty = "n", main = "Various kernel shapes", ylab = "Density")
 rug(X)
@@ -223,7 +241,7 @@ print(timings, 2)
 
 ## Multivariate kernel estimation
 
-For visual clarity purposes, we generate the data according to a similar law with $\dim X = 2$, $n = 100$, $X \sim\chi^2_3$ (IID), $Y := \sin X^{(1)} + \sin X^{(2)} + U$, $U\sim\mathcal{N}(0, 1)$. Define the grid to be 50 points uniformly spaced from 0 to 13. For simplicity, let the chosen bandwidth be $b = (0.7, 0.8)$. Again, we generate kernek weights, estimate the density and the regression function.
+For visual clarity, we generate data according to a similar law with $\dim X = 2$, $n = 100$, $X \sim\chi^2_3$ (IID), $Y := \sin X^{(1)} + \sin X^{(2)} + U$, $U\sim\mathcal{N}(0, 1)$. We define the grid as 50 points uniformly spaced from 0 to 13. For simplicity, let the chosen bandwidth be $b = (0.7, 0.8)$. We generate kernel weights, estimate the density, and estimate the regression function.
 
 ```{r}
 set.seed(1)
@@ -233,16 +251,16 @@ X <- matrix(rchisq(n*2, 3), ncol = 2)
 xg0 <- seq(0, 13, length.out = ng)
 xg <- expand.grid(X1 = xg0, X2 = xg0)
 Y <- sin(X[, 1]) + sin(X[, 2]) + rnorm(n)
-bw <- c(0.7, 0.8)
+b <- c(0.7, 0.8)
 
 microbenchmark(
-  wCPP <- kernelWeights(X, xout = xg, bw = bw),
-  wR <- kernelWeightsR(X, xout = xg, bw = bw),
+  wCPP <- kernelWeights(X, xout = xg, bw = b),
+  wR <- kernelWeightsR(X, xout = xg, bw = b),
   times = 10, unit = "ms", check = "equal")
 all.equal(wR, wCPP, tolerance = 1e-16)
 ```
 
-We see that C++ is roughly 4 times faster. In terms of accuracy, the difference is minuscule:
+C++ is roughly 4 times faster. In terms of accuracy, the difference is minuscule:
 ```{r}
 max.dw <- apply(wR - wCPP, 1, function(x) max(abs(x), na.rm = TRUE))
 filled.contour(xg0, xg0, log10(matrix(max.dw, ng, ng)), xlab = "X1", ylab = "X2",
@@ -253,17 +271,17 @@ points(X[, 1], X[, 2], pch = 16)
 We redo the same test for the kernel density estimator:
 ```{r message=FALSE}
 microbenchmark(
-  fCPP <- kernelDensity(X, xout = xg, bw = bw),
-  fR <- kernelDensityR(X, xout = xg, bw = bw),
+  fCPP <- kernelDensity(X, xout = xg, bw = b),
+  fR <- kernelDensityR(X, xout = xg, bw = b),
   times = 5, unit = "ms", check = "equivalent")
 all.equal(fR, fCPP, tolerance = 1e-16)
 ```
 
 The difference between the two different kernels is better visible in 3D:
 ```{r message=FALSE}
-fCPPunif <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "uniform")
-fCPPtrng <- kernelDensity(X, xout = xg, bw = bw * sqrt(3), kernel = "triangular")
-fCPPepan <- kernelDensity(X, xout = xg, bw = bw * sqrt(5), kernel = "epanechnikov")
+fCPPunif <- kernelDensity(X, xout = xg, bw = b * sqrt(3), kernel = "uniform")
+fCPPtrng <- kernelDensity(X, xout = xg, bw = b * sqrt(3), kernel = "triangular")
+fCPPepan <- kernelDensity(X, xout = xg, bw = b * sqrt(5), kernel = "epanechnikov")
 par(mfrow = c(2, 2), mar = c(0.5, 0.5, 2, 0.5))
 persp(xg0, xg0, matrix(fCPP, nrow = ng), theta = 120, phi = 20, main = "Gaussian", xlab = "X1", ylab = "X2", zlab = "Density")
 persp(xg0, xg0, matrix(fCPPunif, nrow = ng), theta = 120, phi = 20, main = "Uniform", xlab = "X1", ylab = "X2", zlab = "Density")
@@ -271,7 +289,7 @@ persp(xg0, xg0, matrix(fCPPtrng, nrow = ng), theta = 120, phi = 20, main = "Tria
 persp(xg0, xg0, matrix(fCPPepan, nrow = ng), theta = 120, phi = 20, main = "Epanechnikov", xlab = "X1", ylab = "X2", zlab = "Density")
 ```
 
-Now, we run a quick benchmark to see how the problem scales with the sample size and the dimension of the data. These evaluations take longer, therefore, we can use the built-in `system.time` because the CPU overead is negligible:
+Now, we run a quick benchmark to see how the problem scales with the sample size and the dimension of the data. These evaluations take longer, so we use the built-in `system.time()` because the CPU overhead is negligible:
 ```{r message=FALSE}
 ns <- c(125, 500)
 dims <- c(2, 6)
@@ -289,7 +307,7 @@ timings <- cbind(nd, timings)
 print(timings, 2)
 ```
 
-Finally, we can visualise the kernel regression estimator with various kernels and degrees, and robustness operations (described in the original Cleveland 1979 LOESS paper). TODO: add reference.
+Finally, we can visualise the kernel regression estimator with various kernels and degrees, and robustness operations (described in @cleveland1979robust).
 Since the true functional dependence of $Y$ on $X$ is a sine wave, we expect the second-degree local estimator to perform the best.
 
 Here, instead of choosing the bandwidth using the rule of thumb, we plot the cross-validation function (assuming that the bandwidth should be the same across all dimensions):
@@ -320,7 +338,8 @@ for (i in 1:3) {
 }
 ```
 
-We can judge the fit quality by the percentage of explained variance (the issue of over-fitting with small bandwidths has been mitigated via cross-validation) using the available observations as the grid. This comparison is valid only because the noise is homoskedastic in this simulation, which makes the unconditional error variance interpretable. In real-life applications, consider other quality-of-fit measures.
+We can judge the fit quality by the percentage of explained variance (the issue of over-fitting with small bandwidths has been mitigated via cross-validation) using the available observations as the grid.
+This comparison is valid only because the noise is homoskedastic in this simulation, which makes the unconditional error variance interpretable. In real-life applications, consider other quality-of-fit measures.
 
 ```{r message=FALSE}
 ys <- sapply(1:3, function(i) kernelSmooth(x = X,  y = Y, bw = bw.opt[i], degree = i-1))
@@ -331,3 +350,11 @@ print(cor(cbind(Y, ys))[1, 2:4], 3)
 ## Sparsity
 
 TODO
+
+## Conclusion
+
+These examples showcase the speed improvements and comparable accuracy of the Rcpp implementations over pure R code, making the `smoothemplik` a powerful tool for non-parametric statistical analysis.
+
+## References
+
+<div id="refs"></div>
