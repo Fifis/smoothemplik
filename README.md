@@ -1,67 +1,80 @@
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml)
+[![codecov](https://codecov.io/gh/Fifis/smoothemplik/graph/badge.svg?token=LYXLUYWY5X)](https://codecov.io/gh/Fifis/smoothemplik)
 <!-- badges: end -->
 
 # smoothemplik
 
-R package for estimation via Smoothed Empirical Likelihood.
+R package for estimation via Smoothed Empirical Likelihood (SEL).
+
+<img src="https://kostyrka.lu/user/pages/05.programming/10.smoothemplik-package/smoothed-empirical-likelihood-r-package.png" alt="Smoothed Empirical Likelihood" width="400"/>
+
+Smoothed Empirical Likelihood (SEL), also known as Conditional Empirical Likelihood (CEL) or Local Empirical Likelihood (LEL), is a powerful statistical method for estimation and hypothesis testing.
+It shares the competitive advantages of Generalised Empirical Likelihood (GEL) and can estimate models defined by conditional moment restrictions (CMR).
+
+For statistical inference, SEL does not require any explicit variance estimation because the smoothed empirical likelihood ratio (SELR) statistic is internally studentised.
+Consequently, SEL-based confidence intervals and regions have accurate coverage probabilities.
+To test a hypothesis using SEL, the user should compare the difference between the unrestricted and restricted SEL values with the critical values of the chi-squared distribution.
+The SELR test achieves maximum average local power.
+
+Some of the models that can be estimated via SEL are:
+- Linear models with exogenous and endogenous variables: *Y = α + X'β + Z'γ + U*, *E(U | X, W) = 0*;
+- Non-linear models: *E(Y | X) = f(X, θ)*, where *f* is known;
+- Semi-parametric models: *E(Y | X) = X'β + h(X, θ)*, where *h* is unknown;
+- Quantile regression models: *E[I(Y - X'β) - τ | X] = 0*.
+
+Additionally, for a broad class of models, SEL can produce an estimator that is semi-parametrically efficient in the sense of [Chamberlain (1987)](https://doi.org/10.1016/0304-4076(87)90015-7).
+Efficient estimation is the pipe dream of many empirical researchers because having an unbiased estimator with the smallest possible variance means *accuracy*.
+This accuracy leads to four main benefits: (1) having point estimates closer to the true value, (2) having smaller variances and standard errors, (3) discovering more statistically significant effects when they exist, and (4) ensuring that a lack of significance is not due to the weaknesses of the employed estimation method.
+For example, the popular ordinary-least-squares (OLS) estimator of a linear model is not efficient under heteroskedasticity – i.e. in virtually all real-world applications.
+This happens because ‘noisier’ observations have a larger contribution to the objective function – the sum of squared residuals.
+In SEL, the objective function is a sum of local ELR statistics, therefore, all observations contribute similarly to the objective regardless of the conditional variance.
+
+We hope that this algorithmic implementation of SEL will make it more popular among researchers in various fields.
+
+**This package is an evolving project. Comments and suggestions are welcome.**
+
+## How it works?
+
+This package is similar to the popular [gmm](https://CRAN.R-project.org/package=gmm) and [momentfit](https://CRAN.R-project.org/package=momentfit) packages by Pierre Chaussé.
+The main input to the SEL optimiser is the function that computes the sample moment condition.
+All that is needed is a formalised discrepancy between the model and the real observations.
+
+For a linear model, the user can define the residuals like this:
+```{r}
+resFun <- function(theta, data) data$Y - data[, c("X1", "X2")] %*% theta
+```
+Then, `maximiseSEL()` takes it as the input, and the optimiser will find the value of `theta` that yields the ‘best’ fit of the model to the data.
+Here, ‘best’ means that these residuals are closest to zero as measured by the sum of local ELR statistics for each observation.
+
+Unlike functions for unconditional-moment-restriction models that typically require input matrices obtained by taking products of GMM instruments with the residuals, the input to SEL is just a function that computes a vector of residuals (or their close analogues).
+
+## Literature
 
 This package provides direct functionality for the following articles:
 
-* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data* (Vol. 39, pp. 137–171). Emerald Publishing Limited. https://doi.org/10.1108/S0731-905320190000039010
-* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2024). Missing endogenous variables in conditional moment restriction models. *In progress.*
+* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data* (Vol. 39, pp. 137–171). Emerald Publishing Limited. [doi.org/10.1108/S0731-905320190000039010](https://doi.org/10.1108/S0731-905320190000039010)
+* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2024). *Missing endogenous variables in conditional moment restriction models.* (Working paper No. 2024-01). University of Luxembourg, Department of Economics and Management. [hdl.handle.net/10993/60100](hdl.handle.net/10993/60100)
 
-The theory behind the method is provided in the following articles:
+The theory behind the method is provided in the following sources:
 
-* Tripathi, G., & Kitamura, Y. (2003). Testing conditional moment restrictions. *The Annals of Statistics, 31(6)*, 2059–2095.  https://doi.org/10.1214/aos/1074290337
-* Kitamura, Y., Tripathi, G., & Ahn, H. (2004). Empirical likelihood‐based inference in conditional moment restriction models. *Econometrica, 72(6)*, 1667–1714. https://doi.org/10.1111/j.1468-0262.2004.00550.x
+* Tripathi, G., & Kitamura, Y. (2003). Testing conditional moment restrictions. *The Annals of Statistics, 31(6)*, 2059–2095.  [10.1214/aos/1074290337](https://doi.org/10.1214/aos/1074290337).
+* Kitamura, Y., Tripathi, G., & Ahn, H. (2004). Empirical likelihood‐based inference in conditional moment restriction models. *Econometrica, 72(6)*, 1667–1714. [10.1111/j.1468-0262.2004.00550.x](https://doi.org/10.1111/j.1468-0262.2004.00550.x).
+* Owen, A. B. (2013). Self-concordance for empirical likelihood. *Canadian Journal of Statistics, 41*, 387–397.
 
-Very preliminary and incomplete! Do not circulate!
+## Installation
 
-## TODO
+This package currently exists only on GitHub. To install it, run the following two commands:
+```{r}
+install.packages("devtools")
+devtools::install_github("Fifis/smoothemplik")
+```
 
-### High priority
+To load this package, include this line in the code:
+```{r}
+library(smoothemplik)
+```
 
-* If `x` contains duplicates, `DCV(x, bw = bw.grid, weights = w)` complains that no duplicates were found (see the example)
-* Test the previous output of `weightedEL()` and `cemplik()` with the new version, add tests
-* De-duplicate at kernel weights already (via `.prepareKernel`), return the attribute!
-* For `.prepareKernel()` AND mixed kernel: check if the max. column-wise gap between observations is >= than the bandwidth, otherwise write an informative message
-* `bw.CV()` bug: `bw.CV(x, y = y, kernel = "quartic", order = 4)` and `bw.CV(x, y = y, kernel = "quartic")`
-* LOO estimation: instead of dropping unique (X, Y) observations, leave each conditioning points (only X)
-* Add weight support to `kernelDiscreteDensitySmooth`
-* Add `RcppParallel::setThreadOptions(numThreads = "auto")` as the 1st line of parallel-capable functions, use `setDTthreads` also
-* Write test cases for C++ functions with and without speed-ups
-* Eliminate matrices in smoothing completely! Try only parallel loops!
-* Create a default value for memsave, when to invoke it (based on nx*ng)
-* Remove parallelisation over workers via setThreadOptions when there is outer parallelisation in `.kernelMixed()`
-* Make DCV either sparse or memsave, not both; reflect the changes in `bw.CV()`
-* Fix the DCV code with convolutions (especially the quartic one)
-* Move the de-duplication of the xout grid inside `kernelSmooth`
-* Check all instances of `kernelSmooth()`, `kernelDensity()`, `kernelWeights()`, and everything that used the obsolete arguments
-* The check `CV = "DCV"` and `is.null(y)` seems redundat
-* Check where `kernelWeights` and `standardise` were used.
-* Fix the optimiser control argument in `bw.CV()`.
-* Extend the CV to non-Gaussian cases.
-* `smoothEmplikDiscrete()`: if the split variable does not take contiguous values from 1 to the number of categories, estimation fails.
+## Licence
 
-### Medium priority
-
-* CV: implement leave-K-out CV for speed
-* In `kernelMixedSmooth()`: if LOO, do not de-duplicate `xout`, copy it from `arg$x` (currently mitigated via `deduplicate.xout = FALSE`)
-* All LOO to the C++ density function
-* Add custom kernels to Silverman's rule of thumb (with roughness != 1)
-* Check: if the kernel is finite-support and bandwidth is smaller than the largest gap between two observations, then
-* Like in the SEL application: de-duplicate the input matrix, replace with weights; allow the user to disable it
-* Merging cells: allow arbitrary variables (including continuous ones) for proximity.
-* `kernelSmooth()` and `kernelDensity()` should have an argument for increasing small bandwidths in case of zero weights to match the largest gap divided by 2 (times 1.1 to have at least some coverage)
-
-### Low priority
-
-* Create convolution for kernel orders 4 and 6;
-* Reproduce the CKT (2019) results with the `shift` argument (i.e. test the shift)
-* Create a summary class for SEL; print numerical gradients of lambdas; print the number of converged inner optimisation problems
-
-## Note for package development
-
-* Check release with `lintr::lint_package()`
-* Add tests reproducing simple hard-coded examples
+This software is released under the free/open-source [EUPL 1.2 licence](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
