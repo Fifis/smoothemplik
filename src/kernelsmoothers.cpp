@@ -435,7 +435,7 @@ arma::vec kgaussian4conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
     val = (val > 12.68) ? 0 : -0.0044077311214668460 * std::exp(-0.25 * val*val) * (23.380831519646859 - val*val) * (-4.6191684803531409 + val*val);
-    });
+  });
   return ax;
 }
 

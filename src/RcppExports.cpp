@@ -128,6 +128,8 @@ BEGIN_RCPP
 END_RCPP
 }
 
+RcppExport SEXP run_testthat_tests(SEXP);
+
 static const R_CallMethodDef CallEntries[] = {
     {"_smoothemplik_kernelFunCPP", (DL_FUNC) &_smoothemplik_kernelFunCPP, 4},
     {"_smoothemplik_kernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_kernelWeightsOneCPP, 6},
@@ -136,6 +138,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_smoothemplik_sparseKernelWeightsCPP", (DL_FUNC) &_smoothemplik_sparseKernelWeightsCPP, 6},
     {"_smoothemplik_kernelDensityCPP", (DL_FUNC) &_smoothemplik_kernelDensityCPP, 8},
     {"_smoothemplik_kernelSmoothCPP", (DL_FUNC) &_smoothemplik_kernelSmoothCPP, 10},
+    {"run_testthat_tests", (DL_FUNC) &run_testthat_tests, 1},
     {NULL, NULL, 0}
 };
 
