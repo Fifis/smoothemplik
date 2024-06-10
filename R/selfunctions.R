@@ -2,16 +2,21 @@
 #'
 #' Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
 #' Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}.
-#' The names of the elements in the returned list are consistent with Art B. Owen's original R code.
-#' @param z The data vector.
-#' @param ct The count variable that indicates the multiplicity ob observations. Can be fractional. Very small counts below the tolerance threshold are zeroed.
+#' The names of the elements in the returned list are consistent with the original R code in \insertCite{owen2017weighted}{smoothemplik}.
+#'
+#' @param z Numeric data vector.
+#' @param ct Numeric count variable with positive values that indicates the multiplicity of observations.
+#'   Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.
 #' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
 #' @param mu Hypothesized mean of \code{z} in the moment condition.
-#' @param SEL If FALSE, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
+#' @param SEL If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 #' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
 #' @param n.orig An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
 #'   (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
+#' @param boundary.tolerance Relative tolerance for determining when the lambda is not an interior
+#'   solution because it is too close to the boundary. Corresponds to a fraction of the
+#'   interval range length.
 #' @param truncto Counts under \code{weight.tolerance} will be set to this value.
 #'   In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
 #' @param uniroot.control A list passed to the \code{uniroot}.
@@ -25,47 +30,54 @@
 #' although the algorithm used in that paper is slower than the one provided by this function.
 #'
 #' Since we know that the EL probabilities belong to (0, 1), the interval (bracket) for \eqn{\lambda}{l} search
-#' can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}:
-#' \deqn{p_i = c_i/N \cdot (1 + \lambda z_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*z[i] + s)}
+#' can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}. Let
+#' \eqn{z^*_i := z_i - \mu}{Z[i] := z[i] - mu} be the recentred observations.
+#' \deqn{p_i = c_i/N \cdot (1 + \lambda z^*_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*Z[i] + s)}
 #' The probabilities are bounded from above: \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
-#' \deqn{c_i/N \cdot (1 + \lambda z_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*z[i] + s) < 1}
-#' \deqn{c_i/N < 1 + \lambda z_i + s}{c[i]/N < 1 + l*z_i + s}
-#' \deqn{c_i/N - 1 - s < \lambda z_i}{c[i]/N - 1 - s < l*z[i]}
-#' Two cases: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
-#' (cases with \eqn{z_i=0}{z[i] = 0} are trivially excluded because they do not affect the EL). Then,
-#' \deqn{(c_i/N - 1 - s)/z_i > \lambda,\ \forall i: z_i<0}{(c[i]/N - 1 - s)/z[i] > l,  such i that z[i]<0}
-#' \deqn{(c_i/N - 1 - s)/z_i < \lambda,\ \forall i: z_i>0}{(c[i]/N - 1 - s)/z[i] < l,  such i that z[i]>0}
-#' or
-#' \deqn{\lambda < (c_i/N - 1 - s)/z_i, \forall i: z_i<0}{l < (c_i/N - 1 - shift)/z_i, \forall i: z_i<0}
-#' \deqn{\lambda > (c_i/N - 1 - s)/z_i, \forall i: z_i>0}{l > (c_i/N - 1 - shift)/z_i, \forall i: z_i>0}
-#' which implies
-#' \deqn{\lambda < \min_{i: z_i<0} (c_i/N - 1 - s)/z_i}{l < min_{i: z[i]<0} (c_i/N - 1 - s)/z[i]}
-#' \deqn{\lambda > \max_{i: z_i>0} (c_i/N - 1 - s)/z_i}{l > max_{i: z[i]>0} (c_i/N - 1 - s)/z[i]}
+#' \deqn{c_i/N \cdot (1 + \lambda z^*_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*Z[i] + s) < 1}
+#' \deqn{c_i/N - 1 - s < \lambda z^*_i}{c[i]/N - 1 - s < l*Z[i]}
+#' Two cases: either \eqn{z^*_i<0}{Z[i] < 0}, or \eqn{z^*_i>0}{Z[i] > 0}
+#' (cases with \eqn{z^*_i=0}{Z[i] = 0} are trivially excluded because they do not affect the EL). Then,
+#' \deqn{(c_i/N - 1 - s)/z^*_i > \lambda,\ \forall i: z^*_i<0}{(c[i]/N - 1 - s)/Z[i] > l,  such i that Z[i]<0}
+#' \deqn{(c_i/N - 1 - s)/z^*_i < \lambda,\ \forall i: z^*_i>0}{(c[i]/N - 1 - s)/Z[i] < l,  such i that Z[i]>0}
+#' which defines the search bracket:
+#' \deqn{\lambda_{\min} := \max_{i: z^*_i>0} (c_i/N - 1 - s)/z^*_i}{l > max_{i: Z[i]>0} (c_i/N - 1 - s)/Z[i]}
+#' \deqn{\lambda_{\max} := \min_{i: z^*_i<0} (c_i/N - 1 - s)/z^*_i}{l < min_{i: Z[i]<0} (c_i/N - 1 - s)/Z[i]}
+#' \deqn{\lambda_{\min} < \lambda < \lambda_{\max}}
 #'
 #' (This derivation contains \emph{s}, which is the extra shift that extends the
 #' function to allow mixed conditional and unconditional estimation;
 #' Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
 #'
+#' The actual tolerance of the lambda search in \code{uniroot} is
+#' \eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
+#' where \code{tol} can be set in \code{uniroot.control} and
+#' \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
+#'
 #' @return A list with the following elements:
-#' \itemize{
-#' \item{logelr }{Logarithm of the empirical likelihood ratio.}
-#' \item{lam }{The Lagrange multiplier.}
-#' \item{wts }{Observation weights/probabilities (of the same length as \code{z}).}
-#' \item{converged }{TRUE if the algorithm converged, FALSE otherwise (usually means that \code{mu} is not in the convex hull of the data, that is, within the range of \code{z}).}
-#' \item{iter }{The number of iterations used (from \code{uniroot}).}
-#' \item{bracket }{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
-#' \item{estim.prec }{The approximate estimated precision of lambda (from \code{uniroot}).}
-#' \item{f.root }{The value of the function (derivative of the objective w.r.t. lambda) at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate covergence problems.}
-#' \item{exitcode }{An integer indicating the reason of termination.}
+#'
 #' \describe{
-#' \item{0:}{success, an interior solution for lambda found.}
-#' \item{1:}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
-#' \item{2:}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-#' \item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
-#' \item{4:}{an error occurred while calling \code{uniroot}.}
-#' \item{5:}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
+#'   \item{logelr}{Logarithm of the empirical likelihood ratio.}
+#'   \item{lam}{The Lagrange multiplier.}
+#'   \item{wts}{Observation weights/probabilities (of the same length as \code{z}).}
+#'   \item{converged}{\code{TRUE} if the algorithm converged, \code{FALSE} otherwise (usually means that \code{mu} is not within the range of \code{z}, i.e. the one-dimensional convex hull of \code{z}).}
+#'   \item{iter}{The number of iterations used (from \code{uniroot}).}
+#'   \item{bracket}{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
+#'   \item{estim.prec}{The approximate estimated precision of lambda (from \code{uniroot}).}
+#'   \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
+#'   \item{exitcode}{An integer indicating the reason of termination.}
+#'   \describe{
+#'     \item{0}{success, an interior solution for lambda found.}
+#'     \item{1}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
+#'     \item{2}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
+#'     \item{3}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
+#'     \item{4}{an error occurred while calling \code{uniroot}.}
+#'     \item{5}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
+#'     \item{6}{\code{mu} is on the boundary of the convex hull of \code{z}.}
+#'     \item{7}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
+#'   }
 #' }
-#' }
+#'
 #' @references
 #' \insertAllCited{}
 #'
@@ -75,9 +87,9 @@
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 #' )
 #' set.seed(1)
-#' system.time(r1 <- replicate(100, cemplik(sample(earth, replace = TRUE), mu = 5.517)))
+#' system.time(r1 <- replicate(40, cemplik(sample(earth, replace = TRUE), mu = 5.517)))
 #' set.seed(1)
-#' system.time(r2 <- replicate(100, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
+#' system.time(r2 <- replicate(40, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
 #' plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
 #'      bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
 #'      main = "Discrepancy between cemplik and weightedEL", ylab = "")
@@ -90,11 +102,13 @@ weightedEL <- function(z, mu = 0,
                        SEL = FALSE,
                        n.orig = NULL,
                        weight.tolerance = 0.01 / length(z),
+                       boundary.tolerance = 1e-9,
                        truncto = 0,
                        uniroot.control = list(),
                        return.weights = FALSE,
                        verbose = FALSE
 ) {
+  if (is.data.frame(z)) z <- as.matrix(z, rownames.force = TRUE)
   if (any(!is.finite(z))) stop("Non-finite observations (NA, NaN, Inf) are not welcome.")
   if (is.null(ct)) ct <- rep(1, length(z))
   if (any(!is.finite(ct))) stop("Non-finite weights (NA, NaN, Inf) are not welcome.")
@@ -107,8 +121,22 @@ weightedEL <- function(z, mu = 0,
     if (verbose) warning(paste0("Positive counts below ", weight.tolerance, " have been replaced with ", truncto, "."))
     ct[ct < weight.tolerance] <- truncto
   }
+
+  # Preserving the names before trimming
+  if (is.matrix(z)) {
+    if (ncol(z) > 1) stop("Only one-dimensional vectors or matrices are supported.") else z <- drop(z)
+  }
+  if (return.weights) {
+    wts <- numeric(n.orig)
+    names(wts) <- names(z)
+  } else {
+    wts <- NULL
+  }
+
+  # Not all observations contribute meaningfully to the likelihood; tiny weights
+  # push lambda to the boundary
   nonz <- which(ct > 0)
-  if (length(nonz) < length(z)) { # Not all observations are useful
+  if (length(nonz) < length(z)) {
     z <- z[nonz]
     ct <- ct[nonz]
     shift <- shift[nonz]
@@ -117,32 +145,34 @@ weightedEL <- function(z, mu = 0,
   # The denominator for EL with counts is the sum of total counts, and for SEL, it is the number of observations!
   N <- if (SEL) n.orig else sum(ct)
   if (N <= 0) stop("Total weights must be positive.")
-  if (is.matrix(z)) {
-    if (ncol(z) > 1) stop("Only one-dimensional vectors or matrices are supported.") else z <- as.numeric(z)
-  }
-  z <- z - mu
-  wts <- if (return.weights) rep(0, n.orig) else NULL
 
-  # The default output to be overwritten if optimisation succeeds
+  z <- z - mu
+
+  me <- .Machine$double.eps
+
+  z1 <- min(z)
+  zn <- max(z)
+
+  # The default output is for the worst case when the spanning condition is not met
+  # It is overwritten if optimisation succeeds
   lam <- Inf
   logelr <- -Inf
   converged <- FALSE
   iter <- NA
-  minlambda <- -Inf
-  maxlambda <- Inf
-  int <- c(minlambda, maxlambda)
+  int <- c(-Inf, Inf)
   estim.prec <- NA
   f.root <- NA
   exitcode <- 5
 
   # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z)
-  if (min(z) < 0 && max(z) > 0) {
+  if (z1 < 0 && zn > 0) {
     negz <- z < 0
     comp <- (ct / N - 1 - shift) / z
     minlambda <- max(comp[!negz])
     maxlambda <- min(comp[negz])
-    int <- c(minlambda + .Machine$double.eps, maxlambda - .Machine$double.eps)
-    con <- list(tol = .Machine$double.eps, maxiter = 200, trace = 0)
+    int <- c(minlambda, maxlambda)
+    int <- int + abs(int) * c(2, -2) * me # To avoid bad rounding
+    con <- list(tol = me, maxiter = 100) # Strictest convergence
     con[names(uniroot.control)] <- uniroot.control
 
     dllik <- function(lambda) return(sum(ct * z / (1 + lambda * z + shift)))
@@ -157,26 +187,38 @@ weightedEL <- function(z, mu = 0,
       }
       lam <- lambda$root
       if (return.weights) wts[nonz] <- (ct / N) / (1 + z * lam + shift)
-      logelr <- -sum(ct * log(1 + z * lam + shift))
+      logelr <- -sum(ct * log1p(z * lam + shift))
       converged <- if ("warning" %in% class(lambda[[2]])) FALSE else TRUE
       iter <- lambda$iter
       estim.prec <- lambda$estim.prec
       f.root <- lambda$f.root
       exitcode <- 0
-      tol <- sqrt(.Machine$double.eps)
-      if (abs(f.root) > tol) exitcode <- 1
-      if (abs(lam - maxlambda) < tol || abs(lam - minlambda) < tol) exitcode <- exitcode + 2
-    } else {
+
+      if (abs(f.root) > sqrt(me)) exitcode <- 1
+      # Relative tolerance check for boundary closeness
+      int.len <- maxlambda - minlambda
+      if (min(abs(lam - maxlambda), abs(lam - minlambda)) < boundary.tolerance * int.len) exitcode <- exitcode + 2
+    } else { # The original bad output stays intact, only the exit code updates
       exitcode <- 4
     }
+  } else if (z1 == 0 && zn == 0) { # The sample is degenerate
+    lam <- logelr <- iter <- estim.prec <- f.root <- 0
+    converged <- TRUE
+    int <- c(0, 0)
+    exitcode <- 7
+  } else if (z1 == 0 || zn == 0) { # mu is on the boundary
+    converged <- TRUE
+    exitcode <- 6
   }
 
-  err.msg <- c("FOC not met: the value of d/dlambda(weighted EL) is different from 0 by more than sqrt(Mach.eps)!",
-               "Lambda is very close to the boundary (closer than sqrt(Mach.eps))!",
-               "Lambda is very close to the boundary and FOC not met!",
-               "Root finder returned an error!",
-               "mu is not strictly in the convex hull of z (spanning condition fail)!")
-  if (verbose && exitcode > 0) warning(err.msg[exitcode])
+  msg <- c("FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
+           "Lambda is very close to the boundary! (May happen with extremely small weights.)",
+           "Lambda is very close to the boundary and FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
+           "Root finder returned an error!",
+           "mu is not strictly in the convex hull of z (spanning condition fail)!",
+           "mu lies exactly on the boundary of the convex full, ELR(mu) := 0.",
+           "Observations wth substantial counts are identical and equal to mu (degenerate sample).")
+  if (verbose && exitcode > 0) warning(msg[exitcode])
 
   return(list(logelr = logelr, lam = lam, wts = wts,
               converged = converged, iter = iter,
@@ -387,11 +429,11 @@ constrSmoothEmplik <- function(par.free = NULL,
 #' @param ... Passed to \code{\link{constrSmoothEmplik}} or, in case all parameters are fixed, \code{\link{smoothEmplik}}.
 #'
 #' @return A list with the following elements:
-#' \itemize{
-#' \item{par }{The argmax of the SEL that was found by the optimiser.}
-#' \item{value }{The SEL value corresponding to \code{par}.}
-#' \item{restricted }{A logical vector of the same length as \code{par} indicating if the respective element was kept fixed during the optimisation.}
-#' \item{xtimes }{A vector with two components indicating time (in seconds) it took to find the candidate initial value and the final optimum respectively.}
+#' \describe{
+#' \item{par}{The argmax of the SEL that was found by the optimiser.}
+#' \item{value}{The SEL value corresponding to \code{par}.}
+#' \item{restricted}{A logical vector of the same length as \code{par} indicating if the respective element was kept fixed during the optimisation.}
+#' \item{xtimes}{A vector with two components indicating time (in seconds) it took to find the candidate initial value and the final optimum respectively.}
 #' }
 #' @export
 #'
@@ -513,13 +555,14 @@ jitterText <- function(x, y, labels, times = 16, radius = 0.1, bgcol = "#FFFFFF8
 #' @param bw A numeric scalar or a vector passed to `kernelWeights`.
 #' @param trim A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.
 #' @param renormalise Logical; passed to `sparseVectorToList`.
+#' @param ... Other arguments pased to \code{kernelWeights}.
 #'
 #' @return A list with indices of large enough elements.
 #' @export
 #'
 #' @examples
-getSELWeights <- function(x, bw, trim = NULL, renormalise = TRUE) {
-  sel.weights <- kernelWeights(x, bw = bw)
+getSELWeights <- function(x, bw = NULL, ..., trim = NULL, renormalise = TRUE) {
+  sel.weights <- kernelWeights(x, bw = bw, ...)
   sel.weights <- sel.weights / rowSums(sel.weights)
   sel.weights <- apply(sel.weights, 1, sparseVectorToList, trim = trim, renormalise = renormalise)
   return(sel.weights)

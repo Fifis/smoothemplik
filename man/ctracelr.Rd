@@ -19,7 +19,10 @@ ctracelr(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...)
 
 \item{verbose}{Logical: report iteration data?}
 
-\item{...}{Passed to \code{cemplik}.}
+\item{...}{Passed to \code{cemplik}.
+
+This function does not accept the starting lambda because it is much faster (3--5 times)
+to reuse the lambda from the previous iteration.}
 }
 \value{
 A matrix with one row at each mean from mu0 to mu1 and a column for each EL return value (except EL weights).
@@ -37,4 +40,10 @@ logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 100, verbose = TRUE)
 hist(earth, breaks = seq(4.75, 6, 1/8))
 plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
      xlab = "Earth density", ylab = "ELR")
+# TODO: why is there non-convergence in row 59?
+
+# Two-dimensional trajectory
+set.seed(1)
+xy <- matrix(rexp(200), ncol = 2)
+logELR2 <- ctracelr(xy, mu0 = c(0.5, 0.5), mu1 = c(1.5, 1.5), N = 100)
 }

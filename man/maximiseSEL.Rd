@@ -34,11 +34,11 @@ are done with the maximum step size, optimisation is re-done via BFGS.}
 }
 \value{
 A list with the following elements:
-\itemize{
-\item{par }{The argmax of the SEL that was found by the optimiser.}
-\item{value }{The SEL value corresponding to \code{par}.}
-\item{restricted }{A logical vector of the same length as \code{par} indicating if the respective element was kept fixed during the optimisation.}
-\item{xtimes }{A vector with two components indicating time (in seconds) it took to find the candidate initial value and the final optimum respectively.}
+\describe{
+\item{par}{The argmax of the SEL that was found by the optimiser.}
+\item{value}{The SEL value corresponding to \code{par}.}
+\item{restricted}{A logical vector of the same length as \code{par} indicating if the respective element was kept fixed during the optimisation.}
+\item{xtimes}{A vector with two components indicating time (in seconds) it took to find the candidate initial value and the final optimum respectively.}
 }
 }
 \description{

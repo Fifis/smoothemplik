@@ -4,12 +4,14 @@
 \alias{getSELWeights}
 \title{Construct memory-efficient weights for estimation}
 \usage{
-getSELWeights(x, bw, trim = NULL, renormalise = TRUE)
+getSELWeights(x, bw = NULL, ..., trim = NULL, renormalise = TRUE)
 }
 \arguments{
 \item{x}{A numeric vector (with many close-to-zero elements).}
 
 \item{bw}{A numeric scalar or a vector passed to `kernelWeights`.}
+
+\item{...}{Other arguments pased to \code{kernelWeights}.}
 
 \item{trim}{A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.}
 

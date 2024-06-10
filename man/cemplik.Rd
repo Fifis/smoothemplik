@@ -68,7 +68,7 @@ A list with the following values:
     \item{iter}{Number of iterations taken.}
     \item{ndec}{Newton decrement (see Boyd & Vandenberghe).}
     \item{gradnorm}{Norm of the gradient of log empirical likelihood.}
-    }
+}
 }
 \description{
 Implements the empirical-likelihood-ratio test for the mean of the coordinates of \code{z}
@@ -98,4 +98,24 @@ earth <- c(
 )
 cemplik(earth, mu = 5.517, verbose = TRUE) # 5.517 is the modern accepted value
 
+# Linear regression through empirical likelihood
+coef.lm <- coef(lm(mpg ~ hp + am, data = mtcars))
+xmat <- cbind(1, as.matrix(mtcars[, c("hp", "am")]))
+yvec <- mtcars$mpg
+foc.lm <- function(par, x, y) {  # The sample average of this
+  resid <- y - drop(x \%*\% par)   # must be 0
+  resid * x
+}
+minusEL <- function(par) -cemplik(foc.lm(par, xmat, yvec), itermax = 10)$logelr
+coef.el <- optim(c(mean(yvec), 0, 0), minusEL)$par
+abs(coef.el - coef.lm) / coef.lm  # Relative difference
+
+# Likelihood ratio testing without any variance estimation
+# Define the profile empirical likelihood for the coefficient on am
+minusPEL <- function(par.free, par.am)
+  -cemplik(foc.lm(c(par.free, par.am), xmat, yvec), itermax = 20)$logelr
+# Constrained maximisation assuming that the coef on par.am is 3.14
+coef.el.constr <- optim(coef.el[1:2], minusPEL, par.am = 3.14)$par
+print(-2 * cemplik(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
+# Exceeds the critical value qchisq(0.95, df = 1)
 }

@@ -235,7 +235,8 @@ pit <- function(x, xout = NULL) {
   if (is.null(weights)) weights <- rep(1, NROW(x))
   if (length(weights) != NROW(x)) stop("The length of 'weights' must be equal to the number of obervations (NROW(x)).")
   if (!is.null(y)) {
-    if (!is.vector(y)) stop("y must be a numeric vector.")
+    if (NCOL(y) > 1) stop("y must be a numeric vector.")
+    if (!is.null(dim(y))) y <- drop(y)
     if (length(y) != nrow(x)) stop("The length of 'y' must be equal to the number of obervations (NROW(x)).")
   }
 
@@ -271,7 +272,7 @@ pit <- function(x, xout = NULL) {
       } else {
         x <- xy$x
       }
-      weights <- unname(sapply(split(weights, x.matches), sum)) # Adding up weights
+      weights <- unname(vapply(split(weights, x.matches), sum, FUN.VALUE = numeric(1))) # Adding up weights
     } else {
       deduplicate.x <- FALSE # No duplicates found = no action needed
     }
@@ -976,7 +977,7 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
     term2 <- -2 * mean(fhat.LOO)
     return(term1 + term2)
   }
-  CV.values <- sapply(bw, CV)
+  CV.values <- vapply(bw, CV, FUN.VALUE = numeric(1))
   attr(CV.values, "duplicate.stats") <- arg$duplicate.stats
   return(CV.values)
 }
@@ -1048,7 +1049,7 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
     if (!is.finite(m)) m <- Inf
     return(m)
   }
-  ASE.values <- sapply(bw, ASE)
+  ASE.values <- vapply(bw, ASE, FUN.VALUE = numeric(1))
   attr(ASE.values, "duplicate.stats") <- arg$duplicate.stats
   return(ASE.values)
 }

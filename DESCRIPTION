@@ -1,10 +1,11 @@
 Package: smoothemplik
 Type: Package
 Title: Smoothed Empirical Likelihood
-Version: 0.0.11
+Version: 0.0.12
+Date: 2024-06-13
 Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
         role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
-Maintainer: Andreï V. Kostyrka <andrei.kostyrka@gmail.com>
+Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
 Description: Smoothed Empirical Likelihood for asymtotically efficient
     estimation of conditional-moment-restriction-based models
     with focus on linear models under random sampling, variable-probability
@@ -22,13 +23,12 @@ Imports:
     Matrix,
     data.table
 Suggests: 
-    AER,
     knitr,
     rmarkdown,
     microbenchmark,
     testthat (>= 3.0.0)
 RdMacros: Rdpack
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.1
 NeedsCompilation: yes
 LinkingTo: 
     Rcpp, RcppArmadillo, RcppParallel

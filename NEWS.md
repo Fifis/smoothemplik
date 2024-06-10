@@ -1,3 +1,14 @@
+# smoothemplik 0.0.12 (2024-06-13)
+
+- Fixed a bug in `prepareKernel` where a valid `y` vector with attributes would not pass the check
+- Implemented a more accurate check for lambda being close to the boundary based on the relative search interval length in `weightedEL`
+- `weightedEL` preserves the names of the input vector in `wts`
+- Sped up `ctracelr` by using the previous lambda value in the search (~4 times faster)
+- The output of `mllog` now has column names because it was confusing without them
+- The output of `svdlm` is now a vector, not a 1-column matrix
+- Replaced cetain instances of `sapply` with `vapply` in smoothing functions
+- Added unit tests for some functions
+
 # smoothemplik 0.0.11 (2024-01-13)
 
 - Added EUPL licence

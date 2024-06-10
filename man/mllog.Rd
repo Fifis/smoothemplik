@@ -4,7 +4,7 @@
 \alias{mllog}
 \title{Modified minus logarithm with derivatives}
 \usage{
-mllog(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE)
+mllog(x, eps = NULL, M = Inf, der = 0, order = 4, drop = TRUE)
 }
 \arguments{
 \item{x}{Numeric vector for which approximated logarithm is to be computed.}
@@ -17,7 +17,7 @@ mllog(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE)
 
 \item{order}{Positive integer: Taylor approximation order.}
 
-\item{flatten1d}{If TRUE and \code{x} is a vector, the output is a vector and not a 1-column matrix.}
+\item{drop}{If \code{TRUE} and \code{x} is a vector, the output is a vector and not a 1-column matrix.}
 }
 \value{
 A numeric matrix with \code{(order+1)} columns containing the values of the modified log and its derivatives.
@@ -33,16 +33,14 @@ For eps <= x <= M, returns just the logarithm. For x < eps and x > M, returns th
 }
 \examples{
 x <- seq(0.01^0.25, 2^0.25, length.out = 51)^4 - 0.11 # Denser where |f'| is higher
-plot(x, -log(x))
+plot(x, -log(x)); abline(v = 0, lty = 2) # Observe the warning
 lines(x, mllog(x, eps = 0.2), col = 2)
 lines(x, mllog(x, eps = 0.5), col = 3)
 lines(x, mllog(x, eps = 1, M = 1.2, order = 6), col = 4)
-# Suppose that we substitute -log with its Taylor approx. around 1
-x <- seq(0.1, 1.5, 0.2)
-err.mat <- cbind(x, ErrOrder2 = -log(x) - mllog(x, eps = 1, M = 1, order = 2),
-                    ErrOrder3 = -log(x) - mllog(x, eps = 1, M = 1, order = 3),
-                    ErrOrder4 = -log(x) - mllog(x, eps = 1, M = 1, order = 4),
-                    ErrOrder5 = -log(x) - mllog(x, eps = 1, M = 1, order = 5),
-                    ErrOrder6 = -log(x) - mllog(x, eps = 1, M = 1, order = 6))
-print(err.mat, digits = 2)
+
+# Substitute -log with its Taylor approx. around 1
+x <- seq(0.1, 2, 0.05)
+ae <- abs(sapply(2:6, function(o) -log(x) - mllog(x, eps=1, M=1, order=o)))
+matplot(x, ae, type = "l", log = "y", lwd = 2,
+  main = "Abs. trunc. err. of Taylor expansion at 1", ylab = "")
 }

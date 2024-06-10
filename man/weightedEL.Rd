@@ -12,6 +12,7 @@ weightedEL(
   SEL = FALSE,
   n.orig = NULL,
   weight.tolerance = 0.01/length(z),
+  boundary.tolerance = 1e-09,
   truncto = 0,
   uniroot.control = list(),
   return.weights = FALSE,
@@ -19,21 +20,26 @@ weightedEL(
 )
 }
 \arguments{
-\item{z}{The data vector.}
+\item{z}{Numeric data vector.}
 
 \item{mu}{Hypothesized mean of \code{z} in the moment condition.}
 
-\item{ct}{The count variable that indicates the multiplicity ob observations. Can be fractional. Very small counts below the tolerance threshold are zeroed.}
+\item{ct}{Numeric count variable with positive values that indicates the multiplicity of observations.
+Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.}
 
 \item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
 
-\item{SEL}{If FALSE, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
+\item{SEL}{If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
 
 \item{n.orig}{An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).}
 
 \item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
 (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+
+\item{boundary.tolerance}{Relative tolerance for determining when the lambda is not an interior
+solution because it is too close to the boundary. Corresponds to a fraction of the
+interval range length.}
 
 \item{truncto}{Counts under \code{weight.tolerance} will be set to this value.
 In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
@@ -47,30 +53,33 @@ Setting this to FALSE gives huge memory savings in large data sets, especially w
 }
 \value{
 A list with the following elements:
-\itemize{
-\item{logelr }{Logarithm of the empirical likelihood ratio.}
-\item{lam }{The Lagrange multiplier.}
-\item{wts }{Observation weights/probabilities (of the same length as \code{z}).}
-\item{converged }{TRUE if the algorithm converged, FALSE otherwise (usually means that \code{mu} is not in the convex hull of the data, that is, within the range of \code{z}).}
-\item{iter }{The number of iterations used (from \code{uniroot}).}
-\item{bracket }{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
-\item{estim.prec }{The approximate estimated precision of lambda (from \code{uniroot}).}
-\item{f.root }{The value of the function (derivative of the objective w.r.t. lambda) at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate covergence problems.}
-\item{exitcode }{An integer indicating the reason of termination.}
+
 \describe{
-\item{0:}{success, an interior solution for lambda found.}
-\item{1:}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
-\item{2:}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-\item{3:}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
-\item{4:}{an error occurred while calling \code{uniroot}.}
-\item{5:}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
-}
+  \item{logelr}{Logarithm of the empirical likelihood ratio.}
+  \item{lam}{The Lagrange multiplier.}
+  \item{wts}{Observation weights/probabilities (of the same length as \code{z}).}
+  \item{converged}{\code{TRUE} if the algorithm converged, \code{FALSE} otherwise (usually means that \code{mu} is not within the range of \code{z}, i.e. the one-dimensional convex hull of \code{z}).}
+  \item{iter}{The number of iterations used (from \code{uniroot}).}
+  \item{bracket}{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
+  \item{estim.prec}{The approximate estimated precision of lambda (from \code{uniroot}).}
+  \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
+  \item{exitcode}{An integer indicating the reason of termination.}
+  \describe{
+    \item{0}{success, an interior solution for lambda found.}
+    \item{1}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
+    \item{2}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
+    \item{3}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
+    \item{4}{an error occurred while calling \code{uniroot}.}
+    \item{5}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
+    \item{6}{\code{mu} is on the boundary of the convex hull of \code{z}.}
+    \item{7}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
+  }
 }
 }
 \description{
 Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
 Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}.
-The names of the elements in the returned list are consistent with Art B. Owen's original R code.
+The names of the elements in the returned list are consistent with the original R code in \insertCite{owen2017weighted}{smoothemplik}.
 }
 \details{
 This function provides the core functionality for univariate empirical likelihood.
@@ -78,26 +87,29 @@ The technical details is given in \insertCite{cosma2019inference}{smoothemplik},
 although the algorithm used in that paper is slower than the one provided by this function.
 
 Since we know that the EL probabilities belong to (0, 1), the interval (bracket) for \eqn{\lambda}{l} search
-can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}:
-\deqn{p_i = c_i/N \cdot (1 + \lambda z_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*z[i] + s)}
+can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}. Let
+\eqn{z^*_i := z_i - \mu}{Z[i] := z[i] - mu} be the recentred observations.
+\deqn{p_i = c_i/N \cdot (1 + \lambda z^*_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*Z[i] + s)}
 The probabilities are bounded from above: \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
-\deqn{c_i/N \cdot (1 + \lambda z_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*z[i] + s) < 1}
-\deqn{c_i/N < 1 + \lambda z_i + s}{c[i]/N < 1 + l*z_i + s}
-\deqn{c_i/N - 1 - s < \lambda z_i}{c[i]/N - 1 - s < l*z[i]}
-Two cases: either \eqn{z_i<0}{z[i] < 0}, or \eqn{z_i>0}{z[i] > 0}
-(cases with \eqn{z_i=0}{z[i] = 0} are trivially excluded because they do not affect the EL). Then,
-\deqn{(c_i/N - 1 - s)/z_i > \lambda,\ \forall i: z_i<0}{(c[i]/N - 1 - s)/z[i] > l,  such i that z[i]<0}
-\deqn{(c_i/N - 1 - s)/z_i < \lambda,\ \forall i: z_i>0}{(c[i]/N - 1 - s)/z[i] < l,  such i that z[i]>0}
-or
-\deqn{\lambda < (c_i/N - 1 - s)/z_i, \forall i: z_i<0}{l < (c_i/N - 1 - shift)/z_i, \forall i: z_i<0}
-\deqn{\lambda > (c_i/N - 1 - s)/z_i, \forall i: z_i>0}{l > (c_i/N - 1 - shift)/z_i, \forall i: z_i>0}
-which implies
-\deqn{\lambda < \min_{i: z_i<0} (c_i/N - 1 - s)/z_i}{l < min_{i: z[i]<0} (c_i/N - 1 - s)/z[i]}
-\deqn{\lambda > \max_{i: z_i>0} (c_i/N - 1 - s)/z_i}{l > max_{i: z[i]>0} (c_i/N - 1 - s)/z[i]}
+\deqn{c_i/N \cdot (1 + \lambda z^*_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*Z[i] + s) < 1}
+\deqn{c_i/N - 1 - s < \lambda z^*_i}{c[i]/N - 1 - s < l*Z[i]}
+Two cases: either \eqn{z^*_i<0}{Z[i] < 0}, or \eqn{z^*_i>0}{Z[i] > 0}
+(cases with \eqn{z^*_i=0}{Z[i] = 0} are trivially excluded because they do not affect the EL). Then,
+\deqn{(c_i/N - 1 - s)/z^*_i > \lambda,\ \forall i: z^*_i<0}{(c[i]/N - 1 - s)/Z[i] > l,  such i that Z[i]<0}
+\deqn{(c_i/N - 1 - s)/z^*_i < \lambda,\ \forall i: z^*_i>0}{(c[i]/N - 1 - s)/Z[i] < l,  such i that Z[i]>0}
+which defines the search bracket:
+\deqn{\lambda_{\min} := \max_{i: z^*_i>0} (c_i/N - 1 - s)/z^*_i}{l > max_{i: Z[i]>0} (c_i/N - 1 - s)/Z[i]}
+\deqn{\lambda_{\max} := \min_{i: z^*_i<0} (c_i/N - 1 - s)/z^*_i}{l < min_{i: Z[i]<0} (c_i/N - 1 - s)/Z[i]}
+\deqn{\lambda_{\min} < \lambda < \lambda_{\max}}
 
 (This derivation contains \emph{s}, which is the extra shift that extends the
 function to allow mixed conditional and unconditional estimation;
 Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
+
+The actual tolerance of the lambda search in \code{uniroot} is
+\eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
+where \code{tol} can be set in \code{uniroot.control} and
+\eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
 }
 \examples{
 earth <- c(
@@ -105,9 +117,9 @@ earth <- c(
   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 )
 set.seed(1)
-system.time(r1 <- replicate(100, cemplik(sample(earth, replace = TRUE), mu = 5.517)))
+system.time(r1 <- replicate(40, cemplik(sample(earth, replace = TRUE), mu = 5.517)))
 set.seed(1)
-system.time(r2 <- replicate(100, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
+system.time(r2 <- replicate(40, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
 plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
      bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
      main = "Discrepancy between cemplik and weightedEL", ylab = "")

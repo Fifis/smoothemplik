@@ -51,7 +51,7 @@
 #'     \item{iter}{Number of iterations taken.}
 #'     \item{ndec}{Newton decrement (see Boyd & Vandenberghe).}
 #'     \item{gradnorm}{Norm of the gradient of log empirical likelihood.}
-#'     }
+#' }
 #'
 #' @examples
 #' earth <- c(
@@ -60,6 +60,26 @@
 #' )
 #' cemplik(earth, mu = 5.517, verbose = TRUE) # 5.517 is the modern accepted value
 #'
+#' # Linear regression through empirical likelihood
+#' coef.lm <- coef(lm(mpg ~ hp + am, data = mtcars))
+#' xmat <- cbind(1, as.matrix(mtcars[, c("hp", "am")]))
+#' yvec <- mtcars$mpg
+#' foc.lm <- function(par, x, y) {  # The sample average of this
+#'   resid <- y - drop(x %*% par)   # must be 0
+#'   resid * x
+#' }
+#' minusEL <- function(par) -cemplik(foc.lm(par, xmat, yvec), itermax = 10)$logelr
+#' coef.el <- optim(c(mean(yvec), 0, 0), minusEL)$par
+#' abs(coef.el - coef.lm) / coef.lm  # Relative difference
+#'
+#' # Likelihood ratio testing without any variance estimation
+#' # Define the profile empirical likelihood for the coefficient on am
+#' minusPEL <- function(par.free, par.am)
+#'   -cemplik(foc.lm(c(par.free, par.am), xmat, yvec), itermax = 20)$logelr
+#' # Constrained maximisation assuming that the coef on par.am is 3.14
+#' coef.el.constr <- optim(coef.el[1:2], minusPEL, par.am = 3.14)$par
+#' print(-2 * cemplik(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
+#' # Exceeds the critical value qchisq(0.95, df = 1)
 #' @export
 cemplik <- function(z, ct = NULL, mu = NULL,
                     lam = NULL, eps = NULL, M = Inf,
@@ -149,8 +169,9 @@ cemplik <- function(z, ct = NULL, mu = NULL,
     if (iter > itermax) break
   }
 
-  wts <- (ct / sum(ct)) / (1 + z %*% lam) # Without the weights, the numerator was 1/n
-  logelr <- sum(ct * mllog(1 + z %*% lam, eps = eps, M = M, order = order, der = 0))
+  zlam <- drop(z %*% lam)
+  wts <- (ct / sum(ct)) / (1 + zlam) # Without the weights, the numerator was 1/n
+  logelr <- sum(ct * mllog(1 + zlam, eps = eps, M = M, order = order, der = 0))
 
   return(list(logelr = logelr, lam = lam, wts = wts, converged = converged,
               iter = iter, ndec = ndec, gradnorm = gradnorm))
@@ -166,6 +187,9 @@ cemplik <- function(z, ct = NULL, mu = NULL,
 #' @param verbose Logical: report iteration data?
 #' @param ... Passed to \code{cemplik}.
 #'
+#' This function does not accept the starting lambda because it is much faster (3--5 times)
+#' to reuse the lambda from the previous iteration.
+#'
 #' @return A matrix with one row at each mean from mu0 to mu1 and a column for each EL return value (except EL weights).
 #' @export
 #'
@@ -179,19 +203,26 @@ cemplik <- function(z, ct = NULL, mu = NULL,
 #' hist(earth, breaks = seq(4.75, 6, 1/8))
 #' plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
 #'      xlab = "Earth density", ylab = "ELR")
+#' # TODO: why is there non-convergence in row 59?
+#'
+#' # Two-dimensional trajectory
+#' set.seed(1)
+#' xy <- matrix(rexp(200), ncol = 2)
+#' logELR2 <- ctracelr(xy, mu0 = c(0.5, 0.5), mu1 = c(1.5, 1.5), N = 100)
 ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
   if (is.vector(z)) z <- matrix(z, ncol = 1)
   d <- ncol(z)
 
-  ans <- matrix(0, N + 1, d + 1 + d + 4)
+  ans <- matrix(0, nrow = N + 1, ncol = d + 1 + d + 4)
   colnames(ans) <- c(paste("z", 1:d, sep = "."),
                      "logelr",
                      paste("lambda", 1:d, sep = "."),
                      c("conv", "iter", "decr", "gnorm"))
-
+  lam0 <- NULL
   for (i in 0:N) {
     mui <- (i*mu1 + (N-i)*mu0) / N
-    ansi <- cemplik(z = z, ct = ct, mu = mui, ...)
+    if (i > 0) lam0 <- if (all(is.finite(ansi$lam))) drop(ansi$lam) else NULL
+    ansi <- cemplik(z = z, ct = ct, mu = mui, lam = lam0, ...)
     ans[i + 1, ] <- c(mui, ansi$logelr, ansi$lam, ansi$converged, ansi$iter, ansi$ndec, ansi$gradnorm)
     if (verbose) cat("Point ", i, "/", N, ", ", if (ansi$converged == 0) "NOT " else "", "converged",
                      ", log(ELR) = ", ansi$logelr, "\n", sep = "")
@@ -206,7 +237,7 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
 #' @param eps Lower threshold below which approximation starts.
 #' @param M Upper threshold above which approximation starts.
 #' @param der Non-negative integer: 0 yields the function, 1 and higher yields derivatives
-#' @param flatten1d If TRUE and \code{x} is a vector, the output is a vector and not a 1-column matrix.
+#' @param drop If \code{TRUE} and \code{x} is a vector, the output is a vector and not a 1-column matrix.
 #'
 #' @details
 #' Provides a family of alternatives to -log() and derivative thereof in order to attain self-concordance and
@@ -219,19 +250,17 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
 #'
 #' @examples
 #' x <- seq(0.01^0.25, 2^0.25, length.out = 51)^4 - 0.11 # Denser where |f'| is higher
-#' plot(x, -log(x))
+#' plot(x, -log(x)); abline(v = 0, lty = 2) # Observe the warning
 #' lines(x, mllog(x, eps = 0.2), col = 2)
 #' lines(x, mllog(x, eps = 0.5), col = 3)
 #' lines(x, mllog(x, eps = 1, M = 1.2, order = 6), col = 4)
-#' # Suppose that we substitute -log with its Taylor approx. around 1
-#' x <- seq(0.1, 1.5, 0.2)
-#' err.mat <- cbind(x, ErrOrder2 = -log(x) - mllog(x, eps = 1, M = 1, order = 2),
-#'                     ErrOrder3 = -log(x) - mllog(x, eps = 1, M = 1, order = 3),
-#'                     ErrOrder4 = -log(x) - mllog(x, eps = 1, M = 1, order = 4),
-#'                     ErrOrder5 = -log(x) - mllog(x, eps = 1, M = 1, order = 5),
-#'                     ErrOrder6 = -log(x) - mllog(x, eps = 1, M = 1, order = 6))
-#' print(err.mat, digits = 2)
-mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE) {
+#'
+#' # Substitute -log with its Taylor approx. around 1
+#' x <- seq(0.1, 2, 0.05)
+#' ae <- abs(sapply(2:6, function(o) -log(x) - mllog(x, eps=1, M=1, order=o)))
+#' matplot(x, ae, type = "l", log = "y", lwd = 2,
+#'   main = "Abs. trunc. err. of Taylor expansion at 1", ylab = "")
+mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, drop = TRUE) {
   if (is.null(eps)) eps <- 1/length(x)
   if (eps > M) stop("Thresholds not ordered. eps must be less than M.")
 
@@ -239,15 +268,17 @@ mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE) 
   hi <- x > M
   md <- (!lo) & (!hi)
 
-  dlog <- function(x, r = 0)  if (r == 0) log(x) else ((r%%2 == 1)*2-1) * 1/x^r * gamma(r)
-  out <- sapply(0:der, function(r) {
-    f <- x*0
-    f[md] <- dlog(x[md], r = r)
-    if (any(lo)) f[lo] <- logTaylor(x[lo], a = eps, k = order, r = r)
-    if (any(hi)) f[hi] <- logTaylor(x[hi], a = M,   k = order, r = r)
+  # Derivatives of the logarithm
+  dlog <- function(x, d = 0)  if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
+  out <- vapply(0:der, function(d) {
+    f <- numeric(length(x))
+    f[md] <- dlog(x[md], d = d)
+    if (any(lo)) f[lo] <- logTaylor(x[lo], a = eps, k = order, d = d)
+    if (any(hi)) f[hi] <- logTaylor(x[hi], a = M,   k = order, d = d)
     return(f)
-  })
-  if ((der == 0) && flatten1d) out <- as.vector(out)
+  }, FUN.VALUE = numeric(length(x)))
+  colnames(out) <- paste0("deriv", 0:der)
+  if ((der == 0) && drop) out <- drop(out)
 
   return(-out)
 }
@@ -256,77 +287,83 @@ mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, flatten1d = TRUE) 
 #'
 #' @param X Model matrix.
 #' @param y Response vector.
+#' @param rel.tol Relative zero tolerance for generalised inverse via SVD.
+#' @param abs.tol Relative zero tolerance for generalised inverse via SVD.
 #'
 #' Empirical likelihood's Newton steps are of least-squares type.
 #' Denote \eqn{X^+} to be the generalised inverse of X. If SVD algorithm failures are encountered,
 #' it sometimes helps to try \code{svd(t(X))} and translate back. First check to ensure that
 #' \code{X} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.
 #'
-#' @return A matrix of coefficients.
+#' The tolerances are used to check the closeness of singular values to zero. The values of the
+#' singular-value vector \code{d} that are
+#' less than \code{rel.tol * max(d) + abs.tol} are set to zero.
+#'
+#' @return A vector of coefficients.
 #' @export
 #'
 #' @examples
 #' b.svd <- svdlm(X = cbind(1, as.matrix(mtcars[, -1])), y = mtcars[, 1])
 #' b.lm  <- coef(lm(mpg ~ ., data = mtcars))
-#' b.lm - as.numeric(b.svd) # Negligible differences
-svdlm <- function(X, y) {
-  # Tolerances for generalised inverse via SVD
-  RELTOL <- 1e-9
-  ABSTOL <- 1e-100
-
+#' b.lm - b.svd  # Negligible differences
+svdlm <- function(X, y, rel.tol = 1e-9, abs.tol = 1e-100) {
   svdX <- svd(X)
   d <- svdX$d
-  lo <- d < (RELTOL * max(d) + ABSTOL)
+  lo <- d < (rel.tol * max(d) + abs.tol)
   dinv <- 1 / d
   dinv[lo] <- 0
   # nrow is necessary if dinv is 1x1 to avoid getting the identity matrix of size floor(dinv)
   X.plus <- svdX$v %*% diag(dinv, nrow = length(dinv)) %*% t(svdX$u)
-
-  return(X.plus %*% matrix(y, ncol = 1))
+  ret <- X.plus %*% matrix(y, ncol = 1)
+  return(drop(ret))
 }
 
-#' r-th derivative of the kth-order Taylor expansion of log(x)
+#' d-th derivative of the k-th-order Taylor expansion of log(x)
 #'
 #' @param x Numeric: a vector of points for which the logarithm is to be evaluated
 #' @param a Scalar: the point at which the polynomial approximation is computed
-#' @param k Positive integer: maximum polynomial order in the Taylor expansion of the original function.
-#' @param r Non-negative integer: derivative order
+#' @param k Non-negative integer: maximum polynomial order in the Taylor expansion
+#'   of the original function. \code{k = 0} returns a constant.
+#' @param d Non-negative integer: derivative order
 #'
-#' Note that this function returns the r-th derivative of the k-th-order Taylor expansion, not the
-#' k-th-order approximation of the r-th derivative. Therefore, the degree of the resulting polynomial
-#' is \eqn{r-k}.
+#' Note that this function returns the d-th derivative of the k-th-order Taylor expansion, not the
+#' k-th-order approximation of the d-th derivative. Therefore, the degree of the resulting polynomial
+#' is \eqn{d-k}{d-k}.
 #'
-#' @return The approximating Taylor polynomial around \code{a} of the order \code{r-k} evaluated at \code{x}.
+#' @return The approximating Taylor polynomial around \code{a} of the order \code{d-k} evaluated at \code{x}.
 #' @export
 #'
 #' @examples
-#' cl <- c("#e6194B", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
-#'         "#911eb4", "#42d4f4", "#f032e6", "#bfef45")
+#' cl <- rainbow(9, end = 0.8, v = 0.8, alpha = 0.8)
 #' a <- 1.5
 #' x <- seq(a*2, a/2, length.out = 101)
-#' f <- function(x, r = 0)  if (r == 0) log(x) else ((r%%2 == 1)*2-1) * 1/x^r * gamma(r)
+#' f <- function(x, d = 0)  if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
 #' par(mfrow = c(2, 3), mar = c(2, 2, 2.5, 0.2))
-#' for (r in 0:5) {
-#' y <- f(x, r = r)
+#' for (d in 0:5) {
+#' y <- f(x, d = d)
 #' plot(x, y, type = "l", lwd = 7, bty = "n", ylim = range(0, y),
-#'        main = paste0("d^", r, "/dx^", r, " Taylor(Log(x))"))
-#'   for (k in 0:8) lines(x, logTaylor(x, a = a, k = k, r = r), col = cl[k+1], lwd = 1)
-#'   points(a, f(a, r = r), pch = 16, cex = 1.5, col = "white")
+#'        main = paste0("d^", d, "/dx^", d, " Taylor(Log(x))"))
+#'   for (k in 0:8) lines(x, logTaylor(x, a = a, k = k, d = d), col = cl[k+1], lwd = 1.5)
+#'   points(a, f(a, d = d), pch = 16, cex = 1.5, col = "white")
 #' }
 #' legend("topright", as.character(0:8), title = "Order", col = cl, lwd = 1)
-logTaylor <- function(x, a = 1, k = 4, r = 0) {
-  if (r > k) return(x*0) # Polynomial derivatives of order > k are zero
+logTaylor <- function(x, a = 1, k = 4, d = 0) {
+  if (length(a) != 1 || !is.numeric(a)) stop("The centre of approximation 'a' must be a numeric scalar.")
+  if (!(is.numeric(k) && length(k) == 1 && k == round(k) && k >= 0))
+    stop("The polynomial order 'k' must be a non-negative integer scalar.")
+  if (!(is.numeric(d) && length(d) == 1 && d == round(d) && d >= 0))
+    stop("The derivative order 'd' must be a non-negative integer scalar.")
   l <- length(x)
-  xc <- (x-a)/a
-  taylor <- sapply(r:k, function(n) { # Terms of the Taylor expansion
-    if (n == r) { # Lowest order: constant
-      if (r == 0) return(rep(log(a), l)) # Original function = the only special term
-      return(rep(-1 / (-a)^r * gamma(n), l))
+  if (d > k) return(numeric(l)) # Polynomial derivatives of order > k are zero
+  xc <- (x-a) / a
+  taylor <- vapply(d:k, function(n) { # Terms of the Taylor expansion
+    if (n == d) { # Lowest order: constant
+      if (d == 0) return(rep(log(a), l)) # Original function = the only special term
+      return(rep(-1 / (-a)^d * gamma(n), l))
     }
-    mult <- if (r == 0) 1 else prod(n:(n-r+1)) # Multiplier from the polynomial power
-    sgn <- if (n%%2 == 1) 1 else -1
-    mult * sgn * xc^(n-r) / n / a^r
-  })
+    mult <- if (d == 0) 1 else prod(n:(n-d+1)) # Multiplier from the polynomial power
+    return((-1)^(n-1) * mult * xc^(n-d) / n / a^d)
+  }, FUN.VALUE = numeric(l))
   if (l == 1) taylor <- matrix(taylor, nrow = 1) # If sapply is not a matrix
   rowSums(taylor)
 }
