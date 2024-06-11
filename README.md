@@ -7,7 +7,7 @@
 
 R package for estimation via Smoothed Empirical Likelihood (SEL).
 
-<img src="https://kostyrka.lu/user/pages/05.programming/10.smoothemplik-package/smoothed-empirical-likelihood-r-package.png" alt="Smoothed Empirical Likelihood" width="400"/>
+<img src="https://kostyrka.lu/user/pages/05.programming/10.smoothemplik-package/smoothed-empirical-likelihood-r-package.png" alt="Smoothed Empirical Likelihood" width="640"/>
 
 Smoothed Empirical Likelihood (SEL), also known as Conditional Empirical Likelihood (CEL) or Local Empirical Likelihood (LEL), is a powerful statistical method for estimation and hypothesis testing.
 It shares the competitive advantages of Generalised Empirical Likelihood (GEL) and can estimate models defined by conditional moment restrictions (CMR).
@@ -53,14 +53,14 @@ Unlike functions for unconditional-moment-restriction models that typically requ
 
 This package provides direct functionality for the following articles:
 
-* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data* (Vol. 39, pp. 137–171). Emerald Publishing Limited. [doi.org/10.1108/S0731-905320190000039010](https://doi.org/10.1108/S0731-905320190000039010)
-* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2024). *Missing endogenous variables in conditional moment restriction models.* (Working paper No. 2024-01). University of Luxembourg, Department of Economics and Management. [hdl.handle.net/10993/60100](hdl.handle.net/10993/60100)
+* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data* (Vol. 39, pp. 137–171). Emerald Publishing Limited. [doi.org/10.1108/S0731-905320190000039010](https://doi.org/10.1108/S0731-905320190000039010).
+* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2024). *Missing endogenous variables in conditional moment restriction models.* (Working paper No. 2024-01). University of Luxembourg, Department of Economics and Management. [hdl.handle.net/10993/60100](hdl.handle.net/10993/60100).
 
 The theory behind the method is provided in the following sources:
 
 * Tripathi, G., & Kitamura, Y. (2003). Testing conditional moment restrictions. *The Annals of Statistics, 31(6)*, 2059–2095.  [10.1214/aos/1074290337](https://doi.org/10.1214/aos/1074290337).
 * Kitamura, Y., Tripathi, G., & Ahn, H. (2004). Empirical likelihood‐based inference in conditional moment restriction models. *Econometrica, 72(6)*, 1667–1714. [10.1111/j.1468-0262.2004.00550.x](https://doi.org/10.1111/j.1468-0262.2004.00550.x).
-* Owen, A. B. (2013). Self-concordance for empirical likelihood. *Canadian Journal of Statistics, 41*, 387–397.
+* Owen, A. B. (2013). Self-concordance for empirical likelihood. *Canadian Journal of Statistics, 41*, 387–397. [10.1002/cjs.11183](https://doi.org/10.1002/cjs.11183).
 
 ## Installation
 
@@ -78,3 +78,13 @@ library(smoothemplik)
 ## Licence
 
 This software is released under the free/open-source [EUPL 1.2 licence](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+
+
+## Known bugs
+
+- **Hardware-dependent behaviour under the same version of R.** Different R compilers
+  may produce R binaries that yield different outputs for the same R code.
+  The results of numerical search for lambda in `weightedEL()` or `cemplik()`
+  for one-dimensional data may differ between systems. The problematic example
+  reproducing Figure 2.4 from Owen (2001) is included one the help page of `?weightedEL`.
+
