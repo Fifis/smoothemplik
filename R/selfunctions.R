@@ -82,6 +82,7 @@
 #' \insertAllCited{}
 #'
 #' @examples
+#' # Figure 2.4 from Owen (2001) -- with a slightly different data point
 #' earth <- c(
 #'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
@@ -95,6 +96,19 @@
 #'      main = "Discrepancy between cemplik and weightedEL", ylab = "")
 #' abline(h = 0, lty = 2)
 #'
+#' # Warning: depending on the compiler, the discrepancy between cemplik and weightedEL
+#' # can be one million (1) times larger than the machine epsilon despite both of them
+#' # being written in pure R
+#' # The results from Apple clang-1400.0.29.202 and Fortran GCC 12.2.0 are different from
+#' # those obtained under Ubuntu 22.04.4 + GCC 11.4.0-1ubuntu1~22.04,
+#' # Arch Linux 6.6.21 + GCC 14.1.1, and Windows Server 2022 + GCC 13.2.0
+#' out1 <- cemplik(earth, mu = 5.517)[1:4]
+#' out2 <- weightedEL(earth, mu = 5.517, return.weights = TRUE)[1:4]
+#' print(c(out1$lam, out2$lam), 16)
+#'
+#' # Value of lambda                            cemplik           weightedEL
+#' # aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
+#' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
 #' @export
 weightedEL <- function(z, mu = 0,
                        ct = NULL,
