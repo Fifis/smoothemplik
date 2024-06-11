@@ -40,8 +40,7 @@ These bug fixes and features are scheduled for the upcoming releases.
 - Check with R 3.0.0
 - Reproduce the CKT (2019) results with the `shift` argument (i.e. test the shift)
 - Create a summary class for SEL; print numerical gradients of lambdas; print the number of converged inner optimisation problems
-- Address all remaining issues with with `todor`
-- Check release with `lintr::lint_package()`, `R CMD check --as-cran`
+- Check release with `todor`, `lintr::lint_package()`, `R CMD check --as-cran`, and `library(goodpractice)`
 - Add tests reproducing simple hard-coded examples
 
 
