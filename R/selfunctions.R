@@ -459,6 +459,7 @@ maximiseSEL <- function(start.values = NULL,
                         nlm.step.max = NULL,
                         maxit = 50,
                         ...) {
+  optError <- function(e = NULL) return(list(code = 5))
   optmethod <- optmethod[1]
   tic0 <- Sys.time()
 
@@ -551,16 +552,6 @@ sparseVectorToList <- function(x, trim = NULL, renormalise = TRUE) {
   return(list(idx = idx, ct = x))
 }
 
-jitterText <- function(x, y, labels, times = 16, radius = 0.1, bgcol = "#FFFFFF88", col = "black", ...) {
-  dirx <- cos(seq(0, 2*pi, length.out = times + 1)[-1])
-  diry <- sin(seq(0, 2*pi, length.out = times + 1)[-1])
-  for (i in 1:times) graphics::text(x + dirx[i] * radius, y + diry[i] * radius, labels, col = bgcol, ...)
-  graphics::text(x, y, labels, col = col, ...)
-}
-
-
-
-
 #' Construct memory-efficient weights for estimation
 #'
 #' This function constructs SEL weights with appropriate trimming for numerical stability and optional renormalisation so that the sum of the weights be unity
@@ -581,168 +572,4 @@ getSELWeights <- function(x, bw = NULL, ..., trim = NULL, renormalise = TRUE) {
   sel.weights <- sel.weights / rowSums(sel.weights)
   sel.weights <- apply(sel.weights, 1, sparseVectorToList, trim = trim, renormalise = renormalise)
   return(sel.weights)
-}
-
-optError <- function(e = NULL) return(list(code = 5))
-
-checkRes <- function(res, split, min.opp.sign = 3) {
-  r <- split(res, split)
-  ret <- unlist(lapply(r, function(x) {
-    if (all(is.na(x))) return("All NA") else
-      if (sum(x > 0, na.rm = TRUE) >= min.opp.sign & sum(x < 0, na.rm = TRUE) >= min.opp.sign) return("OK") else
-        if (max(x, na.rm = TRUE) > 0 & min(x, na.rm = TRUE) < 0) return("Weak") else return("Fail")
-  }))
-  ret <- factor(ret, levels = c("All NA", "OK", "Weak", "Fail"))
-  return(ret)
-}
-
-# A function to check the spanning condition for every distinct value defining the support
-# Returns indices defining the bins in which the data fall according to conditioning on discrete variables
-# Empirical criterion: grab the closest until there are at least `min.opp.sign` positive
-# and `min.opp.sign` negative residuals.
-# Closest = by Mahalanobis distance
-defineValidSupport <- function(res, data, var.names, type = c("spanning", "cellsize"), min.obs = 3, verbose = TRUE) {
-  type <- type[1]
-  if (!(type %in% c("spanning", "cellsize", "none"))) stop("defineValidSupport: type must be 'spanning' to check the spanning condition or 'cellsize' to simply ensure large enough cells.")
-  spl <- as.integer(interaction(data[, var.names], drop = TRUE, sep = ";"))
-  ch <- checkRes(res = res, split = spl, min.opp.sign = min.obs)
-  group.counts <- table(spl)
-  bad <- switch(type, spanning = ch %in% c("Fail", "Weak"), cellsize = group.counts < min.obs)
-  na  <- switch(type, spanning = ch %in% "All NA", cellsize = rep(FALSE, length(group.counts)))
-
-  if (verbose) {
-    if (type == "spanning" && any(bad)) {
-      cat("The spanning condition necessary for SEL does not hold for ", sum(ch == "Fail"), " groups (", sum(group.counts[ch == "Fail"]), " observations) in the data set.\n", sep = "")
-      cat("Additionally, ", sum(ch == "Weak"), " groups (", sum(group.counts[ch == "Weak"]), " observations) are in the groups with fewer than ",  min.obs, " obs. of opposite sign, creating potential numerical instabilities.\n", sep = "")
-    } else if (type == "cellsize" && any(bad)) {
-      cat("The minimum cell size (", min.obs, ") condition does not hold for ", sum(bad), " groups (", sum(group.counts[bad]), " observations) in the data set.\n", sep = "")
-    } else if (min.obs <= 1) {
-      cat("No restrictions requested, skipping the check and returning the group indices as they are!\n")
-    }
-  }
-  if ((type == "spanning" && all(ch == "OK")) || (type == "cellsize" && all(!bad)) || min.obs <= 1) {
-    return(spl)
-  } else {
-    if (any(bad)) {
-      bad.cats <- which(bad)
-      na.cats <- which(na)
-      n.uniq <- as.integer(max(spl))
-      if (!all(1:n.uniq == 1:max(spl))) stop("defineValidSupport: internal error while generating split.")
-
-      mah.var <- stats::var(data[, var.names])
-      if (any(is.na(mah.var))) stop("Missingness is not allowed in the variables defining the cells.")
-      mah.v_1 <- solve(mah.var)
-
-      d.list <- split(data[, var.names], f = spl)
-      group.means <- as.matrix(do.call(rbind, lapply(d.list, colMeans)))
-      group.distances <- lapply(1:n.uniq, function(i) {
-        di <- sweep(group.means, 2, group.means[i, ], "-")
-        return(rowSums(di %*% mah.v_1 * di))
-      })
-      group.distances <- do.call(rbind, group.distances)
-      diag(group.distances) <- Inf
-      # Visualise group.distances for debugging to see if there is any internal structure
-      # Now we declare that the distances between bad groups are infinite
-      # so that the matches were sought only in the good ones
-      group.distances[bad.cats, bad.cats] <- Inf
-      # Also, the ones where all dependent variable observations are missing are not good for bin enlargement
-      group.distances[bad.cats, na.cats] <- Inf
-      group.distances[na.cats, bad.cats] <- Inf
-
-      bad.cats.closest <- apply(group.distances[bad.cats, , drop = FALSE], 1, which.min)
-
-      spl.new <- spl
-      for (i in seq_along(bad.cats)) spl.new[spl == bad.cats[i]] <- bad.cats.closest[i]
-      spl.new <- as.integer(factor(spl.new)) # Making numeration contiguous
-      if (verbose) {
-        cat("Before: ", n.uniq, " groups, after: ", length(unique(spl.new)), " groups after moving ", sum(group.counts[bad]), " observations (", round(sum(group.counts[bad])/nrow(data) * 100), "%) to larger groups.\n", sep = "")
-      }
-      return(spl.new)
-    }
-  }
-}
-
-smoothEmplikDiscrete <- function(rho,
-                                 theta, data,
-                                 by = NULL, parallel = FALSE, cores = 1,
-                                 trim = NULL,
-                                 minus = FALSE,
-                                 bad.value = -Inf,
-                                 weight.tolerance = NULL,
-                                 attach.attributes = FALSE,
-                                 ...) {
-  if (is.null(by)) stop("You forgot to supply the factor or integer variable 'by' indicating the unique values of the conditioning set.")
-
-  rho.series <- rho(theta, data, ...)
-  n <- length(rho.series)
-  rho.list <- split(rho.series, f = by)
-  if (is.null(weight.tolerance)) weight.tolerance <- 0.01 / n
-
-  SELi <- function(x) {
-    if (all(is.na(x))) return(list(logelr = 0, lam = 0, wts = rep(1 / length(x), length(x)), converged = TRUE, iter = 0, bracket = c(0, 0), estim.prec = NA, f.root = NA, exitcode = 0))
-    x <- x[!is.na(x)]
-    return(suppressWarnings(weightedEL(x, SEL = TRUE, weight.tolerance = weight.tolerance)))
-  }
-
-  if (parallel && cores > 1) { # Returns a list, one item for each conditioning vector point
-    empliklist <- parallel::mclapply(rho.list, SELi, mc.cores = cores)
-  } else { # If no parallelisation or the memory is scarce
-    empliklist <- lapply(rho.list, SELi)
-  }
-
-  SELs <- unlist(lapply(empliklist, "[[", "logelr"))
-  SELs.all <- unname(SELs[by])
-  if (is.null(trim)) trim <- rep(1, n)
-  SEL <- sum(trim * SELs.all) * (1 - 2 * as.numeric(minus))
-  if (!is.finite(SEL)) SEL <- bad.value
-  if (attach.attributes) attr(SEL, "SELs") <- SELs.all
-
-  return(SEL)
-}
-
-
-smoothEmplikMixed <- function(rho, theta, data,
-                              by = NULL,
-                              sel.weights = NULL,
-                              parallel.in = FALSE,
-                              parallel.out = FALSE,
-                              cores = 1,
-                              trim = NULL,
-                              bad.value = -Inf,
-                              minus = FALSE,
-                              weight.tolerance = NULL, # To speed up computation by excluding the observations that contribute almost nothing
-                              ...) {
-  if (is.null(by)) stop("You forgot to supply the factor or integer variable 'by' indicating the unique values of the conditioning set.")
-
-  rho.series <- rho(theta, data, ...)
-  n <- length(rho.series)
-  if (is.null(weight.tolerance)) weight.tolerance <- 0.01 / n
-
-
-  rho.list <- split(rho.series, f = by)
-  if (is.null(trim)) trim <- rep(1, n)
-  trim.list <- split(trim, f = by)
-  if (!is.list(sel.weights)) stop("The current implementation only allows lists of weights.")
-
-  SEL.block <- function(i) {
-    x <- rho.list[[i]]
-    w <- sel.weights[[i]]
-    SEL.b.j <- function(j) {
-      xj <- x[w[[j]]$idx]
-      wj <- w[[j]]$ct
-      if (all(is.na(xj))) return(list(logelr = 0, lam = 0, wts = rep(1 / length(xj), length(xj)), converged = TRUE, iter = 0, bracket = c(0, 0), estim.prec = NA, f.root = NA, exitcode = 0))
-      suppressWarnings(weightedEL(z = xj, ct = wj, SEL = TRUE, weight.tolerance = weight.tolerance))
-    }
-    empliklist <- if (parallel.in && cores > 1) parallel::mclapply(seq_along(x), SEL.b.j, mc.cores = cores) else lapply(seq_along(x), SEL.b.j)
-    logsemplik <- sum(trim.list[[i]] * unlist(lapply(empliklist, "[[", "logelr")))
-    if (!is.finite(logsemplik)) logsemplik <- bad.value
-    attr(logsemplik, "SELR") <- unlist(lapply(empliklist, "[[", "logelr"))
-    return(logsemplik)
-  }
-
-  SEL <- if (parallel.out && cores > 1) parallel::mclapply(seq_along(rho.list), SEL.block, mc.cores = cores) else lapply(seq_along(rho.list), SEL.block)
-  SSEL <- sum(unlist(SEL)) * (1 - 2 * as.numeric(minus))
-  attr(SSEL, "SELs") <- unlist(lapply(SEL, attr, which = "SELR"))
-
-  return(SSEL)
 }

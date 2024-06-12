@@ -2,6 +2,8 @@
 
 These bug fixes and features are scheduled for the upcoming releases.
 
+- Bug: `smoothEmplik()` with `attach.attributes = TRUE` should be converted to `"all"`
+- In `kernelDiscreteDensitySmooth()`, remove the `table` attribute and change the test.
 - Add a vignette for non-parametric methods to GitHub, finish the mixed-smoothing part
 - If `x` contains duplicates, `DCV(x, bw = bw.grid, weights = w)` complains that no duplicates were found (see the example)
 - Test the previous output of `weightedEL()` and `cemplik()` with the new version, add tests
