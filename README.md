@@ -80,11 +80,14 @@ library(smoothemplik)
 This software is released under the free/open-source [EUPL 1.2 licence](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
 
 
-## Known bugs
+## Remarks
 
-- **Hardware-dependent behaviour under the same version of R.** Different R compilers
-  may produce R binaries that yield different outputs for the same R code.
-  The results of numerical search for lambda in `weightedEL()` or `cemplik()`
-  for one-dimensional data may differ between systems. The problematic example
-  reproducing Figure 2.4 from Owen (2001) is included one the help page of `?weightedEL`.
+- **The behaviour of R is hardware-dependent.** Different compilers on different
+  architectures can produce R binaries that yield different outputs for the same R script.
+  This variability particularly affects numerical searches for lambda in functions
+  `weightedEL()` or `cemplik()` for one-dimensional data. This is not a bug in
+  `smoothemplik`, but a consequence of the differences in machine code. Testing showed that
+  running these two functions for Figure 2.4 from Owen (2001) on R compiled for
+  `aarch64-apple-darwin20` produced slightly different results compared to running the same
+  code on `x86_64-pc-linux-gnu` and `x86_64-w64-mingw32` systems, where its output is identical.
 
