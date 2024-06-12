@@ -7,14 +7,19 @@ using namespace RcppParallel;
 // [[Rcpp::depends(RcppParallel)]]
 //' @importFrom RcppParallel RcppParallelLibs
 
+// All auxiliary computations were done in Sage or Mathematica
+
 // Uniform kernel, unscaled (with roughness = int x^2 f(x) dx = 1/3)
 arma::vec kuniform2(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
-  ax.for_each([](arma::vec::elem_type& val) { val = (val < 1.0) ? 0.5 : 0.0; });
+  ax.for_each([](arma::vec::elem_type& val) { val = (val <= 1.0) ? 0.5 : 0.0; });
   return ax;
 }
 
 // Uniform kernel convolution
+// u2 = piecewise([[(-1, 1), 1/2]])
+// u2c = u2.convolution(u2); u2c
+// piecewise(x|-->1/4*x + 1/2 on (-2, 0], x|-->-1/4*x + 1/2 on (0, 2]; x)
 arma::vec kuniform2conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
@@ -27,10 +32,10 @@ arma::vec kuniform2conv(const arma::vec& x) {
 arma::vec kuniform4(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
-    if (val <= 0.5)
-      val = 1.16666666666666667; // 7/6.
-    else if (val < 1.0)
-      val = -1.66666666666666667e-1; // -1/6.
+    if (val < 0.666666666666666667)
+      val = 0.95;
+    else if (val <= 1.0)
+      val = -0.4;
     else
       val = 0.0;
   });
@@ -38,18 +43,21 @@ arma::vec kuniform4(const arma::vec& x) {
 }
 
 // 4th-order uniform convolution
-// x|-->-65/36*x + 25/18 on (0, 1/2], x|-->-49/36*x + 7/6 on (1/2, 1], x|-->5/12*x - 11/18 on (1, 3/2], x|-->-1/36*x + 1/18 on (3/2, 2]; x)
+// u4 = piecewise([[(-1, -2/3), -2/5], [(-2/3, 2/3), 19/20], [(2/3, 1), -2/5]])
+// u4c = u4.convolution(u4); u4c
+// x|-->-793/400*x + 131/100 on (0, 1/3], x|-->-361/400*x + 19/20 on (1/3, 4/3],
+// x|-->23/25*x - 37/25 on (4/3, 5/3], x|-->-4/25*x + 8/25 on (5/3, 2]; x)
 arma::vec kuniform4conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
-    if (val <= 0.5)
-      val = -1.80555555555555556*val + 1.38888888888888888;
-    else if (val <= 1.0)
-      val = -1.36111111111111111*val + 1.16666666666666667;
-    else if (val <= 1.5)
-      val = 4.16666666666666667e-1*val - 6.11111111111111111e-1;
-    else if (val < 2.0)
-      val = -2.77777777777777778e-2*val + 5.55555555555555556e-2;
+    if (val <= 0.333333333333333333)
+      val = 1.9825*val + 1.31;
+    else if (val <= 1.33333333333333333)
+      val = -0.9025*val + 0.95;
+    else if (val < 1.66666666666666667)
+      val = 0.92*val - 1.48;
+    else if (val <= 2.0)
+      val = -0.16*val + 0.32;
     else
       val = 0.0;
   });
@@ -104,6 +112,9 @@ arma::vec ktriangular2(const arma::vec& x) {
 }
 
 // Triangular kernel convolution (2nd order)
+// t2 = piecewise([[(-1, 0), (1+x)], [(0, 1), (1-x)]])
+// t2c = t2.convolution(t2); t2c
+// x|-->1/2*x^3 - x^2 + 2/3 on (0, 1], x|-->-1/6*x^3 + x^2 - 2*x + 4/3 on (1, 2]; x)
 arma::vec ktriangular2conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
@@ -136,15 +147,14 @@ arma::vec ktriangular4(const arma::vec& x) {
     else if (val < 1)
       val = -b + b * val;
     else
-      val = 0.0; // Explicitly set to zero for elements where val >= 1
+      val = 0.0;
   });
   return ax;
 }
 
 // Triangular kernel convolution (4th order)
-// Computed in Sage:
-// f4 = piecewise([[(-1, 0), (1+x)*(12/7 - 30/7*x^2)], [(0, 1), (1-x)*(12/7 - 30/7*x^2)]])
-// g4 = f4.convolution(f4); g4
+// t4 = piecewise([[(-1, 0), (1+x)*(12/7 - 30/7*x^2)], [(0, 1), (1-x)*(12/7 - 30/7*x^2)]])
+// t4c = t4.convolution(t4); t4
 arma::vec ktriangular4conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
@@ -221,6 +231,8 @@ arma::vec kepanechnikov2(const arma::vec& x) {
 }
 
 // Epanechnikov kernel convolution
+// e2 = piecewise([[(-1, 1), 3/4*(1-x^2)]])
+// e2c = e2.convolution(e2); e2c
 arma::vec kepanechnikov2conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
