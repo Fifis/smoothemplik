@@ -626,7 +626,8 @@ kernelSmooth <- function(x,
     WOLS <- function(nonzw, robustw = NULL) {
       dimb <- ncol(xs)+1
       # If there are no non-zero neighbours or one point has too much influence, declare failure
-      if (length(nonzw$idx) == 1 || any(nonzw$ct > 0.999)) return(rep(NA, dimb))
+      # Zero indices can happen in LOO cross-validation
+      if (length(nonzw$idx) <= 1 || any(nonzw$ct > 0.999)) return(rep(NA, dimb))
       wreg <- sqrt(nonzw$ct)
       if (!is.null(robustw)) wreg <- wreg * sqrt(robustw[nonzw$idx])
       xw <- cbind(1, xs[nonzw$idx, , drop = FALSE]) * wreg
@@ -685,9 +686,15 @@ kernelSmooth <- function(x,
   }
   if (degree == 0) bad <- which(!is.finite(result)) # This belongs after the restoration of duplicates
   if (any(is.nan(result)))
-    warning("Some smoothed values are NaN, which happens (among other reasons) when the sum of smoothing weights is exactly zero. Try increasing the bandwidth.")
+    warning(paste0("Some smoothed values are NaN, which happens (among other reasons) when ",
+                   "the sum of smoothing weights is exactly zero (bandwidth ",
+                   paste0(sprintf("%1.2f", arg$bw), collapse = "; "), " -- try increasing it) ",
+                   "or when there are NA's in the input 'x' data (address the missing values)."))
   if ((!any(is.nan(result))) && any(!is.finite(result)))
-    warning("Some smoothed values are NA or Inf, which is really strange. Check the inputs or debug this function: run debugonce(kernelSmooth) and retry the last call.")
+    warning(paste0("Some smoothed values are NA or Inf, which is really strange. ",
+                   "Possible reasons: NA's in the input 'x' data (address the missing values) ",
+                   "or something else. Check the inputs via 'all(is.finite(x))' ",
+                   "or run 'debugonce(kernelSmooth)' and retry the last call."))
 
   attr(result, "duplicate.stats") <- ds
   attr(result, "bad.indices") <- bad
@@ -1087,7 +1094,7 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
 #' @param y A numeric vector of responses (dependent variable) if the user wants least-squares cross-validation.
 #' @param robust.iterations Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).
 #' @param degree Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).
-#' @param start.bw Initial value for bandwidth search.
+#' @param start.bw Numeric vector: initial value for bandwidth search.
 #' @param same Logical: use the same bandwidth for all columns of \code{x}?
 #' @param tol Relative tolerance used by the optimiser as the stopping criterion.
 #' @param try.grid Logical: if true, 10 different bandwidths around the rule-of-thumb
@@ -1143,25 +1150,24 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   arg.list <- list(x = arg$x, weights = arg$weights, kernel = arg$kernel, order = arg$order,
                    chunks = chunks, same = same, no.dedup = TRUE) # Processed data to pass further
   if (CV == "LSCV") arg.list <- c(arg.list, list(y = arg$y), degree = degree, robust.iterations = robust.iterations)
-  if (is.null(y)) {
-    f.to.min <- function(b) {
-      if (isTRUE(any(b <= ndeps))) return(rep(NA, length(b)))
-      do.call(DCV, c(arg.list, list(b = b)))
-    }
-  } else {
-    f.to.min <- function(b) {
-      if (isTRUE(any(b <= ndeps))) return(rep(NA, length(b)))
-      do.call(LSCV, c(arg.list, list(b = b)))
-    }
+
+  ctrl <- dot.args[["control"]]
+  method <- if (is.null(dot.args[["method"]])) "BFGS" else dot.args[["method"]]
+  f.to.min <- function(b) {
+    if (verbose) print(b)
+    if (isTRUE(any(b <= ndeps))) return(if (method == "L-BFGS-B") sqrt(.Machine$double.xmax) else Inf)
+    ret <- if (is.null(y)) do.call(DCV, c(arg.list, list(b = b))) else do.call(LSCV, c(arg.list, list(b = b)))
+    if (method == "L-BFGS-B") ret[!is.finite(ret)] <- sqrt(.Machine$double.xmax)
+    return(ret)
   }
+
   if (is.null(start.bw)) start.bw <- bw.rot(arg$x, kernel = arg$kernel, na.rm = TRUE) * 1.5
   xgaps <- apply(arg$x, 2, function(a) max(diff(sort(a))))
   if (verbose) cat("Rule-of-thumb bw: (", paste0(start.bw, collapse = ", "), "); max. gap between obs.: (",
                    paste0(xgaps, collapse = ", "), "). Taking the maximum as the starting point.\n", sep = "")
-  start.bw <- pmax(start.bw, xgaps)
+  start.bw <- pmax(start.bw, xgaps * (1 + 1e-8))
   if (same && ncol(arg$x) > 1) start.bw <- stats::quantile(start.bw, 0.75) # To the over-smoothing side
-  ctrl <- dot.args[["control"]]
-  method <- if (is.null(dot.args[["method"]])) "BFGS" else dot.args[["method"]]
+
   optim.control <- switch(method, BFGS = list(reltol = tol, REPORT = 1, trace = if (verbose) 2 else 0, ndeps = rep(ndeps, length(start.bw))),
                           `L-BFGS-B` = list(factr = tol / .Machine$double.eps, REPORT = 1, trace = if (verbose) 5 else 0, ndeps = rep(ndeps, length(start.bw))))
   if (!is.null(ctrl)) optim.control[names(ctrl)] <- ctrl
@@ -1170,7 +1176,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   # A quick grid search to avoid multi-modality
   if (try.grid) {
     bgrid <- lapply(-3:6, function(p) start.bw * 1.25^p)
-    CV.grid <- sapply(bgrid, f.to.min)
+    CV.grid <- suppressWarnings(sapply(bgrid, f.to.min))
     if (any(is.finite(CV.grid))) {
       start.bw <-  bgrid[[which.min(CV.grid)]]
       f0 <- CV.grid[which.min(CV.grid)]
@@ -1183,12 +1189,15 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   if (!is.finite(f0)) {
     for (i in 1:25) {
       if (verbose) cat("Bandwidth (", paste0(start.bw, collapse = ", "), ") too small, increasing by 20%...\n", sep = "")
-      start.bw <- start.bw * 1.2
+      start.bw <- start.bw * 1.25
       f0 <- suppressWarnings(f.to.min(start.bw))
       if (is.finite(f0)) break
     }
   }
-  opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = method, control = optim.control), error = function(e) return(e))
+  opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min,
+                           lower = if (method %in% c("L-BFGS-B", "Brent")) xgaps * (1 + 1e-8) else -Inf,
+                           method = method, control = optim.control)
+                           , error = function(e) return(e))
   if (inherits(opt.result, "error")) {
     if (grepl("non-finite finite-difference", opt.result$message)) {
       warning("CV gradient could not be computed (initial bw at the boundary? the optimiser tries strange values?). Retrying optimisation with the Nelder-Mead method.")

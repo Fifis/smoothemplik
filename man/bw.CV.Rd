@@ -54,7 +54,7 @@ no matrix has more than 2^27 elements).}
 
 \item{degree}{Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).}
 
-\item{start.bw}{Initial value for bandwidth search.}
+\item{start.bw}{Numeric vector: initial value for bandwidth search.}
 
 \item{same}{Logical: use the same bandwidth for all columns of \code{x}?}
 

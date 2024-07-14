@@ -1,4 +1,5 @@
 <!-- badges: start -->
+[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
 [![R-CMD-check](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml)
 [![codecov](https://codecov.io/gh/Fifis/smoothemplik/graph/badge.svg?token=LYXLUYWY5X)](https://app.codecov.io/gh/Fifis/smoothemplik)
 <!-- badges: end -->
@@ -34,7 +35,7 @@ We hope that this algorithmic implementation of SEL will make it more popular am
 
 **This package is an evolving project. Comments and suggestions are welcome.**
 
-## How it works?
+## How it works
 
 This package is similar to the popular [gmm](https://CRAN.R-project.org/package=gmm) and [momentfit](https://CRAN.R-project.org/package=momentfit) packages by Pierre Chaussé.
 The main input to the SEL optimiser is the function that computes the sample moment condition.
