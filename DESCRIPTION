@@ -24,7 +24,6 @@ Imports:
 Suggests: 
     knitr,
     rmarkdown,
-    microbenchmark,
     testthat (>= 3.0.0),
     xml2
 RdMacros: Rdpack

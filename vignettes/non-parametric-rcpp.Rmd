@@ -7,7 +7,7 @@ output:
     number_sections: true
 bibliography: "../inst/REFERENCES.bib"
 author: "Andreï V. Kostyrka, University of Luxembourg"
-date: "Created: 2023-12-05, last modified: 2024-06-10, compiled: `r Sys.Date()`"
+date: "Created: 2023-12-05, last modified: 2024-01-15, compiled: `r Sys.Date()`"
 abstract: "This vignette demonstrates how to carry out non-parametric density and kernel estimation with a high degree of flexibility and greater speed than via the straightforward textbook approach."
 keywords: "non-parametric methods, density estimation, kernel smoothing, Nadaraya-Watson, local regression"
 vignette: >
@@ -33,7 +33,35 @@ knitr::opts_chunk$set(
 
 ```{r setup}
 library(smoothemplik)
+
+clock <- function(expr, n = 20) {
+  # Capturing the output into the warm-up iteration to retuce the timing
+  # overhead from spinning up the processor from any sleep or idle state
+  # (idea from the microbenchmark package)
+  ret <- expr
+  tic0 <- proc.time()
+  replicate(n, suppressWarnings(suppressMessages(expr)))
+  tm <- proc.time() - tic0
+  et <- as.numeric(tm["elapsed"]) * 1000
+  times <- c(median = et, mean = mean(et), sd = sd(et))
+  ftimes <- ifelse(times > 1, sprintf("%1.1f", times),
+                   ifelse(times == 1, "~0.5-1.5", "<0.5"))
+  ftimes[3] <- sprintf("%1.1f", times[3])
+  cat("Median [mean +- SD] time per evaluation: ", ftimes[1], " [",
+      ftimes[2], "+-",  "]", " ms\n", sep = "")
+  attr(ret, "time") <- times
+  return(ret)
+}
+
+quiet <- function(expr) {  # Suppressing all output
+  sink(if (.Platform$OS.type == "windows") "NUL" else "/dev/null")
+  ret <- expr
+  sink()
+  return(ret)
+}
 ```
+
+
 
 ## Kernel methods
 
@@ -167,24 +195,14 @@ b <- 0.5
 
 Now, we compare the pure R and Rcpp functions:
 ```{r message=FALSE}
-library(microbenchmark)
-microbenchmark(
-  wCPP <- kernelWeights(X, xout = xg, bw = b),
-  wR   <- kernelWeightsR(X, xout = xg, bw = b),
-  times = 20, unit = "ms", check = "equivalent"
-)
+wCPP <- clock(kernelWeights(X, xout = xg, bw = b))
+wR   <- clock(kernelWeightsR(X, xout = xg, bw = b))
 
-microbenchmark(
-  fCPP <- kernelDensity(X, xout = xg, bw = b),
-  fR   <- kernelDensityR(X, xout = xg, bw = b),
-  times = 20, unit = "ms", check = "equivalent"
-)
+fCPP <- clock(kernelDensity(X, xout = xg, bw = b))
+fR   <- clock(kernelDensityR(X, xout = xg, bw = b))
 
-microbenchmark(
-  mCPP <- kernelSmooth(X, Y, xout = xg, bw = b),
-  mR   <- kernelSmoothR(X, Y, xout = xg, bw = b),
-  times = 20, unit = "ms", check = "equivalent"
-)
+mCPP <- clock(kernelSmooth(X, Y, xout = xg, bw = b))
+mR   <- clock(kernelSmoothR(X, Y, xout = xg, bw = b))
 ```
 
 Note that there are tiny discrepancies related to the order of operations and finite machine precision:
@@ -228,12 +246,9 @@ timings <- sapply(ns, function(n) {
   set.seed(1)
   X <- rchisq(n, 3)
   b <- bw.rot(X)
-  a <- summary(microbenchmark(
-    fR   <- kernelDensityR(X, bw = b),
-    fCPP <- kernelDensity(X, bw = b),
-    times = 3, unit = "ms", check = "equivalent", control = list(warmup = 1)
-  ))
-  c(R = a$median[1], CPP = a$median[2])
+  tR <- quiet(clock(fR <- kernelDensityR(X, bw = b), n = 3))
+  tCPP <- quiet(clock(fCPP <- kernelDensity(X, bw = b), n = 3))
+  c(R = attr(tR, "time"), CPP = attr(tCPP, "time"))
 })
 colnames(timings) <- paste0("n=", ns)
 print(timings, 2)
@@ -253,10 +268,8 @@ xg <- expand.grid(X1 = xg0, X2 = xg0)
 Y <- sin(X[, 1]) + sin(X[, 2]) + rnorm(n)
 b <- c(0.7, 0.8)
 
-microbenchmark(
-  wCPP <- kernelWeights(X, xout = xg, bw = b),
-  wR <- kernelWeightsR(X, xout = xg, bw = b),
-  times = 10, unit = "ms", check = "equal")
+wCPP <- clock(kernelWeights(X, xout = xg, bw = b), n = 10)
+wR <- clock(kernelWeightsR(X, xout = xg, bw = b), n = 10)
 all.equal(wR, wCPP, tolerance = 1e-16)
 ```
 
@@ -270,10 +283,8 @@ points(X[, 1], X[, 2], pch = 16)
 
 We redo the same test for the kernel density estimator:
 ```{r message=FALSE}
-microbenchmark(
-  fCPP <- kernelDensity(X, xout = xg, bw = b),
-  fR <- kernelDensityR(X, xout = xg, bw = b),
-  times = 5, unit = "ms", check = "equivalent")
+fCPP <- clock(kernelDensity(X, xout = xg, bw = b), n = 5)
+fR <- clock(kernelDensityR(X, xout = xg, bw = b), n = 5)
 all.equal(fR, fCPP, tolerance = 1e-16)
 ```
 
@@ -349,7 +360,36 @@ print(cor(cbind(Y, ys))[1, 2:4], 3)
 
 ## Sparsity
 
-TODO
+Large matrices of kernel weights with many zeros can be stored more efficiently using the facilities of the `Matrix` package that should be loaded automatically.
+
+It is not widely known that the computer version of the Gaussian kernel effectively has finite support in most evaluations.
+This is due to the fact that 
+Indeed, $\log_2[\phi(8.62602) / \phi(0)] \approx 2^{-53.674} < \epsilon_{\mathrm{mach}} = 2^{-53}$, which means that the tail density at $\pm8.62603$ and beyond is indistinguishable from zero to the computer compared to the maximum value, i.e. `dnorm(0) + dnorm(8.62603) == dnorm(0)` is `TRUE`!
+Similarly, `1 + dnorm(8.46378) != 1` but `1 + dnorm(8.46379) == 1`, which is expected because `log2(dnorm(8.46379)) == -53.00001`, i.e. the ratio of the values is less than the machine epsilon, and the smaller value is zeroed out.
+
+Therefore, a matrix with Gaussian weights should have some zeros in computer memory even though $\phi(x) > 0$ on $\mathbb{R}$:
+```{r}
+set.seed(1)
+n <- 1000
+X <- sort(rnorm(n))
+w1 <- kernelWeights(X, bw = 0.1)
+w2 <- kernelWeights(X, bw = 0.1, sparse = TRUE)
+print(c(object.size(w1), object.size(w2)))
+print(c(class(w1)[1], class(w2)[1]))
+```
+
+The savings are not always present -- testing is needed:
+```{r}
+print(c(object.size(kernelWeights(X, bw = 0.5)),
+        object.size(kernelWeights(X, bw = 0.5, sparse = TRUE))))
+```
+
+Using kernels with limited support explicitly increases the savings owing to sparsity:
+```{r}
+b.ep <- bw.rot(X, kernel = "epanechnikov")  # ~0.6
+print(c(object.size(kernelWeights(X, kernel = "epanechnikov", bw = b.ep)),
+        object.size(kernelWeights(X, kernel = "epanechnikov", bw = b.ep, sparse = TRUE))))
+```
 
 ## Conclusion
 
