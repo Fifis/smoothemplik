@@ -18,7 +18,7 @@ Consequently, SEL-based confidence intervals and regions have accurate coverage 
 To test a hypothesis using SEL, the user should compare the difference between the unrestricted and restricted SEL values with the critical values of the chi-squared distribution.
 The SELR test achieves maximum average local power.
 
-Some of the models that can be estimated via SEL are:
+Some of the models that can be estimated via SEL include:
 - Linear models with exogenous and endogenous variables: *Y = α + X'β + Z'γ + U*, *E(U | X, W) = 0*;
 - Non-linear models: *E(Y | X) = f(X, θ)*, where *f* is known;
 - Semi-parametric models: *E(Y | X) = X'β + h(X, θ)*, where *h* is unknown;
@@ -28,7 +28,7 @@ Additionally, for a broad class of models, SEL can produce an estimator that is 
 Efficient estimation is the pipe dream of many empirical researchers because having an unbiased estimator with the smallest possible variance means *accuracy*.
 This accuracy leads to four main benefits: (1) having point estimates closer to the true value, (2) having smaller variances and standard errors, (3) discovering more statistically significant effects when they exist, and (4) ensuring that a lack of significance is not due to the weaknesses of the employed estimation method.
 For example, the popular ordinary-least-squares (OLS) estimator of a linear model is not efficient under heteroskedasticity – i.e. in virtually all real-world applications.
-This happens because ‘noisier’ observations have a larger contribution to the objective function – the sum of squared residuals.
+This occurs because ‘noisier’ observations have a larger contribution to the objective function – the sum of squared residuals.
 In SEL, the objective function is a sum of local ELR statistics, therefore, all observations contribute similarly to the objective regardless of the conditional variance.
 
 We hope that this algorithmic implementation of SEL will make it more popular among researchers in various fields.
@@ -65,16 +65,24 @@ The theory behind the method is provided in the following sources:
 
 ## Installation
 
-This package currently exists only on GitHub. To install it, run the following two commands:
+This package currently exists only on GitHub. To install it, first, obtain the compiler.
+* [RTools installer for Windows](https://cloud.r-project.org/bin/windows/Rtools/)
+* [Compilers for Mac](https://mac.r-project.org/tools/)
+* `sudo apt install r-base-dev` on Debian/Ubuntu/Mint or simply use the compiled version on Linux.
+
+Run the following two commands to install the package:
 ```{r}
 install.packages("devtools")
-devtools::install_github("Fifis/smoothemplik")
+devtools::install_github("Fifis/smoothemplik", build_vignettes = TRUE)
 ```
 
 To load this package, include this line in the code:
 ```{r}
 library(smoothemplik)
 ```
+
+If there are installation errors, they are likely due to the broken dependencies of `devtools`: `rlang`, `bslib`, `lifecycle` etc. or something else from the `tidyverse`.
+In case `devtools` cannot be installed, try upgrading R to the next major version (e.g. 4.2.1 → 4.4.2 may help) or removing the problematic dependencies and their dependencies before retrying `install.packages("devtools")`.
 
 ## Licence
 
