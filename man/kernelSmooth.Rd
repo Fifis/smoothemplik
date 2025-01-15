@@ -48,7 +48,7 @@ Since it is the crucial parameter in many applications, a warning is thrown if t
 is not supplied, and then, Silverman's rule of thumb (via \code{bw.row()}) is applied
 to *every dimension* of \code{x}.}
 
-\item{kernel}{Character describing the desired kernel type (Gaussian is infinitely smooth but does not provide finite support).}
+\item{kernel}{Character describing the desired kernel type. NB: due to limited machine precision, even Gaussian has finite support.}
 
 \item{order}{An integer: 2, 4, or 6. Order-2 kernels are the standard kernels that
 are positive everywhere. Orders 4 and 6 produce some negative values, which reduces bias but may hamper density estimation.}
