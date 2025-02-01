@@ -13,7 +13,7 @@ test_that("LSCV works for least-squares cross-validation", {
   expect_true(all(is.finite(CV2)))
 })
 
-test_that("LSCV handles multivariate inputs with unique and distrinct bws", {
+test_that("LSCV handles multivariate inputs with unique and distinct bws, finding an improvement", {
   y <- c(2111.9, 2165.8, 1677.4, 3140.2, 1641.1, 1679.2, 1650.5, 1653.2, 4029.4, 1653.7,
          1653.7, 1653.2, 1942.9, 1658.5, 1750.1, 1643.1, 1683.6, 1641.2, 3263, 1702.2,
          1666.5, 1693.6, 1656.2, 1684.8, 4353.6, 4282.8, 4372, 4281.7, 4272.6, 4261,
