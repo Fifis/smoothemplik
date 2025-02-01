@@ -4,14 +4,14 @@
 \alias{mllog}
 \title{Modified minus logarithm with derivatives}
 \usage{
-mllog(x, eps = NULL, M = Inf, der = 0, order = 4, drop = TRUE)
+mllog(x, eps = NULL, M = NULL, der = 0, order = 4, drop = TRUE)
 }
 \arguments{
 \item{x}{Numeric vector for which approximated logarithm is to be computed.}
 
-\item{eps}{Lower threshold below which approximation starts.}
+\item{eps}{Lower threshold below which approximation starts; can be a scalar of a vector of the same length as \code{x}.}
 
-\item{M}{Upper threshold above which approximation starts.}
+\item{M}{Upper threshold above which approximation starts; can be a scalar of a vector of the same length as \code{x}.}
 
 \item{der}{Non-negative integer: 0 yields the function, 1 and higher yields derivatives}
 

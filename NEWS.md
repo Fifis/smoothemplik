@@ -14,6 +14,7 @@ These bug fixes and features are scheduled for the upcoming releases.
 - SYNTAX: `kernelSmooth()`, being a local average, should have `na.rm` and check the inputs
 - SYNTAX: In `kernelDiscreteDensitySmooth()`, remove the `table` attribute and change the test.
 - SYNTAX: Create a summary class for SEL; print numerical gradients of lambdas; print the number of converged inner optimisation problems
+- FEATURE: Create a class for smoothing that would yield LOESS smoothing matrices, with ranks or distances
 - FEATURE: For sparseVectorToList, the default `trim(x)` should be such that the sum of sorted weights exceeds 0.99999999: `trim = \(w) min(which(cumsum(sort(w / sum(w), decreasing = TRUE)) > 1 - 1e-8))`
 - FEATURE: Create convolution for kernel orders 4 and 6
 - FEATURE: De-duplicate at kernel weights already (via `.prepareKernel()`), return the attribute

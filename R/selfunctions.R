@@ -54,6 +54,8 @@
 #' where \code{tol} can be set in \code{uniroot.control} and
 #' \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
 #'
+#' TODO: write a section of the concondant minus-log expansion
+#'
 #' @return A list with the following elements:
 #'
 #' \describe{
@@ -110,9 +112,11 @@
 #' # aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
 #' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
 #' @export
+
 weightedEL <- function(z, mu = 0,
                        ct = NULL,
                        shift = NULL,
+                       taylor.order = NA,
                        SEL = FALSE,
                        n.orig = NULL,
                        weight.tolerance = 0.01 / length(z),
@@ -126,14 +130,19 @@ weightedEL <- function(z, mu = 0,
   if (any(!is.finite(z))) stop("Non-finite observations (NA, NaN, Inf) are not welcome.")
   if (is.null(ct)) ct <- rep(1, length(z))
   if (any(!is.finite(ct))) stop("Non-finite weights (NA, NaN, Inf) are not welcome.")
-  if (min(ct) < 0) stop("Negative weights are not welcome.")
+  if (min(ct) < 0 && verbose) warning("Negative weights are present.")
+  if (sum(ct) <= 0) stop("The total sum of EL weights must be positive.")
   if (is.null(n.orig)) n.orig <- length(z)
   if (is.null(shift)) shift <- rep(0, length(z))
+  if (!is.na(taylor.order) && !(taylor.order %in% (1:6)*2)) stop("'taylor.order' must be 2, 4, ..., 12.")
+
   # If originally the weights were too small, too many points would be truncated
   # Warn if any non-zero weights are smaller than weight.tolerance
-  if (any(0 < ct & ct < weight.tolerance)) {
-    if (verbose) warning(paste0("Positive counts below ", weight.tolerance, " have been replaced with ", truncto, "."))
-    ct[ct < weight.tolerance] <- truncto
+  closeto0 <- (abs(ct) < weight.tolerance)
+  if (any(closeto0)) {
+    if (verbose) warning(paste0("Counts closer to 0 than ", sprintf("%1.2e", weight.tolerance), " have been replaced with ", if (truncto == 0) "0." else  paste0("±", truncto, " of appropriate sign.")))
+    ct[closeto0 & ct > 0] <- truncto
+    ct[closeto0 & ct < 0] <- -truncto
   }
 
   # Preserving the names before trimming
@@ -149,7 +158,7 @@ weightedEL <- function(z, mu = 0,
 
   # Not all observations contribute meaningfully to the likelihood; tiny weights
   # push lambda to the boundary
-  nonz <- which(ct > 0)
+  nonz <- which(ct != 0)
   if (length(nonz) < length(z)) {
     z <- z[nonz]
     ct <- ct[nonz]
@@ -158,12 +167,11 @@ weightedEL <- function(z, mu = 0,
   if (SEL) ct <- ct / sum(ct) # We might have truncated some weights, so re-normalisation is needed!
   # The denominator for EL with counts is the sum of total counts, and for SEL, it is the number of observations!
   N <- if (SEL) n.orig else sum(ct)
-  if (N <= 0) stop("Total weights must be positive.")
+  if (N <= 0) stop(paste0("Total weights after tolerance checks (", N, ") must be positive (check the counts and maybe decrease 'weight.tolerance', which is now ", sprintf("%1.1e", weight.tolerance), ".\n"))
 
   z <- z - mu
 
   me <- .Machine$double.eps
-
   z1 <- min(z)
   zn <- max(z)
 
@@ -178,21 +186,40 @@ weightedEL <- function(z, mu = 0,
   f.root <- NA
   exitcode <- 5
 
-  # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z)
-  if (z1 < 0 && zn > 0) {
+  # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z),
+  # or the Taylor expansion must be used to avoid this check an simply return a strongly negative likelihood
+  if (sign(z1*zn) == 1) {
+    if (!is.finite(taylor.order)) {
+      warning("The hypothesised mean is outside the convex hull -- using the 4th-order Taylor appxomation.")
+      taylor.order <- 4
+    } # Else it should fail with an appropriate error code
+  }
+  if ((z1 < 0 && zn > 0) | !is.na(taylor.order)) {
     negz <- z < 0
     comp <- (ct / N - 1 - shift) / z
     minlambda <- max(comp[!negz])
     maxlambda <- min(comp[negz])
+    if (!is.finite(minlambda)) minlambda <- -2*maxlambda
+    if (!is.finite(maxlambda)) maxlambda <- -2*minlambda
     int <- c(minlambda, maxlambda)
     int <- int + abs(int) * c(2, -2) * me # To avoid bad rounding
     con <- list(tol = me, maxiter = 100) # Strictest convergence
     con[names(uniroot.control)] <- uniroot.control
 
-    dllik <- function(lambda) return(sum(ct * z / (1 + lambda * z + shift)))
-    lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt = "yes"),
-      warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
-      error = function(e) return(NULL) # If there is a warning, we still return the object
+    eps <- ct / N  # Taylor expansion beyond this point
+    logelr <- if (is.finite(taylor.order)) function(lambda) sum(ct * mllog(1 + z * lambda + shift, eps = eps, der = 0, order = taylor.order, drop = TRUE)) else
+      function(lambda) -sum(ct * log(1 + z * lambda + shift))
+    dllik <- if (is.finite(taylor.order)) function(lamb) sum(mllog(1 + z * lambda + shift, eps = eps, der = 1, order = taylor.order, drop = TRUE)) else
+      function(lambda) return(sum(ct * z / (1 + lambda * z + shift)))
+    # xs <- seq(int[1], int[2], length.out = 51)
+    # ys <- sapply(xs, logelr)
+    # plot(xs, ys)
+    # lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt = "yes"),
+    #                    warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
+    #                    error = function(e) return(NULL) # If there is a warning, we still return the object
+    lambda <- tryCatch(brentZero(dllik, lower = int[1], upper = int[2], tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt),
+                       warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
+                       error = function(e) return(NULL) # If there is a warning, we still return the object
     )
     if (!is.null(lambda)) { # Some result with or without a warning as the second element of the list
       if ("warning" %in% class(lambda[[2]])) {
@@ -201,7 +228,7 @@ weightedEL <- function(z, mu = 0,
       }
       lam <- lambda$root
       if (return.weights) wts[nonz] <- (ct / N) / (1 + z * lam + shift)
-      logelr <- -sum(ct * log1p(z * lam + shift))
+      logelr <- sum(ct * mllog(1 + z * lam + shift, eps = eps, der = 0, order = taylor.order, drop = TRUE))
       converged <- if ("warning" %in% class(lambda[[2]])) FALSE else TRUE
       iter <- lambda$iter
       estim.prec <- lambda$estim.prec
@@ -219,18 +246,24 @@ weightedEL <- function(z, mu = 0,
     lam <- logelr <- iter <- estim.prec <- f.root <- 0
     converged <- TRUE
     int <- c(0, 0)
-    exitcode <- 7
+    exitcode <- 8
   } else if (z1 == 0 || zn == 0) { # mu is on the boundary
-    converged <- TRUE
-    exitcode <- 6
+    # Here, we check if Taylor approximation was used for a finite value
+    if (!is.finite(taylor.order)) {
+      converged <- TRUE
+      exitcode <- 6
+    } else {
+      exitcode <- 7
+    }
   }
 
   msg <- c("FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
            "Lambda is very close to the boundary! (May happen with extremely small weights.)",
            "Lambda is very close to the boundary and FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
            "Root finder returned an error!",
-           "mu is not strictly in the convex hull of z (spanning condition fail)!",
-           "mu lies exactly on the boundary of the convex full, ELR(mu) := 0.",
+           "mu is not strictly in the convex hull of z (spanning condition fail), and no Taylor expansion was applied to address it.",
+           "mu lies exactly on the boundary of the convex hull, ELR(mu) := 0.",
+           "mu lies exactly on the boundary of the convex hull, but Taylor approximation yields ELR(mu) > 0.",
            "Observations wth substantial counts are identical and equal to mu (degenerate sample).")
   if (verbose && exitcode > 0) warning(msg[exitcode])
 
@@ -239,6 +272,7 @@ weightedEL <- function(z, mu = 0,
               bracket = int, estim.prec = estim.prec, f.root = f.root,
               exitcode = exitcode))
 }
+
 
 #' Smoothed Empirical Likelihood function value
 #'

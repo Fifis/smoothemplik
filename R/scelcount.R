@@ -237,8 +237,8 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
 #'
 #' @param x Numeric vector for which approximated logarithm is to be computed.
 #' @param order Positive integer: Taylor approximation order.
-#' @param eps Lower threshold below which approximation starts.
-#' @param M Upper threshold above which approximation starts.
+#' @param eps Lower threshold below which approximation starts; can be a scalar of a vector of the same length as \code{x}.
+#' @param M Upper threshold above which approximation starts; can be a scalar of a vector of the same length as \code{x}.
 #' @param der Non-negative integer: 0 yields the function, 1 and higher yields derivatives
 #' @param drop If \code{TRUE} and \code{x} is a vector, the output is a vector and not a 1-column matrix.
 #'
@@ -263,9 +263,13 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
 #' ae <- abs(sapply(2:6, function(o) -log(x) - mllog(x, eps=1, M=1, order=o)))
 #' matplot(x, ae, type = "l", log = "y", lwd = 2,
 #'   main = "Abs. trunc. err. of Taylor expansion at 1", ylab = "")
-mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, drop = TRUE) {
-  if (is.null(eps)) eps <- 1/length(x)
-  if (eps > M) stop("Thresholds not ordered. eps must be less than M.")
+mllog <- function(x, eps = NULL, M = NULL, der = 0, order = 4, drop = TRUE) {
+  if (is.null(eps)) eps <- rep(1/length(x), length(x))
+  if (is.null(M)) M <- rep(Inf, length(x))
+  if (length(eps) == 1) eps <- rep(eps, length(x))
+  if (length(M) == 1) M <- rep(M, length(x))
+  if (length(eps) != length(M)) stop(paste0("eps has length ", length(eps), ", but M has ", length(M), ". Make them equal!"))
+  if (any(eps > M)) stop("Thresholds not ordered. eps must be less than M.")
 
   lo <- x < eps
   hi <- x > M
@@ -285,6 +289,7 @@ mllog <- function(x, eps = NULL, M = Inf, der = 0, order = 4, drop = TRUE) {
 
   return(-out)
 }
+
 
 #' Least-squares regression via SVD
 #'

@@ -18,13 +18,23 @@ test_that("input validation for weightedEL", {
   a <- -4:4
   expect_error(weightedEL(c(a, NA)), "Non-finite observations")
   expect_error(weightedEL(z = a, ct = 1/a), "Non-finite weights")
-  expect_error(weightedEL(z = a, ct = a), "Negative weights")
   expect_warning(weightedEL(z = 1:10, mu = pi, ct = c(9:1, 1e-12), verbose = TRUE),
-                 "Positive counts below")
+                 "Counts closer to 0")
   expect_error(weightedEL(a, ct = abs(a) * 1e-9), "Total weights")
 })
 
+test_that("negative weights are handled correctly", {
+  a <- -4:4
+  weightedEL(z = 1:6, ct = c(rep(1, 5), -0.9), mu = 3 , return.weights = TRUE, verbose = TRUE)
+  expect_error(weightedEL(z = a, ct = a), "The total sum")
+})
+
 test_that("weight re-normalisation does not affect lambda", {
+  expect_equal(weightedEL(z = 1:10, ct = 10:1, mu = pi)$lam,
+               weightedEL(z = 1:10, ct = 10:1, mu = pi, SEL = TRUE)$lam, tolerance = 1e-14)
+})
+
+test_that("SEL weight scaling does not affect lamdda", {
   expect_equal(weightedEL(z = 1:10, ct = 10:1, mu = pi)$lam,
                weightedEL(z = 1:10, ct = 10:1, mu = pi, SEL = TRUE)$lam, tolerance = 1e-14)
 })
@@ -57,7 +67,7 @@ test_that("exit codes of weightedEL", {
   expect_equal(weightedEL(-4:3)$exitcode, 0)
   expect_equal(weightedEL(1:9)$exitcode, 5)
   expect_equal(weightedEL(1:9, mu = 9)$exitcode, 6)
-  expect_equal(weightedEL(rep(pi, 10), mu = pi)$exitcode, 7)
+  expect_equal(weightedEL(rep(pi, 10), mu = pi)$exitcode, 8)
   expect_warning(weightedEL(rep(pi, 10), mu = pi, verbose = TRUE), regexp = "are identical")
   # Come up with ideas for 1, 2, 3, 4 exit code!
 })

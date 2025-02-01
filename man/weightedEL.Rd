@@ -9,6 +9,7 @@ weightedEL(
   mu = 0,
   ct = NULL,
   shift = NULL,
+  taylor.order = NA,
   SEL = FALSE,
   n.orig = NULL,
   weight.tolerance = 0.01/length(z),
@@ -110,6 +111,8 @@ The actual tolerance of the lambda search in \code{uniroot} is
 \eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
 where \code{tol} can be set in \code{uniroot.control} and
 \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
+
+TODO: write a section of the concondang minus-log expansion
 }
 \examples{
 # Figure 2.4 from Owen (2001) -- with a slightly different data point
