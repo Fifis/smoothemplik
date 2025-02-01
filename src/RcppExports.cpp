@@ -11,6 +11,36 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// brentMin
+Rcpp::List brentMin(Rcpp::Function f, double lower, double upper, double tol, int maxiter);
+RcppExport SEXP _smoothemplik_brentMin(SEXP fSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP tolSEXP, SEXP maxiterSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::Function >::type f(fSEXP);
+    Rcpp::traits::input_parameter< double >::type lower(lowerSEXP);
+    Rcpp::traits::input_parameter< double >::type upper(upperSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
+    rcpp_result_gen = Rcpp::wrap(brentMin(f, lower, upper, tol, maxiter));
+    return rcpp_result_gen;
+END_RCPP
+}
+// brentZero
+Rcpp::List brentZero(Rcpp::Function f, double lower, double upper, double tol, int maxiter);
+RcppExport SEXP _smoothemplik_brentZero(SEXP fSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP tolSEXP, SEXP maxiterSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::Function >::type f(fSEXP);
+    Rcpp::traits::input_parameter< double >::type lower(lowerSEXP);
+    Rcpp::traits::input_parameter< double >::type upper(upperSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
+    rcpp_result_gen = Rcpp::wrap(brentZero(f, lower, upper, tol, maxiter));
+    return rcpp_result_gen;
+END_RCPP
+}
 // kernelFunCPP
 arma::vec kernelFunCPP(arma::vec x, std::string kernel, int order, bool convolution);
 RcppExport SEXP _smoothemplik_kernelFunCPP(SEXP xSEXP, SEXP kernelSEXP, SEXP orderSEXP, SEXP convolutionSEXP) {
@@ -131,6 +161,8 @@ END_RCPP
 RcppExport SEXP run_testthat_tests(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_smoothemplik_brentMin", (DL_FUNC) &_smoothemplik_brentMin, 5},
+    {"_smoothemplik_brentZero", (DL_FUNC) &_smoothemplik_brentZero, 5},
     {"_smoothemplik_kernelFunCPP", (DL_FUNC) &_smoothemplik_kernelFunCPP, 4},
     {"_smoothemplik_kernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_kernelWeightsOneCPP, 6},
     {"_smoothemplik_sparseKernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_sparseKernelWeightsOneCPP, 6},
