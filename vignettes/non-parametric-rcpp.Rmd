@@ -361,9 +361,7 @@ print(cor(cbind(Y, ys))[1, 2:4], 3)
 ## Sparsity
 
 Large matrices of kernel weights with many zeros can be stored more efficiently using the facilities of the `Matrix` package that should be loaded automatically.
-
-It is not widely known that the computer version of the Gaussian kernel effectively has finite support in most evaluations.
-This is due to the fact that 
+E.g. it is not widely known that the computer version of the Gaussian kernel effectively has finite support in most evaluations.
 Indeed, $\log_2[\phi(8.62602) / \phi(0)] \approx 2^{-53.674} < \epsilon_{\mathrm{mach}} = 2^{-53}$, which means that the tail density at $\pm8.62603$ and beyond is indistinguishable from zero to the computer compared to the maximum value, i.e. `dnorm(0) + dnorm(8.62603) == dnorm(0)` is `TRUE`!
 Similarly, `1 + dnorm(8.46378) != 1` but `1 + dnorm(8.46379) == 1`, which is expected because `log2(dnorm(8.46379)) == -53.00001`, i.e. the ratio of the values is less than the machine epsilon, and the smaller value is zeroed out.
 
@@ -386,14 +384,33 @@ print(c(object.size(kernelWeights(X, bw = 0.5)),
 
 Using kernels with limited support explicitly increases the savings owing to sparsity:
 ```{r}
-b.ep <- bw.rot(X, kernel = "epanechnikov")  # ~0.6
-print(c(object.size(kernelWeights(X, kernel = "epanechnikov", bw = b.ep)),
-        object.size(kernelWeights(X, kernel = "epanechnikov", bw = b.ep, sparse = TRUE))))
+print(c(object.size(kernelWeights(X, kernel = "epanechnikov", bw = 0.6)),
+        object.size(kernelWeights(X, kernel = "epanechnikov", bw = 0.6, sparse = TRUE))))
+```
+
+`smoothemplik` offers another storage format for sparse weight matrices: a list with indices of non-zero elements in each row and their values.
+Since the weights have to add up to one, by default, it re-normalises the rows to add up to unity, which is why `renormalise = FALSE` is required to preserve the original kernel weights.
+```{r}
+set.seed(1)
+nz <- c(1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, 1, 1)
+m <- matrix(runif(16) * nz, nrow = 4, byrow = TRUE)
+print(m)
+print(apply(m, 1, sparseVectorToList, renormalise = FALSE))
+```
+
+Not only the savings appear in large objects, the list of lists can be passed to `parallel::mclapply` for speed gains, and it does not need conversion back to numeric, unlike sparse matrices.
+Here is how it compares to the `dgCMatrix` solution: the size is slightly larger, but the large number of small row-based chunks can be handled immediately without accessing the entire matrix.
+This is useful in such applications as re-sampling, bootstrap, big-data handling etc.
+```{r}
+kw <- kernelWeights(X, kernel = "epanechnikov", bw = 0.6)
+print(c(object.size(kw),
+        object.size(kernelWeights(X, kernel = "epanechnikov", bw = 0.6, sparse = TRUE)),
+        object.size(apply(kw, 1, sparseVectorToList, renormalise = FALSE))))
 ```
 
 ## Conclusion
 
-These examples showcase the speed improvements and comparable accuracy of the Rcpp implementations over pure R code, making the `smoothemplik` a powerful tool for non-parametric statistical analysis.
+These examples showcase the speed improvements and comparable accuracy of the Rcpp implementations over pure R code, making the `smoothemplik` a versatile and efficient tool for non-parametric statistical analysis.
 
 ## References
 
