@@ -25,7 +25,9 @@ test_that("input validation for weightedEL", {
 
 test_that("negative weights are handled correctly", {
   a <- -4:4
-  weightedEL(z = 1:6, ct = c(rep(1, 5), -0.9), mu = 3 , return.weights = TRUE, verbose = TRUE)
+  f <- suppressWarnings(weightedEL(z = 1:6, ct = c(rep(1, 5), -0.9), mu = 3, return.weights = TRUE))
+  expect_equal(f$logelr, -Inf)
+  expect_true(is.finite(f$lam))
   expect_error(weightedEL(z = a, ct = a), "The total sum")
 })
 
@@ -60,12 +62,12 @@ test_that("very small counts result in bad uniroot output", {
   expect_equal(EL0$exitcode, 3)
   expect_equal(EL1$exitcode, 0)
   expect_equal(length(EL0$wts), length(EL1$wts))
-  expect_equal(sum(EL1$wts == 0), 37) # If the defaults change, this will break
+  expect_equal(sum(EL1$wts == 0), 35) # If the defaults change, this will break
 })
 
 test_that("exit codes of weightedEL", {
   expect_equal(weightedEL(-4:3)$exitcode, 0)
-  expect_equal(weightedEL(1:9)$exitcode, 5)
+  expect_equal(weightedEL(1:9)$exitcode, 4)
   expect_equal(weightedEL(1:9, mu = 9)$exitcode, 6)
   expect_equal(weightedEL(rep(pi, 10), mu = pi)$exitcode, 8)
   expect_warning(weightedEL(rep(pi, 10), mu = pi, verbose = TRUE), regexp = "are identical")

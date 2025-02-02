@@ -2,19 +2,22 @@
 % Please edit documentation in R/selfunctions.R
 \name{sparseVectorToList}
 \alias{sparseVectorToList}
+\alias{sparseMatrixToList}
 \title{Convert a weight vector to list}
 \usage{
-sparseVectorToList(x, trim = NULL, renormalise = TRUE)
+sparseVectorToList(x, trim = NULL, renormalise = FALSE)
+
+sparseMatrixToList(x, trim = NULL, renormalise = FALSE)
 }
 \arguments{
-\item{x}{A numeric vector (with many close-to-zero elements).}
+\item{x}{A numeric vector or matrix (with many close-to-zero elements).}
 
 \item{trim}{A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.}
 
 \item{renormalise}{Logical: renormalise the sum of weights to one after trimming?}
 }
 \value{
-A list with indices of large enough elements.
+A list with indices and values of non-zero elements.
 }
 \description{
 This function saves memory (which is crucial in large samples) and allows one to speed up the code by minimising the number of
@@ -22,4 +25,11 @@ time-consuming subsetting operations and memory-consuming matrix multiplications
 sparse matrix manipulation since the EL smoothing weights are usually fixed at the beginning, and need not be recomputed dynamically,
 so we recommend applying this function to the rows of a matrix. In order to avoid numerical instability, the weights are trimmed
 at \code{0.01 / length(x)}. Using too much trimming may cause the spanning condition to fail (the moment function values can have the same sign in some neighbourhoods).
+}
+\examples{
+set.seed(1)
+m <- round(matrix(rnorm(100), 10, 10), 2)
+m[as.logical(rbinom(100, 1, 0.7))] <- 0
+sparseVectorToList(m[, 3])
+sparseMatrixToList(m)
 }

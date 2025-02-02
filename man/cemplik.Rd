@@ -35,11 +35,11 @@ cemplik(
 
 \item{lam}{Starting lambda, default (0 ... 0)}
 
-\item{eps}{Lower cut-off for \code{mllog()}, default 1/nrow(z)}
+\item{eps}{Lower cut-off for \code{logTaylor()}, default 1/nrow(z)}
 
-\item{M}{Upper cutoff for \code{mllog()}, default Inf}
+\item{M}{Upper cutoff for \code{logTaylor()}, default Inf}
 
-\item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to \code{mllog}.}
+\item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to \code{logTaylor}.}
 
 \item{wttol}{Weight tolerance for counts to improve numerical stability}
 

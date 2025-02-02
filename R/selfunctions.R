@@ -8,6 +8,9 @@
 #' @param ct Numeric count variable with positive values that indicates the multiplicity of observations.
 #'   Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.
 #' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
+#' @param taylor.order If \code{NA}, then the sum of log-weights is maximised. If an even integer between
+#'   2 and 12, replaces the left branch of the log with its Taylor expansion, allowing for \code{mu}
+#'   to be outside the convex hull of \code{z}.
 #' @param mu Hypothesized mean of \code{z} in the moment condition.
 #' @param SEL If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 #' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
@@ -76,7 +79,8 @@
 #'     \item{4}{an error occurred while calling \code{uniroot}.}
 #'     \item{5}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
 #'     \item{6}{\code{mu} is on the boundary of the convex hull of \code{z}.}
-#'     \item{7}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
+#'     \item{7}{Most observations are equal to \code{mu}.}
+#'     \item{8}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
 #'   }
 #' }
 #'
@@ -119,7 +123,7 @@ weightedEL <- function(z, mu = 0,
                        taylor.order = NA,
                        SEL = FALSE,
                        n.orig = NULL,
-                       weight.tolerance = 0.01 / length(z),
+                       weight.tolerance = NULL,
                        boundary.tolerance = 1e-9,
                        truncto = 0,
                        uniroot.control = list(),
@@ -135,12 +139,16 @@ weightedEL <- function(z, mu = 0,
   if (is.null(n.orig)) n.orig <- length(z)
   if (is.null(shift)) shift <- rep(0, length(z))
   if (!is.na(taylor.order) && !(taylor.order %in% (1:6)*2)) stop("'taylor.order' must be 2, 4, ..., 12.")
+  if (is.null(weight.tolerance)) weight.tolerance <- if (!SEL) 1 / sqrt(length(z)) / 1024 else max(ct) * sqrt(.Machine$double.eps)
 
   # If originally the weights were too small, too many points would be truncated
   # Warn if any non-zero weights are smaller than weight.tolerance
   closeto0 <- (abs(ct) < weight.tolerance)
   if (any(closeto0)) {
-    if (verbose) warning(paste0("Counts closer to 0 than ", sprintf("%1.2e", weight.tolerance), " have been replaced with ", if (truncto == 0) "0." else  paste0("±", truncto, " of appropriate sign.")))
+    if (verbose)
+      warning(paste0("Counts closer to 0 than ", sprintf("%1.2e", weight.tolerance),
+                     " have been replaced with ",
+                     if (truncto == 0) "0." else  paste0("+-", truncto, " of appropriate sign.")))
     ct[closeto0 & ct > 0] <- truncto
     ct[closeto0 & ct < 0] <- -truncto
   }
@@ -190,45 +198,45 @@ weightedEL <- function(z, mu = 0,
   # or the Taylor expansion must be used to avoid this check an simply return a strongly negative likelihood
   if (sign(z1*zn) == 1) {
     if (!is.finite(taylor.order)) {
-      warning("The hypothesised mean is outside the convex hull -- using the 4th-order Taylor appxomation.")
+      if (verbose > 0) warning("The hypothesised mean is outside the convex hull -- using the 4th-order Taylor appxomation.")
       taylor.order <- 4
     } # Else it should fail with an appropriate error code
   }
   if ((z1 < 0 && zn > 0) | !is.na(taylor.order)) {
     negz <- z < 0
     comp <- (ct / N - 1 - shift) / z
-    minlambda <- max(comp[!negz])
-    maxlambda <- min(comp[negz])
+    minlambda <- suppressWarnings(max(comp[!negz]))
+    maxlambda <- suppressWarnings(min(comp[negz]))
     if (!is.finite(minlambda)) minlambda <- -2*maxlambda
     if (!is.finite(maxlambda)) maxlambda <- -2*minlambda
     int <- c(minlambda, maxlambda)
     int <- int + abs(int) * c(2, -2) * me # To avoid bad rounding
-    con <- list(tol = me, maxiter = 100) # Strictest convergence
+    con <- list(tol = me, maxiter = 100, trace = 0) # Wishing the strictest convergence
     con[names(uniroot.control)] <- uniroot.control
 
     eps <- ct / N  # Taylor expansion beyond this point
-    logelr <- if (is.finite(taylor.order)) function(lambda) sum(ct * mllog(1 + z * lambda + shift, eps = eps, der = 0, order = taylor.order, drop = TRUE)) else
-      function(lambda) -sum(ct * log(1 + z * lambda + shift))
-    dllik <- if (is.finite(taylor.order)) function(lamb) sum(mllog(1 + z * lambda + shift, eps = eps, der = 1, order = taylor.order, drop = TRUE)) else
-      function(lambda) return(sum(ct * z / (1 + lambda * z + shift)))
+    # logELr <- function(lambda) sum(ct * logTaylor(1 + z * lambda + shift, eps = eps, der = 0, order = taylor.order, drop = TRUE))
+    dllik <- function(lambda) sum(ct * z * logTaylor(1 + z * lambda + shift, eps = eps, der = 1, order = taylor.order)[, "deriv1"])
     # xs <- seq(int[1], int[2], length.out = 51)
-    # ys <- sapply(xs, logelr)
+    # ys <- sapply(xs, logELr)
+    # ys1 <- sapply(xs, dllik)
     # plot(xs, ys)
-    # lambda <- tryCatch(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt = "yes"),
-    #                    warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
-    #                    error = function(e) return(NULL) # If there is a warning, we still return the object
-    lambda <- tryCatch(brentZero(dllik, lower = int[1], upper = int[2], tol = con$tol, maxiter = con$maxiter, trace = con$trace, extendInt),
-                       warning = function(w) return(list(stats::uniroot(dllik, interval = int, tol = con$tol, maxiter = con$maxiter, trace = con$trace), w)),
-                       error = function(e) return(NULL) # If there is a warning, we still return the object
-    )
+    # plot(xs, ys1)
+    try.extend <- (sign(z1*zn) == 1 || !is.na(taylor.order))
+    lambda <- tryCatch(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (try.extend) "yes" else "no",
+                                 maxiter = con$maxiter, trace = con$trace),
+                       warning = function(w) return(list(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (try.extend) "yes" else "no",
+                                                                   maxiter = con$maxiter, trace = con$trace), w)),
+                       error = function(e) return(NULL)) # If there is a warning, we still return the object
     if (!is.null(lambda)) { # Some result with or without a warning as the second element of the list
       if ("warning" %in% class(lambda[[2]])) {
         if (verbose) print(lambda[[2]]) # The user should know that went wrong in uniroot()
         lambda <- lambda[[1]]
       }
       lam <- lambda$root
-      if (return.weights) wts[nonz] <- (ct / N) / (1 + z * lam + shift)
-      logelr <- sum(ct * mllog(1 + z * lam + shift, eps = eps, der = 0, order = taylor.order, drop = TRUE))
+      zlam1 <- 1 + z * lam + shift
+      if (return.weights) wts[nonz] <- ct / N * logTaylor(zlam1, eps = eps, der = 1, order = taylor.order)[, "deriv1"]
+      logelr <- -sum(ct * logTaylor(zlam1, eps = eps, der = 0, order = taylor.order))
       converged <- if ("warning" %in% class(lambda[[2]])) FALSE else TRUE
       iter <- lambda$iter
       estim.prec <- lambda$estim.prec
@@ -257,6 +265,8 @@ weightedEL <- function(z, mu = 0,
     }
   }
 
+  if (return.weights && any(!is.finite(wts[nonz]))) exitcode <- 9
+
   msg <- c("FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
            "Lambda is very close to the boundary! (May happen with extremely small weights.)",
            "Lambda is very close to the boundary and FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
@@ -264,7 +274,8 @@ weightedEL <- function(z, mu = 0,
            "mu is not strictly in the convex hull of z (spanning condition fail), and no Taylor expansion was applied to address it.",
            "mu lies exactly on the boundary of the convex hull, ELR(mu) := 0.",
            "mu lies exactly on the boundary of the convex hull, but Taylor approximation yields ELR(mu) > 0.",
-           "Observations wth substantial counts are identical and equal to mu (degenerate sample).")
+           "Observations with substantial counts are identical and equal to mu (degenerate sample).",
+           "Lambda search succeeded but some probabilities are not finite (division by zero?).")
   if (verbose && exitcode > 0) warning(msg[exitcode])
 
   return(list(logelr = logelr, lam = lam, wts = wts,
@@ -570,21 +581,31 @@ maximiseSEL <- function(start.values = NULL,
 #' so we recommend applying this function to the rows of a matrix. In order to avoid numerical instability, the weights are trimmed
 #' at \code{0.01 / length(x)}. Using too much trimming may cause the spanning condition to fail (the moment function values can have the same sign in some neighbourhoods).
 #'
-#' @param x A numeric vector (with many close-to-zero elements).
+#' @param x A numeric vector or matrix (with many close-to-zero elements).
 #' @param trim A trimming function that returns a threshold value below which the weights are ignored. In common applications, this function should tend to 0 as the length of \code{x} increases.
 #' @param renormalise Logical: renormalise the sum of weights to one after trimming?
 #'
-#' @return A list with indices of large enough elements.
+#' @return A list with indices and values of non-zero elements.
 #' @export
 #'
 #' @examples
-sparseVectorToList <- function(x, trim = NULL, renormalise = TRUE) {
+#' set.seed(1)
+#' m <- round(matrix(rnorm(100), 10, 10), 2)
+#' m[as.logical(rbinom(100, 1, 0.7))] <- 0
+#' sparseVectorToList(m[, 3])
+#' sparseMatrixToList(m)
+sparseVectorToList <- function(x, trim = NULL, renormalise = FALSE) {
   if (is.null(trim)) trim <- function(x) 0.01 / length(x)
   idx <- which(x >= trim(x))
   x <- x[idx]
   if (renormalise) x <- x / sum(x)
   return(list(idx = idx, ct = x))
 }
+
+#' @rdname sparseVectorToList
+#' @export
+sparseMatrixToList <- function(x, trim = NULL, renormalise = FALSE)
+  apply(x, 1, sparseVectorToList, trim = trim, renormalise = renormalise)
 
 #' Construct memory-efficient weights for estimation
 #'

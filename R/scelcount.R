@@ -28,9 +28,9 @@
 #' @param ct A numeric vector of non-negative counts.
 #' @param mu Hypothesised mean, default (0 ... 0) in R^ncol(z)
 #' @param lam Starting lambda, default (0 ... 0)
-#' @param eps Lower cut-off for \code{mllog()}, default 1/nrow(z)
-#' @param M Upper cutoff for \code{mllog()}, default Inf
-#' @param order Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to \code{mllog}.
+#' @param eps Lower cut-off for \code{logTaylor()}, default 1/nrow(z)
+#' @param M Upper cutoff for \code{logTaylor()}, default Inf
+#' @param order Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to \code{logTaylor}.
 #' @param wttol Weight tolerance for counts to improve numerical stability
 #' @param thresh Convergence threshold for log-likelihood (the default is aggressive)
 #' @param itermax Upper bound on number of Newton steps (seems ample)
@@ -111,11 +111,11 @@ cemplik <- function(z, ct = NULL, mu = NULL,
   if (sum(ct) <= 0) stop("Total weight must be positive.")
 
   # Initialising at lambda = 0
-  init <- mllog(rep(1, n), eps = eps, M = M, order = order, der = 2) # i.e. fn and derivatives at lam = 0
-  init <- init * ct # Multiply every column: weights appear OUTSIDE of mllog
+  init <- -logTaylor(rep(1, n), eps = eps, M = M, order = order, der = 2) # i.e. fn and derivatives at lam = 0
+  init <- init * ct # Multiply every column: weights appear OUTSIDE of logTaylor
   # If the initial lambda is supplied, compare lam = 0 with it and pick the best
   if (!is.null(lam)) {
-    init1 <- mllog(1 + z %*% lam, eps = eps, M = M, order = order, der = 2)
+    init1 <- -logTaylor(1 + z %*% lam, eps = eps, M = M, order = order, der = 2)
     init1 <- init1 * ct
     if (sum(init1[, 1]) < sum(init[, 1])) { # Minimising --> lower is better
       init <- init1
@@ -146,7 +146,7 @@ cemplik <- function(z, ct = NULL, mu = NULL,
     tt <- 1 # usually called t, but R uses t for transpose
     while (!backtrack) {
       newlam <- lam + tt*step
-      newvals <- mllog(1 + z %*% newlam, eps = eps, M = M, order = order, der = 2)
+      newvals <- -logTaylor(1 + z %*% newlam, eps = eps, M = M, order = order, der = 2)
       newvals <- newvals * ct
       fnew <- sum(newvals[, 1])
       targ <- fold + ALPHA * tt * sum(gold*step) + BACKEPS # (BACKEPS for round-off, should not be needed)
@@ -174,7 +174,7 @@ cemplik <- function(z, ct = NULL, mu = NULL,
 
   zlam <- drop(z %*% lam)
   wts <- (ct / sum(ct)) / (1 + zlam) # Without the weights, the numerator was 1/n
-  logelr <- sum(ct * mllog(1 + zlam, eps = eps, M = M, order = order, der = 0))
+  logelr <- -sum(ct * logTaylor(1 + zlam, eps = eps, M = M, order = order, der = 0))
 
   return(list(logelr = logelr, lam = lam, wts = wts, converged = converged,
               iter = iter, ndec = ndec, gradnorm = gradnorm))
@@ -236,7 +236,7 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
 #' Modified minus logarithm with derivatives
 #'
 #' @param x Numeric vector for which approximated logarithm is to be computed.
-#' @param order Positive integer: Taylor approximation order.
+#' @param order Positive integer: Taylor approximation order. If \code{NA}, returns \code{log(x)} or its derivative.
 #' @param eps Lower threshold below which approximation starts; can be a scalar of a vector of the same length as \code{x}.
 #' @param M Upper threshold above which approximation starts; can be a scalar of a vector of the same length as \code{x}.
 #' @param der Non-negative integer: 0 yields the function, 1 and higher yields derivatives
@@ -253,41 +253,47 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
 #'
 #' @examples
 #' x <- seq(0.01^0.25, 2^0.25, length.out = 51)^4 - 0.11 # Denser where |f'| is higher
-#' plot(x, -log(x)); abline(v = 0, lty = 2) # Observe the warning
-#' lines(x, mllog(x, eps = 0.2), col = 2)
-#' lines(x, mllog(x, eps = 0.5), col = 3)
-#' lines(x, mllog(x, eps = 1, M = 1.2, order = 6), col = 4)
+#' plot(x,  log(x)); abline(v = 0, lty = 2) # Observe the warning
+#' lines(x, logTaylor(x, eps = 0.2), col = 2)
+#' lines(x, logTaylor(x, eps = 0.5), col = 3)
+#' lines(x, logTaylor(x, eps = 1, M = 1.2, order = 6), col = 4)
 #'
-#' # Substitute -log with its Taylor approx. around 1
+#' # Substitute log with its Taylor approx. around 1
 #' x <- seq(0.1, 2, 0.05)
-#' ae <- abs(sapply(2:6, function(o) -log(x) - mllog(x, eps=1, M=1, order=o)))
-#' matplot(x, ae, type = "l", log = "y", lwd = 2,
+#' ae <- abs(sapply(2:6, function(o) log(x) - logTaylor(x, eps=1, M=1, order=o)))
+#' matplot(x[x!=1], ae[x!=1,], type = "l", log = "y", lwd = 2,
 #'   main = "Abs. trunc. err. of Taylor expansion at 1", ylab = "")
-mllog <- function(x, eps = NULL, M = NULL, der = 0, order = 4, drop = TRUE) {
+logTaylor <- function(x, eps = NULL, M = NULL, der = 0, order = 4, drop = TRUE) {
   if (is.null(eps)) eps <- rep(1/length(x), length(x))
   if (is.null(M)) M <- rep(Inf, length(x))
   if (length(eps) == 1) eps <- rep(eps, length(x))
   if (length(M) == 1) M <- rep(M, length(x))
-  if (length(eps) != length(M)) stop(paste0("eps has length ", length(eps), ", but M has ", length(M), ". Make them equal!"))
+  if (length(eps) != length(M))
+    stop(paste0("eps has length ", length(eps), ", but M has ", length(M), ". Make them equal!"))
   if (any(eps > M)) stop("Thresholds not ordered. eps must be less than M.")
 
   lo <- x < eps
   hi <- x > M
   md <- (!lo) & (!hi)
+  if (is.na(order)) {
+    lo <- hi <- rep(FALSE, length(x))
+    md <- rep(TRUE, length(x))
+  }
 
   # Derivatives of the logarithm
-  dlog <- function(x, d = 0)  if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
+  dlog <- function(x, d = 0)
+    if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
   out <- vapply(0:der, function(d) {
     f <- numeric(length(x))
     f[md] <- dlog(x[md], d = d)
-    if (any(lo)) f[lo] <- logTaylor(x[lo], a = eps, k = order, d = d)
-    if (any(hi)) f[hi] <- logTaylor(x[hi], a = M,   k = order, d = d)
+    if (any(lo)) f[lo] <- tlog(x[lo], a = eps[lo], k = order, d = d)
+    if (any(hi)) f[hi] <- tlog(x[hi], a = M[hi],   k = order, d = d)
     return(f)
   }, FUN.VALUE = numeric(length(x)))
   colnames(out) <- paste0("deriv", 0:der)
   if ((der == 0) && drop) out <- drop(out)
 
-  return(-out)
+  return(out)
 }
 
 
@@ -351,23 +357,25 @@ svdlm <- function(X, y, rel.tol = 1e-9, abs.tol = 1e-100) {
 #' y <- f(x, d = d)
 #' plot(x, y, type = "l", lwd = 7, bty = "n", ylim = range(0, y),
 #'        main = paste0("d^", d, "/dx^", d, " Taylor(Log(x))"))
-#'   for (k in 0:8) lines(x, logTaylor(x, a = a, k = k, d = d), col = cl[k+1], lwd = 1.5)
+#'   for (k in 0:8) lines(x, tlog(x, a = a, k = k, d = d), col = cl[k+1], lwd = 1.5)
 #'   points(a, f(a, d = d), pch = 16, cex = 1.5, col = "white")
 #' }
 #' legend("topright", as.character(0:8), title = "Order", col = cl, lwd = 1)
-logTaylor <- function(x, a = 1, k = 4, d = 0) {
-  if (length(a) != 1 || !is.numeric(a)) stop("The centre of approximation 'a' must be a numeric scalar.")
+tlog <- function(x, a = 1, k = 4, d = 0) {
+  l <- length(x)
+  if (length(a) == 1) a <- rep(a, l)
+  if ((length(a) != length(x)) || !is.numeric(a))
+    stop("The centre of approximation 'a' must be a scalar of length 1 or length(x).")
   if (!(is.numeric(k) && length(k) == 1 && k == round(k) && k >= 0))
     stop("The polynomial order 'k' must be a non-negative integer scalar.")
   if (!(is.numeric(d) && length(d) == 1 && d == round(d) && d >= 0))
     stop("The derivative order 'd' must be a non-negative integer scalar.")
-  l <- length(x)
   if (d > k) return(numeric(l)) # Polynomial derivatives of order > k are zero
   xc <- (x-a) / a
   taylor <- vapply(d:k, function(n) { # Terms of the Taylor expansion
     if (n == d) { # Lowest order: constant
-      if (d == 0) return(rep(log(a), l)) # Original function = the only special term
-      return(rep(-1 / (-a)^d * gamma(n), l))
+      if (d == 0) return(log(a)) # Original function = the only special term
+      return(-1 / (-a)^d * gamma(n))
     }
     mult <- if (d == 0) 1 else prod(n:(n-d+1)) # Multiplier from the polynomial power
     return((-1)^(n-1) * mult * xc^(n-d) / n / a^d)

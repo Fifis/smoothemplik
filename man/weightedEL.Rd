@@ -12,7 +12,7 @@ weightedEL(
   taylor.order = NA,
   SEL = FALSE,
   n.orig = NULL,
-  weight.tolerance = 0.01/length(z),
+  weight.tolerance = NULL,
   boundary.tolerance = 1e-09,
   truncto = 0,
   uniroot.control = list(),
@@ -29,6 +29,10 @@ weightedEL(
 Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.}
 
 \item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
+
+\item{taylor.order}{If \code{NA}, then the sum of log-weights is maximised. If an even integer between
+2 and 12, replaces the left branch of the log with its Taylor expansion, allowing for \code{mu}
+to be outside the convex hull of \code{z}.}
 
 \item{SEL}{If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
@@ -73,7 +77,8 @@ A list with the following elements:
     \item{4}{an error occurred while calling \code{uniroot}.}
     \item{5}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
     \item{6}{\code{mu} is on the boundary of the convex hull of \code{z}.}
-    \item{7}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
+    \item{7}{Most observations are equal to \code{mu}.}
+    \item{8}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
   }
 }
 }
@@ -112,7 +117,7 @@ The actual tolerance of the lambda search in \code{uniroot} is
 where \code{tol} can be set in \code{uniroot.control} and
 \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
 
-TODO: write a section of the concondang minus-log expansion
+TODO: write a section of the concondant minus-log expansion
 }
 \examples{
 # Figure 2.4 from Owen (2001) -- with a slightly different data point
