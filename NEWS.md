@@ -48,6 +48,12 @@ These bug fixes and features are scheduled for the upcoming releases.
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
 
+# smothemplik 0.0.13 (2025-02-05)
+
+- Implemented Taylor expansion to allow mu to be outside the convex hull in `weightedEL()`, as in Owen (2013)
+- Replaced `uniroot()` with a C++ version of Brent's zero search for speed
+- Improved handling of influential observations in LSCV
+
 # smoothemplik 0.0.12 (2024-06-13)
 
 - Fixed a bug in `prepareKernel()` where a valid `y` vector with attributes would not pass the check.
