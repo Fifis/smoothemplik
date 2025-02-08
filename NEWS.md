@@ -35,6 +35,7 @@ These bug fixes and features are scheduled for the upcoming releases.
 - FEATURE: Check: if the kernel is finite-support and bandwidth is smaller than the largest gap between two observations, then, set the bandwidth in that dimension to 1.1 times that gap. `kernelSmooth()` and `kernelDensity()` should have an argument for increasing small bandwidths in case of zero weights to match the largest gap divided by 2 (times 1.1 to have at least some coverage)
 - FEATURE: Like in the SEL application: de-duplicate the input matrix, replace with weights; allow the user to disable it
 - FEATURE: Merging cells: allow arbitrary variables (including continuous ones) for proximity.
+- FEATURE: robustify SEL against spanning condition violation based on weighted quantiles, not simply midpoint of x1 and x2
 - MISC: Test the previous output of `weightedEL()` and `cemplik()` with the new version, reproduce Owen's examples, add tests
 - MISC: Check analytical expressions for all combinations of kernels, convolutions, and orders in Sage and Mathematica, publish the reproducing codes
 - MISC: Reproduce the CKT (2019) results with the `shift` argument (i.e. test the shift)

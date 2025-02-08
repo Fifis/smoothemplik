@@ -62,15 +62,17 @@ test_that("very small counts result in bad uniroot output", {
   expect_equal(EL0$exitcode, 3)
   expect_equal(EL1$exitcode, 0)
   expect_equal(length(EL0$wts), length(EL1$wts))
-  expect_equal(sum(EL1$wts == 0), 35) # If the defaults change, this will break
+  expect_equal(sum(EL1$wts == 0), 26) # If the defaults change, this will break
 })
 
 test_that("exit codes of weightedEL", {
   expect_equal(weightedEL(-4:3)$exitcode, 0)
-  expect_equal(weightedEL(1:9)$exitcode, 4)
-  expect_equal(weightedEL(1:9, mu = 9)$exitcode, 6)
-  expect_equal(weightedEL(rep(pi, 10), mu = pi)$exitcode, 8)
-  expect_warning(weightedEL(rep(pi, 10), mu = pi, verbose = TRUE), regexp = "are identical")
+  expect_equal(weightedEL(-1:8, ct = c(1e-8, rep(1, 9)), weight.tolerance = 0)$exitcode, 3)
+  expect_equal(weightedEL(1:5, chull.fail = "none")$exitcode, 5)
+  expect_equal(weightedEL(rep(pi, 10), mu = pi, chull.fail = "none")$exitcode, 8)
+  expect_equal(weightedEL(rep(pi, 10), mu = pi, chull.fail = "taylor")$exitcode, 8)
+  expect_equal(weightedEL(1:9, mu = 9, chull.fail = "taylor")$exitcode, 9)
+  expect_equal(weightedEL(1:9, chull.fail = "taylor")$exitcode, 10)
   # Come up with ideas for 1, 2, 3, 4 exit code!
 })
 
