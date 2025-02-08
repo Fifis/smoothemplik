@@ -18,9 +18,19 @@ test_that("input validation for weightedEL", {
   a <- -4:4
   expect_error(weightedEL(c(a, NA)), "Non-finite observations")
   expect_error(weightedEL(z = a, ct = 1/a), "Non-finite weights")
+  expect_error(weightedEL(z = a, taylor.order = 10), "must be 2, 4")
+  expect_error(weightedEL(z = a, taylor.order = 2, lower = 1, upper = -1), "must be less or equal")
+  expect_error(weightedEL(z = cbind(-4:4, 1:9)), "Only one-dimensional")
   expect_warning(weightedEL(z = 1:10, mu = pi, ct = c(9:1, 1e-12), verbose = TRUE),
                  "Counts closer to 0")
   expect_error(weightedEL(a, ct = abs(a) * 1e-9), "Total weights")
+})
+
+test_that("weighted EL works as expected with good inputs", {
+  a <- seq(-9, -1, 1)
+  expect_true(is.finite(weightedEL(a, chull.fail = "taylor")$logelr))
+  expect_true(!is.finite(weightedEL(a, chull.fail = "none")$logelr))
+  expect_warning(weightedEL(a, chull.fail = "none", verbose = TRUE), "convex hull")
 })
 
 test_that("negative weights are handled correctly", {
@@ -67,13 +77,16 @@ test_that("very small counts result in bad uniroot output", {
 
 test_that("exit codes of weightedEL", {
   expect_equal(weightedEL(-4:3)$exitcode, 0)
+  expect_equal(weightedEL(c(-1e-8, 1:9), chull.fail = "none")$exitcode, 2)
   expect_equal(weightedEL(-1:8, ct = c(1e-8, rep(1, 9)), weight.tolerance = 0)$exitcode, 3)
   expect_equal(weightedEL(1:5, chull.fail = "none")$exitcode, 5)
+  expect_equal(weightedEL(0:3, chull.fail = "none")$exitcode, 7)
   expect_equal(weightedEL(rep(pi, 10), mu = pi, chull.fail = "none")$exitcode, 8)
   expect_equal(weightedEL(rep(pi, 10), mu = pi, chull.fail = "taylor")$exitcode, 8)
-  expect_equal(weightedEL(1:9, mu = 9, chull.fail = "taylor")$exitcode, 9)
-  expect_equal(weightedEL(1:9, chull.fail = "taylor")$exitcode, 10)
-  # Come up with ideas for 1, 2, 3, 4 exit code!
+  expect_equal(weightedEL(0:3, chull.fail = "taylor")$exitcode, 9)
+  expect_equal(weightedEL(c(0.999, 1:9), chull.fail = "taylor")$exitcode, 10)
+  expect_equal(weightedEL(z = -1:8, lower = 0.1, upper = 0.1, taylor.order = 2)$exitcode, 13)
+  # Come up with ideas for 1, &, 4 exit code!
 })
 
 

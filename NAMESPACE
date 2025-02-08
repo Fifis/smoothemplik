@@ -2,6 +2,8 @@
 
 export(DCV)
 export(LSCV)
+export(brentMin)
+export(brentZero)
 export(bw.CV)
 export(bw.rot)
 export(cemplik)

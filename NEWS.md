@@ -2,6 +2,7 @@
 
 These bug fixes and features are scheduled for the upcoming releases.
 
+- BUG: `"downX"` does not work in `f <- function (x) 1 - x; brentZero(f, c(9, 10), extendInt = "downX")`
 - BUG: `bw.CV(x, y = y, kernel = "quartic", order = 4)` and `bw.CV(x, y = y, kernel = "quartic")`
 - BUG: `maximiseSEL()` fails if no weights are provided -- check and auto-generate
 - BUG: Fix the DCV code with convolutions (especially the quartic one)
@@ -17,6 +18,7 @@ These bug fixes and features are scheduled for the upcoming releases.
 - FEATURE: Create a class for smoothing that would yield LOESS smoothing matrices, with ranks or distances
 - FEATURE: For sparseVectorToList, the default `trim(x)` should be such that the sum of sorted weights exceeds 0.99999999: `trim = \(w) min(which(cumsum(sort(w / sum(w), decreasing = TRUE)) > 1 - 1e-8))`
 - FEATURE: Create convolution for kernel orders 4 and 6
+- FEATURE: add convergence check in `brentZero()`, like in `uniroot()`.
 - FEATURE: De-duplicate at kernel weights already (via `.prepareKernel()`), return the attribute
 - FEATURE: For `.prepareKernel()` AND mixed kernel: check if the max. column-wise gap between observations is >= than the bandwidth, otherwise write an informative message
 - FEATURE: Make DCV either sparse or memsave, not both; reflect the changes in `bw.CV()`

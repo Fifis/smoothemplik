@@ -5,24 +5,8 @@
 
 using namespace Rcpp;
 
-/*
- This is an adaptation of Brent's local minimization from John Burkardt's code
- (similar to "local_min" or "R_zeroin2"-style logic), but with the following additions:
- - We track the number of iterations.
- - We stop when the standard Brent criterion is met, or if we exceed a maximum iteration count.
- - We return a list with elements:
- $root       (location of the min)
- $f.root     (function value at that location)
- $iter          (total iteration count used)
- $estim.prec    (our estimate of the final bracket size)
- There are no preliminary iterations.
- 
- The code stores the approximate final bracket width in $estim.prec, like in "uniroot".
- If the minimiser is pinned to an end point, we set $estim.prec = NA.
- */
-
 // [[Rcpp::export]]
-Rcpp::List brentMin(
+Rcpp::List brentMinCPP(
     Function f,
     NumericVector interval = NumericVector(),
     double lower = NA_REAL,
@@ -412,21 +396,20 @@ void doExtendInterval(
   }
 }
 
-/*
- This is an adaptation of Brent's root search from John Burkardt's code
-   1. Take an R function f + a bracket [a, upper].
-   2. Assume that f(lower) and f(upper) have opposite signs (so there's a root).
-   3. Return a list analogous to uniroot's output in base R:
-      $root        the final solution
-      $f.root      the function value at that solution
-      $iter        the number of iterations used
-      $estim.prec  the approximate final bracket width
-                   (NA if the solution is at an endpoint)
-*/
+
+// This is an adaptation of Brent's root search from John Burkardt's code
+//   1. Take an R function f + a bracket [a, upper].
+//   2. Assume that f(lower) and f(upper) have opposite signs (so there's a root).
+//   3. Return a list analogous to uniroot's output in base R:
+//      $root        the final solution
+//      $f.root      the function value at that solution
+//      $iter        the number of iterations used
+//      $init.it     the number of initial iterations to fund the function sign change
+//      $estim.prec  the approximate final bracket width
+//                   (NA if the solution is at an endpoint)
 
 // [[Rcpp::export]]
-
-List brentZero(
+List brentZeroCPP(
   Function f,
   NumericVector interval = NumericVector(),
   double lower = NA_REAL,
@@ -434,7 +417,6 @@ List brentZero(
   Nullable<NumericVector> f_lower = R_NilValue,
   Nullable<NumericVector> f_upper = R_NilValue,
   std::string extendInt = "no",
-  bool check_conv = false,
   double tol = 1e-8,
   int maxiter = 500,
   int trace = 0
@@ -444,10 +426,10 @@ List brentZero(
     lower = std::min(interval[0], interval[1]);
     upper = std::max(interval[0], interval[1]);
   } else if (interval.size() != 0 && interval.size() != 2) {
-    stop("'interval' must be a vector of length 2 if given, else empty.");
+    stop("brentZero: 'interval' must be a vector of length 2 if given, else empty.");
   }
   if (!R_finite(lower) || !R_finite(upper) || lower >= upper) {
-    stop("lower < upper is not fulfilled");
+    stop("brentZero: 'lower' must be strictly less than 'upper'.");
   }
 
   // Evaluate f at lower, upper if not supplied

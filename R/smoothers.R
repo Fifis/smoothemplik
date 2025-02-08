@@ -360,6 +360,12 @@ pit <- function(x, xout = NULL) {
 #' image(g, x, w)
 #' all.equal(w[, 1, drop = FALSE],  # Internal calculation for one column
 #'           smoothemplik:::kernelFunCPP((g - x[1])/2, "triangular", 2, FALSE))
+#'
+#' # Bare-bones interface to the C++ functions
+#' x <- seq(-3, 3, 0.01)
+#' kmat <- sapply(c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"),
+#'                function(k) smoothemplik:::kernelFunCPP(x, k, 4, TRUE))
+#' matplot(x, kmat, type = "l", lty = 1)
 kernelWeights <- function(x,
                           xout = NULL,
                           bw = NULL,

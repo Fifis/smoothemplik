@@ -11,9 +11,9 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
-// brentMin
-Rcpp::List brentMin(Function f, NumericVector interval, double lower, double upper, double tol, int maxiter, int trace);
-RcppExport SEXP _smoothemplik_brentMin(SEXP fSEXP, SEXP intervalSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP tolSEXP, SEXP maxiterSEXP, SEXP traceSEXP) {
+// brentMinCPP
+Rcpp::List brentMinCPP(Function f, NumericVector interval, double lower, double upper, double tol, int maxiter, int trace);
+RcppExport SEXP _smoothemplik_brentMinCPP(SEXP fSEXP, SEXP intervalSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP tolSEXP, SEXP maxiterSEXP, SEXP traceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -24,13 +24,13 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
     Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
-    rcpp_result_gen = Rcpp::wrap(brentMin(f, interval, lower, upper, tol, maxiter, trace));
+    rcpp_result_gen = Rcpp::wrap(brentMinCPP(f, interval, lower, upper, tol, maxiter, trace));
     return rcpp_result_gen;
 END_RCPP
 }
-// brentZero
-List brentZero(Function f, NumericVector interval, double lower, double upper, Nullable<NumericVector> f_lower, Nullable<NumericVector> f_upper, std::string extendInt, bool check_conv, double tol, int maxiter, int trace);
-RcppExport SEXP _smoothemplik_brentZero(SEXP fSEXP, SEXP intervalSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP f_lowerSEXP, SEXP f_upperSEXP, SEXP extendIntSEXP, SEXP check_convSEXP, SEXP tolSEXP, SEXP maxiterSEXP, SEXP traceSEXP) {
+// brentZeroCPP
+List brentZeroCPP(Function f, NumericVector interval, double lower, double upper, Nullable<NumericVector> f_lower, Nullable<NumericVector> f_upper, std::string extendInt, double tol, int maxiter, int trace);
+RcppExport SEXP _smoothemplik_brentZeroCPP(SEXP fSEXP, SEXP intervalSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP f_lowerSEXP, SEXP f_upperSEXP, SEXP extendIntSEXP, SEXP tolSEXP, SEXP maxiterSEXP, SEXP traceSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -41,11 +41,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< Nullable<NumericVector> >::type f_lower(f_lowerSEXP);
     Rcpp::traits::input_parameter< Nullable<NumericVector> >::type f_upper(f_upperSEXP);
     Rcpp::traits::input_parameter< std::string >::type extendInt(extendIntSEXP);
-    Rcpp::traits::input_parameter< bool >::type check_conv(check_convSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
     Rcpp::traits::input_parameter< int >::type maxiter(maxiterSEXP);
     Rcpp::traits::input_parameter< int >::type trace(traceSEXP);
-    rcpp_result_gen = Rcpp::wrap(brentZero(f, interval, lower, upper, f_lower, f_upper, extendInt, check_conv, tol, maxiter, trace));
+    rcpp_result_gen = Rcpp::wrap(brentZeroCPP(f, interval, lower, upper, f_lower, f_upper, extendInt, tol, maxiter, trace));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -169,8 +168,8 @@ END_RCPP
 RcppExport SEXP run_testthat_tests(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_smoothemplik_brentMin", (DL_FUNC) &_smoothemplik_brentMin, 7},
-    {"_smoothemplik_brentZero", (DL_FUNC) &_smoothemplik_brentZero, 11},
+    {"_smoothemplik_brentMinCPP", (DL_FUNC) &_smoothemplik_brentMinCPP, 7},
+    {"_smoothemplik_brentZeroCPP", (DL_FUNC) &_smoothemplik_brentZeroCPP, 10},
     {"_smoothemplik_kernelFunCPP", (DL_FUNC) &_smoothemplik_kernelFunCPP, 4},
     {"_smoothemplik_kernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_kernelWeightsOneCPP, 6},
     {"_smoothemplik_sparseKernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_sparseKernelWeightsOneCPP, 6},
