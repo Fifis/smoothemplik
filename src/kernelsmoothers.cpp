@@ -51,7 +51,7 @@ arma::vec kuniform4conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {
     if (val <= 0.333333333333333333)
-      val = 1.9825*val + 1.31;
+      val = -1.9825*val + 1.31;
     else if (val <= 1.33333333333333333)
       val = -0.9025*val + 0.95;
     else if (val < 1.66666666666666667)
@@ -133,7 +133,7 @@ arma::vec ktriangular2conv(const arma::vec& x) {
 }
 
 // Triangular 4th-order, piecewise linear
-// y = a-b|x|) if |x|<(a+b)/2b and -b+b*|x| otherwise (intersection at (a-b)/2a)
+// y = a-b|x| if |x|<(a+b)/2b and -b+b*|x| otherwise (intersection at (a-b)/2a)
 //  b=sqrt(2)+1
 arma::vec ktriangular4(const arma::vec& x) {
   const double b = 2.41421356237309492343; // sqrt(2)+1
@@ -154,7 +154,7 @@ arma::vec ktriangular4(const arma::vec& x) {
 
 // Triangular kernel convolution (4th order)
 // t4 = piecewise([[(-1, 0), (1+x)*(12/7 - 30/7*x^2)], [(0, 1), (1-x)*(12/7 - 30/7*x^2)]])
-// t4c = t4.convolution(t4); t4
+// t4c = t4.convolution(t4); t4c
 arma::vec ktriangular4conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
   ax.for_each([](arma::vec::elem_type& val) {

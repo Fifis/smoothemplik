@@ -10,7 +10,7 @@ getParabola3 <- function(x, y) {
   a <- (x[1] * (y[3] - y[2]) + x[2] * (y[1] - y[3]) + x[3] * (y[2] - y[1])) / xprod
   b <- (x[1]^2 * (y[2] - y[3]) + x[2]^2 * (y[3] - y[1]) + x[3]^2 * (y[1] - y[2])) / xprod
   c <- (x[2] * (x[1]^2 * y[3] - x[3]^2 * y[1]) + x[2]^2 * (x[3] * y[1] - x[1] * y[3]) + x[1] * x[3] * y[2] * (x[3] - x[1]))/ xprod
-  c(a, b, c)
+  c(a = a, b = b, c = c)
 }
 
 # Get the coefficients of a parabola with f(x), f'(x), f''
@@ -795,7 +795,7 @@ maximiseSEL <- function(start.values = NULL,
 #' sparseVectorToList(m[, 3])
 #' sparseMatrixToList(m)
 sparseVectorToList <- function(x, trim = NULL, renormalise = FALSE) {
-  if (is.null(trim)) trim <- function(x) 0.01 / length(x)
+  if (is.null(trim)) trim <- function(x) rep(2*.Machine$double.eps, length(x))
   idx <- which(x >= trim(x))
   x <- x[idx]
   if (renormalise) x <- x / sum(x)
