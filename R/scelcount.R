@@ -233,6 +233,10 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
   return(ans)
 }
 
+# Derivatives of the logarithm
+dlog <- function(x, d = 0)
+  if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
+
 #' Modified minus logarithm with derivatives
 #'
 #' @param x Numeric vector for which approximated logarithm is to be computed.
@@ -247,7 +251,7 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...) {
 #' computes the modified negative logarithm and its first derivatives.
 #' For eps <= x <= M, returns just the logarithm. For x < eps and x > M, returns the Taylor approximation of the given \code{order}.
 #' 4th order is the lowest that gives self concordance.
-
+#'
 #' @return A numeric matrix with \code{(order+1)} columns containing the values of the modified log and its derivatives.
 #' @export
 #'
@@ -280,9 +284,6 @@ logTaylor <- function(x, eps = NULL, M = NULL, der = 0, order = 4, drop = TRUE) 
     md <- rep(TRUE, length(x))
   }
 
-  # Derivatives of the logarithm
-  dlog <- function(x, d = 0)
-    if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
   out <- vapply(0:der, function(d) {
     f <- numeric(length(x))
     f[md] <- dlog(x[md], d = d)
@@ -361,25 +362,7 @@ svdlm <- function(X, y, rel.tol = 1e-9, abs.tol = 1e-100) {
 #'   points(a, f(a, d = d), pch = 16, cex = 1.5, col = "white")
 #' }
 #' legend("topright", as.character(0:8), title = "Order", col = cl, lwd = 1)
-tlog <- function(x, a = 1, k = 4, d = 0) {
-  l <- length(x)
-  if (length(a) == 1) a <- rep(a, l)
-  if ((length(a) != length(x)) || !is.numeric(a))
-    stop("The centre of approximation 'a' must be a scalar of length 1 or length(x).")
-  if (!(is.numeric(k) && length(k) == 1 && k == round(k) && k >= 0))
-    stop("The polynomial order 'k' must be a non-negative integer scalar.")
-  if (!(is.numeric(d) && length(d) == 1 && d == round(d) && d >= 0))
-    stop("The derivative order 'd' must be a non-negative integer scalar.")
-  if (d > k) return(numeric(l)) # Polynomial derivatives of order > k are zero
-  xc <- (x-a) / a
-  taylor <- vapply(d:k, function(n) { # Terms of the Taylor expansion
-    if (n == d) { # Lowest order: constant
-      if (d == 0) return(log(a)) # Original function = the only special term
-      return(-1 / (-a)^d * gamma(n))
-    }
-    mult <- if (d == 0) 1 else prod(n:(n-d+1)) # Multiplier from the polynomial power
-    return((-1)^(n-1) * mult * xc^(n-d) / n / a^d)
-  }, FUN.VALUE = numeric(l))
-  if (l == 1) taylor <- matrix(taylor, nrow = 1) # If sapply is not a matrix
-  rowSums(taylor)
-}
+tlog <- function(x, a = as.numeric(c(1.0)), k = 4L, d = 0L)
+  .Call(`_smoothemplik_tlogCPP`, x, a, k, d)
+# Taken from RcppExports
+

@@ -40,3 +40,7 @@ kernelSmoothCPP <- function(x, y, xout, weights, bw, kernel = "gaussian", order 
     .Call(`_smoothemplik_kernelSmoothCPP`, x, y, xout, weights, bw, kernel, order, LOO, convolution, chunks)
 }
 
+tlogCPP <- function(x, a = as.numeric( c(1.0)), k = 4L, d = 0L) {
+    .Call(`_smoothemplik_tlogCPP`, x, a, k, d)
+}
+

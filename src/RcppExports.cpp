@@ -164,6 +164,20 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// tlogCPP
+NumericVector tlogCPP(NumericVector x, NumericVector a, int k, int d);
+RcppExport SEXP _smoothemplik_tlogCPP(SEXP xSEXP, SEXP aSEXP, SEXP kSEXP, SEXP dSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type a(aSEXP);
+    Rcpp::traits::input_parameter< int >::type k(kSEXP);
+    Rcpp::traits::input_parameter< int >::type d(dSEXP);
+    rcpp_result_gen = Rcpp::wrap(tlogCPP(x, a, k, d));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 RcppExport SEXP run_testthat_tests(SEXP);
 
@@ -177,7 +191,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_smoothemplik_sparseKernelWeightsCPP", (DL_FUNC) &_smoothemplik_sparseKernelWeightsCPP, 6},
     {"_smoothemplik_kernelDensityCPP", (DL_FUNC) &_smoothemplik_kernelDensityCPP, 8},
     {"_smoothemplik_kernelSmoothCPP", (DL_FUNC) &_smoothemplik_kernelSmoothCPP, 10},
-    {"run_testthat_tests", (DL_FUNC) &run_testthat_tests, 1},
+    {"_smoothemplik_tlogCPP", (DL_FUNC) &_smoothemplik_tlogCPP, 4},
+    {"run_testthat_tests",    (DL_FUNC) &run_testthat_tests,    1},
     {NULL, NULL, 0}
 };
 
