@@ -9,8 +9,9 @@ smoothEmplik(
   theta,
   data,
   sel.weights = NULL,
-  trim = NULL,
+  chull.fail = c("taylor", "wald", "none"),
   weight.tolerance = NULL,
+  trim = NULL,
   minus = FALSE,
   parallel = FALSE,
   cores = 1,
@@ -37,9 +38,16 @@ the kernel weights based on the \code{data} argument passed to \code{...}.
 If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must
 be a function that computes the kernel weights for the data set.}
 
-\item{trim}{A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.}
+\item{chull.fail}{A character: what to do if the convex hull of \code{z} does not contain \code{mu}
+(spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
+of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
+\code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
+with the Wald statistic (testing if the weighted mean of \code{z} is zero).}
 
-\item{weight.tolerance}{Passed to \code{weightedEL} (uses the same default value).}
+\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
+(similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+
+\item{trim}{A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.}
 
 \item{minus}{If TRUE, returns SEL times -1 (for optimisation via minimisation).}
 
@@ -88,14 +96,14 @@ Evaluates SEL function for a given moment function at a certain parameter value.
 set.seed(1)
 x <- sort(rlnorm(100))
 # Heteroskedastic DGP
-y <- 1 + 1*x + rnorm(100) * (1 + x + sin(x))
+y <- abs(1 + 1*x + rnorm(100) * (1 + x + sin(x)))
 mod.OLS <- lm(y ~ x)
 rho <- function(theta, ...) y - theta[1] - theta[2]*x  # Moment fn
-w <- kernelWeights(x, PIT = TRUE) # To ensure enough neighbours
+w <- kernelWeights(x, PIT = TRUE, bw = 0.25, kernel = "epanechnikov")
 w <- w / rowSums(w)
 image(x, x, w, log = "xy")
 theta.vals <- list(c(1, 1), coef(mod.OLS))
-SEL <- function(b) smoothEmplik(rho = rho, theta = b, sel.weights = w)
+SEL <- function(b, ...) smoothEmplik(rho = rho, theta = b, sel.weights = w)
 sapply(theta.vals, SEL) # Smoothed empirical likelihood
 # SEL maximisation
 b.SEL <- optim(coef(mod.OLS), SEL, method = "BFGS",
@@ -105,4 +113,39 @@ plot(x, y)
 abline(1, 1, lty = 2)
 abline(mod.OLS, col = 2)
 abline(b.SEL$par, col = 4)
+
+# Now we start from (0, 0), for which the Taylor expansion is necessary
+# because all residuals at this starting value are positive and the
+# unmodified EL ratio for the test of equality to 0 is -Inf
+smoothEmplik(rho=rho, theta=c(0, 0), sel.weights=w, chull.fail="none")
+smoothEmplik(rho=rho, theta=c(0, 0), sel.weights=w)
+# The next example is very slow; approx. 5 s
+\dontrun{
+# Experiment: a small bandwidth so that the spanning condition should fail
+w <- kernelWeights(x, PIT = TRUE, bw = 0.10, kernel = "epanechnikov")
+w <- w / rowSums(w)
+b.SELt <- optim(c(0, 0), SEL, chull.fail = "taylor",  # This is more reliable
+                method = "BFGS", control = list(fnscale = -1))
+b.SELw <- optim(c(0, 0), SEL, chull.fail = "wald",  # This is more reliable
+                method = "BFGS", control = list(fnscale = -1))
+b0grid <- seq(-0.75, 4.5, length.out = 51)
+b1grid <- seq(-0.75, 2.5, length.out = 51)
+bgrid <- as.matrix(expand.grid(b0grid, b1grid))
+selgrid <- unlist(parallel::mclapply(1:nrow(bgrid), function(i)
+  smoothEmplik(rho, bgrid[i, ], sel.weights = w, chull.fail = "taylor"),
+    mc.cores = parallel::detectCores()/2-1))
+selgrid <- matrix(selgrid, nrow = length(b0grid))
+probs <- c(0.25, 0.5, 0.75, 0.8, 0.9, 0.95, 0.99, 1-10^seq(-4, -16, -2))
+levs <- qchisq(probs, df = 2)
+# levs <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000)
+labs <- round(levs, 1)
+cols <- rainbow(length(levs), end = 0.7, v = 0.7)
+par(mar = c(4, 4, 2, 0) + .1)
+contour(b0grid, b1grid, -2*(selgrid - max(selgrid, na.rm = TRUE)), levels = levs,
+        labels = labs, col = cols, lwd = 1.5, bty = "n",
+        main = "'Safe' likelihood contours", asp = 1)
+image(b0grid, b1grid, log1p(-2*(selgrid - max(selgrid, na.rm = TRUE))))
+# The narrow lines are caused by the fact that if two observations are close together
+# at the edge, the curvature at that point is extreme
+}
 }

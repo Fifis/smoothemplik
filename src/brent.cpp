@@ -1,5 +1,4 @@
-
-  #include <Rcpp.h>
+#include <Rcpp.h>
 #include <cmath>
 #include <cfloat>  // for DBL_EPSILON
 #include <string>

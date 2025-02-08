@@ -1,3 +1,32 @@
+# Get the coefficients of a parabola passing through (x, y)
+# getParabola(c(-1, 0, 1), c(2, 0, 2))
+# x0 <- c(-1, 0, 2); y0 <- c(0, 1, 1)
+# abc <- getParabola(x0, y0)
+# f <- function(x) abc[1]*x^2 + abc[2]*x + abc[3]
+# curve(f, -1.5, 2.5); points(x0, y0)
+getParabola3 <- function(x, y) {
+  if (length(x) != 3 || length(y) != 3) stop("Exactly 3 points are required to fit a parabola.")
+  xprod <- (x[1] - x[2])*(x[1] - x[3])*(x[2] - x[3])
+  a <- (x[1] * (y[3] - y[2]) + x[2] * (y[1] - y[3]) + x[3] * (y[2] - y[1])) / xprod
+  b <- (x[1]^2 * (y[2] - y[3]) + x[2]^2 * (y[3] - y[1]) + x[3]^2 * (y[1] - y[2])) / xprod
+  c <- (x[2] * (x[1]^2 * y[3] - x[3]^2 * y[1]) + x[2]^2 * (x[3] * y[1] - x[1] * y[3]) + x[1] * x[3] * y[2] * (x[3] - x[1]))/ xprod
+  c(a, b, c)
+}
+
+# Get the coefficients of a parabola with f(x), f'(x), f''
+# f(x) = 2x^2 + 3x - 5
+# f' = 4x + 3
+# f'' = 4
+# If x = -1, (f, f', f'') = (-6, -1, 4)
+# getParabola(-1, -6, -1, 4)
+getParabola <- function(x, f, fp, fpp) {
+  a <- fpp/2
+  b <- fp - fpp * x
+  c <- f + 0.5 * x * (fpp * x - 2*fp)
+  return(c(a = a, b = b, c = c))
+}
+
+
 #' Empirical likelihood for one-dimensional vectors
 #'
 #' Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
@@ -8,15 +37,28 @@
 #' @param ct Numeric count variable with positive values that indicates the multiplicity of observations.
 #'   Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.
 #' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
-#' @param taylor.order If \code{NA}, then the sum of log-weights is maximised. If an even integer between
-#'   2 and 12, replaces the left branch of the log with its Taylor expansion, allowing for \code{mu}
+#' @param taylor.order If \code{NA}, then the sum of log-weights is maximised. If 2, 4, 6, or 8,
+#'   replaces the left branch of the log with its Taylor expansion, allowing for \code{mu}
 #'   to be outside the convex hull of \code{z}.
+#' @param lower A positive scalar or numeric vector denoting the left cut-off before which log(weight)
+#'   in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order} is 2, 4, 6, or 8.
+#'   If \code{NULL} or \code{-Inf}, no such replacement is done. Recommended at a small number ct/sum(ct)
+#'   to ensure self-concordance of the log-likelihoogetParabola(-1, -6, -1, 4)d.
+#' @param upper A positive scalar or numeric vector greater or equal to \code{lower} denoting the right cut-off
+#'   after which log(weight) in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order}
+#'   is 2, 4, 6, or 8. If \code{NULL} or \code{Inf}, no such replacement is done. Recommended at 1
+#'   if \code{mu} is not in the convex hull of \code{z} to ensure that a finite solution exists.
 #' @param mu Hypothesized mean of \code{z} in the moment condition.
 #' @param SEL If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 #' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
 #' @param n.orig An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
 #'   (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
+#' @param chull.fail A character: what to do if the convex hull of \code{z} does not contain \code{mu}
+#'   (spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
+#'   of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
+#'   \code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
+#'   with the Wald statistic (testing if the weighted mean of \code{z} is zero).
 #' @param boundary.tolerance Relative tolerance for determining when the lambda is not an interior
 #'   solution because it is too close to the boundary. Corresponds to a fraction of the
 #'   interval range length.
@@ -71,17 +113,7 @@
 #'   \item{estim.prec}{The approximate estimated precision of lambda (from \code{uniroot}).}
 #'   \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
 #'   \item{exitcode}{An integer indicating the reason of termination.}
-#'   \describe{
-#'     \item{0}{success, an interior solution for lambda found.}
-#'     \item{1}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
-#'     \item{2}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-#'     \item{3}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
-#'     \item{4}{an error occurred while calling \code{uniroot}.}
-#'     \item{5}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
-#'     \item{6}{\code{mu} is on the boundary of the convex hull of \code{z}.}
-#'     \item{7}{Most observations are equal to \code{mu}.}
-#'     \item{8}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
-#'   }
+#'   \item{message}{Character string describing the optimisation termination status.}
 #' }
 #'
 #' @references
@@ -102,6 +134,10 @@
 #'      main = "Discrepancy between cemplik and weightedEL", ylab = "")
 #' abline(h = 0, lty = 2)
 #'
+#' # Handling the convex hull violation differently
+#' weightedEL(1:9)
+#' weightedEL(1:9, chull.fail = "wald")
+#'
 #' # Warning: depending on the compiler, the discrepancy between cemplik and weightedEL
 #' # can be one million (1) times larger than the machine epsilon despite both of them
 #' # being written in pure R
@@ -117,19 +153,17 @@
 #' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
 #' @export
 
-weightedEL <- function(z, mu = 0,
-                       ct = NULL,
-                       shift = NULL,
-                       taylor.order = NA,
+weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
+                       taylor.order = NA, lower = NULL, upper = NULL,
                        SEL = FALSE,
                        n.orig = NULL,
-                       weight.tolerance = NULL,
-                       boundary.tolerance = 1e-9,
-                       truncto = 0,
+                       weight.tolerance = NULL, boundary.tolerance = 1e-9,
+                       truncto = 0, chull.fail = c("taylor", "wald", "none"),
                        uniroot.control = list(),
                        return.weights = FALSE,
                        verbose = FALSE
 ) {
+  me <- .Machine$double.eps
   if (is.data.frame(z)) z <- as.matrix(z, rownames.force = TRUE)
   if (any(!is.finite(z))) stop("Non-finite observations (NA, NaN, Inf) are not welcome.")
   if (is.null(ct)) ct <- rep(1, length(z))
@@ -138,8 +172,10 @@ weightedEL <- function(z, mu = 0,
   if (sum(ct) <= 0) stop("The total sum of EL weights must be positive.")
   if (is.null(n.orig)) n.orig <- length(z)
   if (is.null(shift)) shift <- rep(0, length(z))
-  if (!is.na(taylor.order) && !(taylor.order %in% (1:6)*2)) stop("'taylor.order' must be 2, 4, ..., 12.")
-  if (is.null(weight.tolerance)) weight.tolerance <- if (!SEL) 1 / sqrt(length(z)) / 1024 else max(ct) * sqrt(.Machine$double.eps)
+  if (is.finite(taylor.order) && (!(taylor.order %in% (1:4)*2)))
+    stop("'taylor.order' must be 2, 4, 6, or 8.")
+  if (is.null(weight.tolerance)) weight.tolerance <- if (!SEL) me^(1/3) else max(ct) * sqrt(.Machine$double.eps)
+  chull.fail <- match.arg(chull.fail)
 
   # If originally the weights were too small, too many points would be truncated
   # Warn if any non-zero weights are smaller than weight.tolerance
@@ -153,10 +189,10 @@ weightedEL <- function(z, mu = 0,
     ct[closeto0 & ct < 0] <- -truncto
   }
 
-  # Preserving the names before trimming
   if (is.matrix(z)) {
     if (ncol(z) > 1) stop("Only one-dimensional vectors or matrices are supported.") else z <- drop(z)
   }
+
   if (return.weights) {
     wts <- numeric(n.orig)
     names(wts) <- names(z)
@@ -167,10 +203,14 @@ weightedEL <- function(z, mu = 0,
   # Not all observations contribute meaningfully to the likelihood; tiny weights
   # push lambda to the boundary
   nonz <- which(ct != 0)
-  if (length(nonz) < length(z)) {
+  n.init <- length(z)
+  n.final <- length(nonz)
+  if (n.final < length(z)) {
     z <- z[nonz]
     ct <- ct[nonz]
     shift <- shift[nonz]
+    if (length(lower) == n.init) lower <- lower[nonz]
+    if (length(upper) == n.init) upper <- upper[nonz]
   }
   if (SEL) ct <- ct / sum(ct) # We might have truncated some weights, so re-normalisation is needed!
   # The denominator for EL with counts is the sum of total counts, and for SEL, it is the number of observations!
@@ -179,7 +219,6 @@ weightedEL <- function(z, mu = 0,
 
   z <- z - mu
 
-  me <- .Machine$double.eps
   z1 <- min(z)
   zn <- max(z)
 
@@ -194,94 +233,204 @@ weightedEL <- function(z, mu = 0,
   f.root <- NA
   exitcode <- 5
 
+  if (is.null(lower)) lower <- rep(-Inf, n.final)
+  if (is.null(upper)) upper <- rep(Inf, n.final)
+  if (any(lower > upper)) stop("'lower' must be less or equal to 'upper', e.g. lower = 0.01, upper = Inf.")
+
+  # Weighted mean and variance for convenience
+  wm <- stats::weighted.mean(z, ct)
+  wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)
+
   # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z),
-  # or the Taylor expansion must be used to avoid this check an simply return a strongly negative likelihood
-  if (sign(z1*zn) == 1) {
-    if (!is.finite(taylor.order)) {
-      if (verbose > 0) warning("The hypothesised mean is outside the convex hull -- using the 4th-order Taylor appxomation.")
-      taylor.order <- 4
-    } # Else it should fail with an appropriate error code
-  }
-  if ((z1 < 0 && zn > 0) | !is.na(taylor.order)) {
+  # or some form of Taylor expansion must be used to avoid this check an simply return a strongly negative
+  # value (e.g. Euclidean LL, quartic LL etc.) without w_i > 0 or a Wald statistic instead of LR
+  spanning <- z1 < 0 && zn > 0
+  if (length(z) < 2) { # Codes > 5
+    exitcode <- 6
+  } else if (z1 == zn) { # The sample is degenerate without variance, no extrapolation possible
+    exitcode <- 8
+  } else if (!spanning) {  ######### TODO: test with 2 observations
+    if ((z1 == 0 || zn == 0) && chull.fail == "none") {
+      # mu is on the boundary
+      logelr <- -Inf
+      lam <- iter <- estim.prec <- f.root <- 0
+      converged <- TRUE
+      int <- c(0, 0)
+      exitcode <- 7
+    } else if (chull.fail == "taylor") {
+      l <- length(z)
+      zo <- order(z)
+      zsort <- z[zo]
+      z12 <- zsort[1:2]
+      znn <- zsort[l-1:0]
+      iqr <- stats::IQR(z)
+
+      # With f(x + (0, 1, 2, 3)h), one can estimate the following derivatives
+      # 2nd: weights 2 -5 4 -1, error O(h^2)
+      # 1st: weights -11/6 3 -1.5 1/3, error O(h^3)
+      # With f(x + (-1, 0, 1)h), it is the standard 1 -2 1 for f'' and -0.5 0.5 for f'
+      # Step size for noisy functions: for 3 wrong digits, multiply the optimum by 10
+      if (z1 >= 0) {  # All non-negative values, sample average > 0
+        # Larger step size for numerically more stable parabola estimates
+        # If the space between 2 points is too small, compute 1-sided derivatives
+        mu.limit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
+        if (diff(z12)*0.01 < iqr*0.001) {  # Points very close to one another
+          zgrid <- mu.limit + iqr*0.001*(0:3)
+          w.fp <- c(-11/6, 3, -1.5, 1/3)  # These numbers are obtained from the pnd package
+          w.fpp <- c(2, -5, 4, -1)  # pnd::fdCoef(deriv.order = 2, stencil = 0:3)
+        } else {
+          zgrid <- mu.limit + diff(z12)*0.01*c(-1, 0, 1)
+          w.fp <- c(-0.5, 0, 0.5)
+          w.fpp <- c(1, -2, 1)
+        }
+      } else if (zn <= 0) {
+        mu.limit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
+        if (diff(znn)*0.01 < iqr*0.001) {
+          zgrid <- mu.limit + iqr*0.001*(-3:0)
+          w.fp <- c(-1/3, 1.5, -3, 11/6)
+          w.fpp <- c(-1, 4, -5, 2)
+        } else {
+          zgrid <- mu.limit + diff(z12)*0.01*c(-1, 0, 1)
+          w.fp <- c(-0.5, 0, 0.5)
+          w.fpp <- c(1, -2, 1)
+        }
+      }
+
+      llgrid <- sapply(zgrid, function(m) weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
+      ss <- zgrid[2] - zgrid[1]
+      fp <- sum(llgrid * w.fp) / ss
+      fpp <- sum(llgrid * w.fpp) / ss^2
+      # Check with
+      # pnd::Grad(function(m) weightedEL(z = z, mu = m, ct = ct)$logelr, zgrid[1],
+      #   elementwise = FALSE, vectorised = FALSE, multivalued = FALSE, h = 1e-5)
+      if (z1 >= 0) {
+        f <- if (length(zgrid) == 4) llgrid[1] else llgrid[2]
+      } else if (zn <= 0) {
+        f <- if (length(zgrid) == 4) llgrid[4] else llgrid[2]
+      }
+      abc <- getParabola(x = mu.limit, f, fp, fpp)
+      parab  <- function(x) abc[1]*x^2  + abc[2]*x  + abc[3]
+      logelr <- parab(0)
+      # For z = 1:9
+      # xgrid <- seq((z[1]+z[2])/2, (znn[1]+znn[2])/2, length.out = 51)
+      # ygrid <- sapply(xgrid, function(m) weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
+      # plot(xgrid, ygrid, xlim = range(z, 0) + c(-0.25, 0.25), ylim = c(min(ygrid)*1.5, 0), bty = "n")
+      # points(zgrid, llgrid, col = 2, pch = 16)
+      # xgrid2 <- seq(-0.1, 1.5, length.out = 31)
+      # ygrid2 <- parab(xgrid2)
+      # lines(xgrid2, ygrid2, col = 2)
+      if (z1 == 0 || zn == 0) {
+        converged <- TRUE
+        exitcode <- 9
+      } else {
+      exitcode <- 10
+      }
+    } else if (chull.fail == "wald") {  # Expansion of EL at 0
+      logelr <- -0.5 * wm^2 / wv
+      if (z1 == 0 || zn == 0) {
+        converged <- TRUE
+        exitcode <- 11
+      } else {
+        exitcode <- 12
+      }
+    }
+    # Else: do nothing, classical ELR failure
+  } else {  # The main 'good' loop: EL may proceed because the spanning condition holds
+    # Any requests for self-concordance or other Taylor forms?
+    do.taylor <- (!is.na(taylor.order)) && (any(is.finite(upper)) || any(is.finite(lower)))
+
     negz <- z < 0
     comp <- (ct / N - 1 - shift) / z
-    minlambda <- suppressWarnings(max(comp[!negz]))
-    maxlambda <- suppressWarnings(min(comp[negz]))
-    if (!is.finite(minlambda)) minlambda <- -2*maxlambda
-    if (!is.finite(maxlambda)) maxlambda <- -2*minlambda
-    int <- c(minlambda, maxlambda)
+    min.lam <- suppressWarnings(max(comp[!negz]))
+    max.lam <- suppressWarnings(min(comp[negz]))
+    if (!is.finite(min.lam)) min.lam <- -max.lam
+    if (!is.finite(max.lam)) max.lam <- -min.lam
+    int <- c(min.lam, max.lam)
     int <- int + abs(int) * c(2, -2) * me # To avoid bad rounding
     con <- list(tol = me, maxiter = 100, trace = 0) # Wishing the strictest convergence
     con[names(uniroot.control)] <- uniroot.control
 
-    eps <- ct / N  # Taylor expansion beyond this point
-    # logELr <- function(lambda) sum(ct * logTaylor(1 + z * lambda + shift, eps = eps, der = 0, order = taylor.order, drop = TRUE))
-    dllik <- function(lambda) sum(ct * z * logTaylor(1 + z * lambda + shift, eps = eps, der = 1, order = taylor.order)[, "deriv1"])
+    # Taylor expansion beyond these point to the left and to the right
+    # If Taylor expansion is requested by everything is infinite, request left-tail expansion
+    if (is.finite(taylor.order) && all(!is.finite(lower))) lower <- ct / N
+    if (length(lower) == 1) lower <-  rep(lower, n.final)
+    if (length(upper) == 1) upper <- rep(upper, n.final)
+    if (length(lower) != n.final || length(upper) != n.final)
+      stop("'lower' and 'upper' must have length 1 or length(z).")
+    # logELr <- function(lambda) sum(ct * logTaylor(1 + z * lambda + shift, eps = lower, M = upper, der = 0, order = taylor.order, drop = TRUE))
+    dllik <- function(lambda) sum(ct * z * logTaylor(1 + z * lambda + shift, eps = lower, M = upper, der = 1, order = taylor.order)[, "deriv1"])
     # xs <- seq(int[1], int[2], length.out = 51)
     # ys <- sapply(xs, logELr)
     # ys1 <- sapply(xs, dllik)
     # plot(xs, ys)
     # plot(xs, ys1)
-    try.extend <- (sign(z1*zn) == 1 || !is.na(taylor.order))
-    lambda <- tryCatch(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (try.extend) "yes" else "no",
+
+    lam.list <- tryCatch(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (do.taylor) "yes" else "no",
                                  maxiter = con$maxiter, trace = con$trace),
-                       warning = function(w) return(list(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (try.extend) "yes" else "no",
+                       warning = function(w) return(list(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (do.taylor) "yes" else "no",
                                                                    maxiter = con$maxiter, trace = con$trace), w)),
                        error = function(e) return(NULL)) # If there is a warning, we still return the object
-    if (!is.null(lambda)) { # Some result with or without a warning as the second element of the list
-      if ("warning" %in% class(lambda[[2]])) {
-        if (verbose) print(lambda[[2]]) # The user should know that went wrong in uniroot()
-        lambda <- lambda[[1]]
+    if (!is.null(lam.list)) { # Some result with or without a warning as the second element of the list
+      if ("warning" %in% class(lam.list[[2]])) {
+        if (verbose) print(lam.list[[2]]) # The user should know that went wrong in uniroot()
+        lam.list <- lam.list[[1]]
       }
-      lam <- lambda$root
+      lam <- lam.list$root
       zlam1 <- 1 + z * lam + shift
-      if (return.weights) wts[nonz] <- ct / N * logTaylor(zlam1, eps = eps, der = 1, order = taylor.order)[, "deriv1"]
-      logelr <- -sum(ct * logTaylor(zlam1, eps = eps, der = 0, order = taylor.order))
-      converged <- if ("warning" %in% class(lambda[[2]])) FALSE else TRUE
-      iter <- lambda$iter
-      estim.prec <- lambda$estim.prec
-      f.root <- lambda$f.root
+      wvec <- ct * logTaylor(zlam1, der = 1, order = taylor.order, eps = lower, M = upper)[, "deriv1"]
+      if (!SEL) wvec <- wvec / N
+      if (return.weights) wts[nonz] <- wvec
+      logelr <- -sum(ct * logTaylor(zlam1, der = 0, order = taylor.order, eps = lower, M = upper))
+      # Empirical fix for nonsensical probabilities
+      # This should not happen unless the spanning condition fails and the Taylor expansion is very inaccurate
+      if (any(wvec < 0) && logelr > 0) logelr <- -logelr
+      if (any(!is.infinite(wvec))) exitcode <- 14
+
+      converged <- if ("warning" %in% class(lam.list[[2]])) FALSE else TRUE
+      iter <- lam.list$iter
+      if (iter == con$maxiter) converged <- FALSE
+
+      estim.prec <- lam.list$estim.prec
+      f.root <- lam.list$f.root
       exitcode <- 0
 
       if (abs(f.root) > sqrt(me)) exitcode <- 1
       # Relative tolerance check for boundary closeness
-      int.len <- maxlambda - minlambda
-      if (min(abs(lam - maxlambda), abs(lam - minlambda)) < boundary.tolerance * int.len) exitcode <- exitcode + 2
+      int.len <- max.lam - min.lam
+      if (min(abs(lam - max.lam), abs(lam - min.lam)) < boundary.tolerance * int.len)
+        exitcode <- exitcode + 2
+      if (do.taylor && abs(sum(wvec) - 1) > 0.0001) exitcode <- 13
     } else { # The original bad output stays intact, only the exit code updates
       exitcode <- 4
     }
-  } else if (z1 == 0 && zn == 0) { # The sample is degenerate
-    lam <- logelr <- iter <- estim.prec <- f.root <- 0
-    converged <- TRUE
-    int <- c(0, 0)
-    exitcode <- 8
-  } else if (z1 == 0 || zn == 0) { # mu is on the boundary
-    # Here, we check if Taylor approximation was used for a finite value
-    if (!is.finite(taylor.order)) {
-      converged <- TRUE
-      exitcode <- 6
-    } else {
-      exitcode <- 7
-    }
+
   }
+
 
   if (return.weights && any(!is.finite(wts[nonz]))) exitcode <- 9
 
-  msg <- c("FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
-           "Lambda is very close to the boundary! (May happen with extremely small weights.)",
-           "Lambda is very close to the boundary and FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!",
-           "Root finder returned an error!",
-           "mu is not strictly in the convex hull of z (spanning condition fail), and no Taylor expansion was applied to address it.",
-           "mu lies exactly on the boundary of the convex hull, ELR(mu) := 0.",
-           "mu lies exactly on the boundary of the convex hull, but Taylor approximation yields ELR(mu) > 0.",
-           "Observations with substantial counts are identical and equal to mu (degenerate sample).",
-           "Lambda search succeeded but some probabilities are not finite (division by zero?).")
-  if (verbose && exitcode > 0) warning(msg[exitcode])
+  msg <- c("FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!", # 1
+           "Lambda is very close to the boundary! (May happen with extremely small weights.)", # 2
+           "Lambda is very close to the boundary and FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!", # 3
+           "Root finder returned an error!", # 4
+           "mu is not strictly in the convex hull of z, and no Taylor expansion is used.", # 5
+           "At least two points are needed for meaningful EL computations.", # 6
+           "mu lies exactly on the boundary of the convex hull, log ELR(mu) := -Inf.", # 7
+           "Observations with substantial counts are identical and equal to mu (degenerate sample).", # 8
+           "mu lies exactly on the convex hull boundary, quadratic branch approximation used to obtain ELR(mu) > 0.", # 9
+           "mu lies outside the convex hull, quadratic branch approximation used to obtain ELR(mu) > 0.", # 10
+           "mu lies exactly on the convex hull boundary, Wald approximation used to obtain ELR(mu) > 0.", # 11
+           "mu lies outside the convex hull, Wald approximation used to obtain ELR(mu) > 0.", # 12
+           "mu is strictly in the convex hull of z, Taylor expansion yields sum(weights) != 1 and/or weights < 0.",  # 13
+           "Lambda search succeeded but some probabilities are not finite (division by zero?)") # 14
+  msg <- if (exitcode > 0) msg[exitcode] else "successful convergence within the first-order-condition tolerance"
+  if (verbose && exitcode > 0) warning(msg)
+
 
   return(list(logelr = logelr, lam = lam, wts = wts,
               converged = converged, iter = iter,
               bracket = int, estim.prec = estim.prec, f.root = f.root,
-              exitcode = exitcode))
+              exitcode = exitcode, message = msg))
 }
 
 
@@ -298,8 +447,8 @@ weightedEL <- function(z, mu = 0,
 #'   the kernel weights based on the \code{data} argument passed to \code{...}.
 #'   If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must
 #'   be a function that computes the kernel weights for the data set.
+#' @inheritParams weightedEL
 #' @param trim A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.
-#' @param weight.tolerance Passed to \code{weightedEL} (uses the same default value).
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).
 #' @param parallel If TRUE, uses \code{parallel::mclapply} to speed up the computation.
 #' @param cores The number of cores used by \code{parallel::mclapply}.
@@ -336,14 +485,14 @@ weightedEL <- function(z, mu = 0,
 #' set.seed(1)
 #' x <- sort(rlnorm(100))
 #' # Heteroskedastic DGP
-#' y <- 1 + 1*x + rnorm(100) * (1 + x + sin(x))
+#' y <- abs(1 + 1*x + rnorm(100) * (1 + x + sin(x)))
 #' mod.OLS <- lm(y ~ x)
 #' rho <- function(theta, ...) y - theta[1] - theta[2]*x  # Moment fn
-#' w <- kernelWeights(x, PIT = TRUE) # To ensure enough neighbours
+#' w <- kernelWeights(x, PIT = TRUE, bw = 0.25, kernel = "epanechnikov")
 #' w <- w / rowSums(w)
 #' image(x, x, w, log = "xy")
 #' theta.vals <- list(c(1, 1), coef(mod.OLS))
-#' SEL <- function(b) smoothEmplik(rho = rho, theta = b, sel.weights = w)
+#' SEL <- function(b, ...) smoothEmplik(rho = rho, theta = b, sel.weights = w)
 #' sapply(theta.vals, SEL) # Smoothed empirical likelihood
 #' # SEL maximisation
 #' b.SEL <- optim(coef(mod.OLS), SEL, method = "BFGS",
@@ -353,35 +502,73 @@ weightedEL <- function(z, mu = 0,
 #' abline(1, 1, lty = 2)
 #' abline(mod.OLS, col = 2)
 #' abline(b.SEL$par, col = 4)
-smoothEmplik <- function(rho,
-                         theta,
-                         data,
+#'
+#' # Now we start from (0, 0), for which the Taylor expansion is necessary
+#' # because all residuals at this starting value are positive and the
+#' # unmodified EL ratio for the test of equality to 0 is -Inf
+#' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights=w, chull.fail="none")
+#' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights=w)
+#' # The next example is very slow; approx. 5 s
+#' \dontrun{
+#' # Experiment: a small bandwidth so that the spanning condition should fail
+#' w <- kernelWeights(x, PIT = TRUE, bw = 0.10, kernel = "epanechnikov")
+#' w <- w / rowSums(w)
+#' b.SELt <- optim(c(0, 0), SEL, chull.fail = "taylor",  # This is more reliable
+#'                 method = "BFGS", control = list(fnscale = -1))
+#' b.SELw <- optim(c(0, 0), SEL, chull.fail = "wald",  # This is more reliable
+#'                 method = "BFGS", control = list(fnscale = -1))
+#' b0grid <- seq(-0.75, 4.5, length.out = 51)
+#' b1grid <- seq(-0.75, 2.5, length.out = 51)
+#' bgrid <- as.matrix(expand.grid(b0grid, b1grid))
+#' selgrid <- unlist(parallel::mclapply(1:nrow(bgrid), function(i)
+#'   smoothEmplik(rho, bgrid[i, ], sel.weights = w, chull.fail = "taylor"),
+#'     mc.cores = parallel::detectCores()/2-1))
+#' selgrid <- matrix(selgrid, nrow = length(b0grid))
+#' probs <- c(0.25, 0.5, 0.75, 0.8, 0.9, 0.95, 0.99, 1-10^seq(-4, -16, -2))
+#' levs <- qchisq(probs, df = 2)
+#' # levs <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000)
+#' labs <- round(levs, 1)
+#' cols <- rainbow(length(levs), end = 0.7, v = 0.7)
+#' par(mar = c(4, 4, 2, 0) + .1)
+#' contour(b0grid, b1grid, -2*(selgrid - max(selgrid, na.rm = TRUE)), levels = levs,
+#'         labels = labs, col = cols, lwd = 1.5, bty = "n",
+#'         main = "'Safe' likelihood contours", asp = 1)
+#' image(b0grid, b1grid, log1p(-2*(selgrid - max(selgrid, na.rm = TRUE))))
+#' # The narrow lines are caused by the fact that if two observations are close together
+#' # at the edge, the curvature at that point is extreme
+#' }
+smoothEmplik <- function(rho, theta, data,
                          sel.weights = NULL,
-                         trim = NULL, weight.tolerance = NULL,
-                         minus = FALSE,
+                         chull.fail = c("taylor", "wald", "none"),
+                         weight.tolerance = NULL,
+                         trim = NULL, minus = FALSE,
                          parallel = FALSE, cores = 1,
                          memory.saving = c("none", "full", "partial"), chunks = 10, print.progress = FALSE,
                          bad.value = -Inf,
                          attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "nabla", "converged", "exitcode", "probabilities"),
                          ...
 ) {
+  chull.fail <- match.arg(chull.fail)
   # Constructing residuals
   rho.series <- rho(theta, data, ...)
   n <- length(rho.series)
-  if (is.null(weight.tolerance)) weight.tolerance <- 0.01 / n
   if (any("none" %in% attach.attributes)) attach.attributes <- "none"
   attach.probs <- ("probabilities" %in% attach.attributes) | isTRUE(attach.attributes == "all")
 
   # Since SEL is a non-parametric method and relies on smoothing with kernel weights, using large matrices for large problems
   # can be terribly inefficient. Instead, we split it into chunks.
   memory.saving <- memory.saving[1]
+  taylor.order <- NA
   empliklist <- vector("list", n)
   if (memory.saving == "full") {
       if (!is.function(sel.weights)) stop("smoothEmplik: sel.weights must be a function that accepts an index and a data frame and returns a numeric vector of kernel weights.")
     if (print.progress) pb <- utils::txtProgressBar(min = 0, max = n, style = 3)
       for (i in 1:n) {
         w <- suppressWarnings(as.numeric(sel.weights(i, data)))
-        empliklist[[i]] <- weightedEL(rho.series, ct = w, SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs)
+        w <- w / sum(w)
+        if (is.null(weight.tolerance)) weight.tolerance <- max(w) * sqrt(.Machine$double.eps)
+        empliklist[[i]] <- weightedEL(rho.series, ct = w, SEL = TRUE,
+                                      weight.tolerance = weight.tolerance, return.weights = attach.probs)
         if (print.progress && (i %% floor(n / 50) == 0)) utils::setTxtProgressBar(pb, i)
       }
     if (print.progress) close(pb)
@@ -410,9 +597,22 @@ smoothEmplik <- function(rho,
 
         # If w is a sparse matrix, it can be converted into a list to save memory (helps in most cases)
         ELiFunc <- if (is.list(w)) {
-          function(i) weightedEL(rho.series[w[[i]]$idx], ct = w[[i]]$ct, SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs)
+          function(i) {
+            ii <- w[[i]]$idx
+            wi <- w[[i]]$ct
+            wi <- wi / sum(wi)
+            if (is.null(weight.tolerance)) weight.tolerance <- max(wi) * sqrt(.Machine$double.eps)
+            weightedEL(rho.series[ii], ct = wi, SEL = TRUE, chull.fail = chull.fail,
+                       weight.tolerance = weight.tolerance, return.weights = attach.probs)
+          }
         } else if (is.matrix(w)) {
-          function(i) weightedEL(rho.series, ct = w[i, ], SEL = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs)
+          function(i) {
+            wi <- w[i, ]
+            wi <- wi / sum(wi)
+            if (is.null(weight.tolerance)) weight.tolerance <- max(wi) * sqrt(.Machine$double.eps)
+            weightedEL(rho.series, ct = wi, SEL = TRUE, chull.fail = chull.fail,
+                       weight.tolerance = weight.tolerance, return.weights = attach.probs)
+          }
         } else {
           if (memory.saving == "none")
             stop("smoothEmplik: sel.weights must be a list or a matrix of weights for every observation of the data set, or a function returning a matrix or a list (favouring CPU over memory).") else

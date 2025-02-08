@@ -10,11 +10,14 @@ weightedEL(
   ct = NULL,
   shift = NULL,
   taylor.order = NA,
+  lower = NULL,
+  upper = NULL,
   SEL = FALSE,
   n.orig = NULL,
   weight.tolerance = NULL,
   boundary.tolerance = 1e-09,
   truncto = 0,
+  chull.fail = c("taylor", "wald", "none"),
   uniroot.control = list(),
   return.weights = FALSE,
   verbose = FALSE
@@ -30,9 +33,19 @@ Can be fractional. Very small counts below the threshold \code{weight.tolerance}
 
 \item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
 
-\item{taylor.order}{If \code{NA}, then the sum of log-weights is maximised. If an even integer between
-2 and 12, replaces the left branch of the log with its Taylor expansion, allowing for \code{mu}
+\item{taylor.order}{If \code{NA}, then the sum of log-weights is maximised. If 2, 4, 6, or 8,
+replaces the left branch of the log with its Taylor expansion, allowing for \code{mu}
 to be outside the convex hull of \code{z}.}
+
+\item{lower}{A positive scalar or numeric vector denoting the left cut-off before which log(weight)
+in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order} is 2, 4, 6, or 8.
+If \code{NULL} or \code{-Inf}, no such replacement is done. Recommended at a small number ct/sum(ct)
+to ensure self-concordance of the log-likelihoogetParabola(-1, -6, -1, 4)d.}
+
+\item{upper}{A positive scalar or numeric vector greater or equal to \code{lower} denoting the right cut-off
+after which log(weight) in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order}
+is 2, 4, 6, or 8. If \code{NULL} or \code{Inf}, no such replacement is done. Recommended at 1
+if \code{mu} is not in the convex hull of \code{z} to ensure that a finite solution exists.}
 
 \item{SEL}{If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
@@ -48,6 +61,12 @@ interval range length.}
 
 \item{truncto}{Counts under \code{weight.tolerance} will be set to this value.
 In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
+
+\item{chull.fail}{A character: what to do if the convex hull of \code{z} does not contain \code{mu}
+(spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
+of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
+\code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
+with the Wald statistic (testing if the weighted mean of \code{z} is zero).}
 
 \item{uniroot.control}{A list passed to the \code{uniroot}.}
 
@@ -69,17 +88,7 @@ A list with the following elements:
   \item{estim.prec}{The approximate estimated precision of lambda (from \code{uniroot}).}
   \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
   \item{exitcode}{An integer indicating the reason of termination.}
-  \describe{
-    \item{0}{success, an interior solution for lambda found.}
-    \item{1}{the value of the derivative at the root is greater than \code{sqrt(.Machine$double.eps)} (not an issue with the tolerance).}
-    \item{2}{the root was found and the function value seems to be zero, but the root is very close (\code{< sqrt(.Machine$double.eps)}) to the boundary.}
-    \item{3}{like \code{1} and \code{2} simultaneously: the value of the target function exceeds the tolerance, and the result is less than the tolerance away from the boundary.}
-    \item{4}{an error occurred while calling \code{uniroot}.}
-    \item{5}{\code{mu} is not strictly in the convex hull of \code{z} (spanning condition not met).}
-    \item{6}{\code{mu} is on the boundary of the convex hull of \code{z}.}
-    \item{7}{Most observations are equal to \code{mu}.}
-    \item{8}{All values of \code{z} are identical, and \code{mu} is equal to this value.}
-  }
+  \item{message}{Character string describing the optimisation termination status.}
 }
 }
 \description{
@@ -133,6 +142,10 @@ plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "
      bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
      main = "Discrepancy between cemplik and weightedEL", ylab = "")
 abline(h = 0, lty = 2)
+
+# Handling the convex hull violation differently
+weightedEL(1:9)
+weightedEL(1:9, chull.fail = "wald")
 
 # Warning: depending on the compiler, the discrepancy between cemplik and weightedEL
 # can be one million (1) times larger than the machine epsilon despite both of them
