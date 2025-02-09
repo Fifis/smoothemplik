@@ -12,7 +12,6 @@ brentZero(
   f_lower = NULL,
   f_upper = NULL,
   extendInt = "no",
-  check_conv = FALSE,
   tol = 1e-08,
   maxiter = 500L,
   trace = 0L
@@ -38,7 +37,7 @@ brentZero(
   \item{\code{"upX"}}{Assumes the function is increasing around the root and extends upward if needed.}
   \item{\code{"downX"}}{Assumes the function is decreasing around the root and extends downward if needed.}
 }
-This behavior mirrors that of \code{\link[base]{uniroot}}.}
+This behavior mirrors that of [uniroot()].}
 
 \item{tol}{Small positive scalar: convergence tolerance. The search stops when the bracket size is smaller than
 \code{2 * .Machine$double.eps * abs(x) + tol}, or if the function evaluates to zero at the candidate root.}
@@ -66,4 +65,14 @@ Brent's local root search
 f <- function (x, a) x - a
 str(uniroot(f, c(0, 1), tol = 0.0001, a = 1/3))
 uniroot(function(x) cos(x) - x, lower = -pi, upper = pi, tol = 1e-9)$root
+
+# This function is faster than the base R uniroot, and this is the primary
+# reason why it was written in C++
+system.time(replicate(1000, { shift <- runif(1, 0, 2*pi)
+  uniroot(function(x) cos(x+shift) - x, lower = -pi, upper = pi)
+}))
+system.time(replicate(1000, { shift <- runif(1, 0, 2*pi)
+  brentZero(function(x) cos(x+shift) - x, lower = -pi, upper = pi)
+}))
+# Roughly twice as fast
 }

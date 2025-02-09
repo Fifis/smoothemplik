@@ -4,7 +4,7 @@
 \alias{tlog}
 \title{d-th derivative of the k-th-order Taylor expansion of log(x)}
 \usage{
-tlog(x, a = 1, k = 4, d = 0)
+tlog(x, a = as.numeric(c(1)), k = 4L, d = 0L)
 }
 \arguments{
 \item{x}{Numeric: a vector of points for which the logarithm is to be evaluated}

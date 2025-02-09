@@ -83,4 +83,10 @@ print(c(object.size(w), object.size(wsp)) / 1024) # Kilobytes used
 image(g, x, w)
 all.equal(w[, 1, drop = FALSE],  # Internal calculation for one column
           smoothemplik:::kernelFunCPP((g - x[1])/2, "triangular", 2, FALSE))
+
+# Bare-bones interface to the C++ functions
+x <- seq(-3, 3, 0.01)
+kmat <- sapply(c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"),
+               function(k) smoothemplik:::kernelFunCPP(x, k, 4, TRUE))
+matplot(x, kmat, type = "l", lty = 1)
 }

@@ -7,8 +7,7 @@
 kernelFun(
   x,
   kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
-  order = c(2, 4, 6),
-  rescale = TRUE,
+  order = c(2, 4),
   convolution = FALSE
 )
 }
@@ -18,11 +17,8 @@ kernelFun(
 \item{kernel}{Kernel type: uniform, Epanechnikov, triangular, quartic, or Gaussian.}
 
 \item{order}{Kernel order. 2nd-order kernels are always non-negative.
-kth-order kernels have all moments from 1 to (k-1) equal to zero, which is
-achieved by having some negative values.}
-
-\item{rescale}{Logical: rescale to unit variance? If \code{TRUE}, ensures that, for the chosen kernel
-name, the second-order kernel integrates to 1:
+  kth-order kernels have all moments from 1 to (k-1) equal to zero, which is
+  achieved by having some negative values.
 \eqn{\int_{-\infty}^{+\infty} x^2 k(x) = \sigma^2_k = 1}.
 This is useful because in this case, the constant \code{k_2} in formulæ 3.12 and 3.21
 from \insertCite{silverman1986density;textual}{smoothemplik} is equal to 1.}
@@ -33,38 +29,35 @@ from \insertCite{silverman1986density;textual}{smoothemplik} is equal to 1.}
 A numeric vector of the same length as input.
 }
 \description{
-Computes 5 most popular kernel functions of orders 2, 4, and 6 with the potential of returning
+Computes 5 most popular kernel functions of orders 2 and 4 with the potential of returning
 an analytical convolution kernel for density cross-validation. These kernels appear
 in \insertCite{silverman1986density}{smoothemplik}.
 }
 \examples{
 ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"); names(ks) <- ks
-os <- c(2, 4, 6); names(os) <- paste0("o", os)
+os <- c(2, 4); names(os) <- paste0("o", os)
 cols <- c("#000000CC", "#0000CCCC", "#CC0000CC", "#00AA00CC", "#BB8800CC")
 put.legend <- function() legend("topright", legend = ks, lty = 1, col = cols, bty = "n")
 xout <- seq(-4, 4, length.out = 301)
 plot(NULL, NULL, xlim = range(xout), ylim = c(0, 1.1),
   xlab = "", ylab = "", main = "Unscaled kernels", bty = "n"); put.legend()
-for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], rescale = FALSE), col = cols[i])
+for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i]), col = cols[i])
 par(mfrow = c(1, 2))
 plot(NULL, NULL, xlim = range(xout), ylim = c(-0.1, 0.8), xlab = "", ylab = "",
-  main = "4th-order scaled kernels", bty = "n"); put.legend()
+  main = "4th-order kernels", bty = "n"); put.legend()
 for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 4), col = cols[i])
-plot(NULL, NULL, xlim = range(xout), ylim = c(-0.25, 1.2), xlab = "", ylab = "",
-  main = "6th-order scaled kernels", bty = "n"); put.legend()
-for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 6), col = cols[i])
 par(mfrow = c(1, 1))
 plot(NULL, NULL, xlim = range(xout), ylim = c(-0.25, 1.4), xlab = "", ylab = "",
   main = "Convolution kernels", bty = "n"); put.legend()
 for (i in 1:5) {
-  for (j in 1:3) lines(xout, kernelFun(xout, kernel = ks[i], order = os[j],
+  for (j in 1:2) lines(xout, kernelFun(xout, kernel = ks[i], order = os[j],
   convolution = TRUE), col = cols[i], lty = j)
-}; legend("topleft", c("2nd order", "4th order", "6th order"), lty = 1:3, bty = "n")
+}; legend("topleft", c("2nd order", "4th order"), lty = 1:2, bty = "n")
 
 # All kernels integrate to correct values; we compute the moments
 mom <- Vectorize(function(k, o, m, c) integrate(function(x) x^m * kernelFun(x, k, o,
-  rescale = FALSE, convolution = c), lower = -Inf, upper = Inf)$value)
-for (m in 0:6) {
+  convolution = c), lower = -Inf, upper = Inf)$value)
+for (m in 0:4) {
   cat("\nComputing integrals of x^", m, " * f(x). \nSimple unscaled kernel:\n", sep = "")
   print(round(outer(os, ks, function(o, k) mom(k, o, m = m, c = FALSE)), 4))
   cat("Convolution kernel:\n")

@@ -52,7 +52,7 @@ This is an adaptation of the implementation by John Burkardt (currently availabl
 This function is similar to \code{local_min} or \code{R_zeroin2}-style logic, but with the
 following additions: the number of iterations is tracked, and the algorithm stops when the
 standard Brent criterion is met or if the maximum iteration count is reached.
-The code stores the approximate final bracket width in \code{estim.prec}, like in \code{uniroot}.
+The code stores the approximate final bracket width in \code{estim.prec}, like in [uniroot()].
 If the minimiser is pinned to an end point, \code{estim.prec = NA}.
 
 There are no preliminary iterations, unlike [brentZero()].

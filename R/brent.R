@@ -19,7 +19,7 @@
 #' This function is similar to \code{local_min} or \code{R_zeroin2}-style logic, but with the
 #' following additions: the number of iterations is tracked, and the algorithm stops when the
 #' standard Brent criterion is met or if the maximum iteration count is reached.
-#' The code stores the approximate final bracket width in \code{estim.prec}, like in \code{uniroot}.
+#' The code stores the approximate final bracket width in \code{estim.prec}, like in [uniroot()].
 #' If the minimiser is pinned to an end point, \code{estim.prec = NA}.
 #'
 #' There are no preliminary iterations, unlike [brentZero()].
@@ -62,7 +62,7 @@ brentMin <- function(f, interval, lower = NA_real_, upper = NA_real_, tol = 1e-8
 #'     \item{\code{"upX"}}{Assumes the function is increasing around the root and extends upward if needed.}
 #'     \item{\code{"downX"}}{Assumes the function is decreasing around the root and extends downward if needed.}
 #'   }
-#'   This behavior mirrors that of \code{\link[base]{uniroot}}.
+#'   This behavior mirrors that of [uniroot()].
 #' @param tol Small positive scalar: convergence tolerance. The search stops when the bracket size is smaller than
 #'   \code{2 * .Machine$double.eps * abs(x) + tol}, or if the function evaluates to zero at the candidate root.
 #' @param maxiter Positive integer: the maximum number of iterations before stopping.
