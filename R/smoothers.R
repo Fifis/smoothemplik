@@ -1227,7 +1227,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 
 #' Basic univatiate kernel functions
 #'
-#' Computes 5 most popular kernel functions of orders 2, 4, and 6 with the potential of returning
+#' Computes 5 most popular kernel functions of orders 2 and 4 with the potential of returning
 #' an analytical convolution kernel for density cross-validation. These kernels appear
 #' in \insertCite{silverman1986density}{smoothemplik}.
 #'
@@ -1236,8 +1236,6 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #' @param order Kernel order. 2nd-order kernels are always non-negative.
 #'   kth-order kernels have all moments from 1 to (k-1) equal to zero, which is
 #'   achieved by having some negative values.
-#' @param rescale Logical: rescale to unit variance? If \code{TRUE}, ensures that, for the chosen kernel
-#' name, the second-order kernel integrates to 1:
 #' \eqn{\int_{-\infty}^{+\infty} x^2 k(x) = \sigma^2_k = 1}.
 #' This is useful because in this case, the constant \code{k_2} in formulæ 3.12 and 3.21
 #' from \insertCite{silverman1986density;textual}{smoothemplik} is equal to 1.
@@ -1252,32 +1250,29 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #'
 #' @examples
 #' ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"); names(ks) <- ks
-#' os <- c(2, 4, 6); names(os) <- paste0("o", os)
+#' os <- c(2, 4); names(os) <- paste0("o", os)
 #' cols <- c("#000000CC", "#0000CCCC", "#CC0000CC", "#00AA00CC", "#BB8800CC")
 #' put.legend <- function() legend("topright", legend = ks, lty = 1, col = cols, bty = "n")
 #' xout <- seq(-4, 4, length.out = 301)
 #' plot(NULL, NULL, xlim = range(xout), ylim = c(0, 1.1),
 #'   xlab = "", ylab = "", main = "Unscaled kernels", bty = "n"); put.legend()
-#' for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], rescale = FALSE), col = cols[i])
+#' for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i]), col = cols[i])
 #' par(mfrow = c(1, 2))
 #' plot(NULL, NULL, xlim = range(xout), ylim = c(-0.1, 0.8), xlab = "", ylab = "",
-#'   main = "4th-order scaled kernels", bty = "n"); put.legend()
+#'   main = "4th-order kernels", bty = "n"); put.legend()
 #' for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 4), col = cols[i])
-#' plot(NULL, NULL, xlim = range(xout), ylim = c(-0.25, 1.2), xlab = "", ylab = "",
-#'   main = "6th-order scaled kernels", bty = "n"); put.legend()
-#' for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 6), col = cols[i])
 #' par(mfrow = c(1, 1))
 #' plot(NULL, NULL, xlim = range(xout), ylim = c(-0.25, 1.4), xlab = "", ylab = "",
 #'   main = "Convolution kernels", bty = "n"); put.legend()
 #' for (i in 1:5) {
-#'   for (j in 1:3) lines(xout, kernelFun(xout, kernel = ks[i], order = os[j],
+#'   for (j in 1:2) lines(xout, kernelFun(xout, kernel = ks[i], order = os[j],
 #'   convolution = TRUE), col = cols[i], lty = j)
-#' }; legend("topleft", c("2nd order", "4th order", "6th order"), lty = 1:3, bty = "n")
+#' }; legend("topleft", c("2nd order", "4th order"), lty = 1:2, bty = "n")
 #'
 #' # All kernels integrate to correct values; we compute the moments
 #' mom <- Vectorize(function(k, o, m, c) integrate(function(x) x^m * kernelFun(x, k, o,
-#'   rescale = FALSE, convolution = c), lower = -Inf, upper = Inf)$value)
-#' for (m in 0:6) {
+#'   convolution = c), lower = -Inf, upper = Inf)$value)
+#' for (m in 0:4) {
 #'   cat("\nComputing integrals of x^", m, " * f(x). \nSimple unscaled kernel:\n", sep = "")
 #'   print(round(outer(os, ks, function(o, k) mom(k, o, m = m, c = FALSE)), 4))
 #'   cat("Convolution kernel:\n")
@@ -1286,85 +1281,10 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #'
 kernelFun <- function(x,
                       kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
-                      order = c(2, 4, 6),
-                      rescale = TRUE,
+                      order = c(2, 4),
                       convolution = FALSE
 ) {
-  order <- order[1]
-  if (!(order %in% c(2, 4, 6))) stop("Only kernels of orders 2, 4, 6 have been implemented.")
   kernel <- kernel[1]
-  adj.factor <- switch(kernel,
-    uniform = sqrt(3),
-    triangular = sqrt(6),
-    epanechnikov = sqrt(5),
-    quartic = sqrt(7),
-    gaussian = 1
-  )
-  if (!rescale) adj.factor <- 1
-  x <- x / adj.factor
-  x <- abs(x)
-  if (!convolution) {
-    abc <- if (order == 2) c(1, 0, 0) else if (order == 4) {
-      switch(kernel,
-             uniform = c(NA, NA, NA),
-             triangular = c(12, -30, 0) / 7,
-             epanechnikov = c(15, -35, 0) / 8,
-             quartic = c(7, -21, 0) / 4,
-             gaussian = c(3, -1, 0) / 2
-      )
-    } else if (order == 6) {
-      switch(kernel,
-             uniform = c(NA, NA, NA),
-             triangular = c(1635, -10500, 11970) / 683,
-             epanechnikov = c(175, -1050, 1155) / 64,
-             quartic = c(315, -2310, 3003) / 128,
-             gaussian = c(15, -10, 1) / 8
-      )
-    }
-    k <- switch(kernel,
-      uniform = 1/2 * (x < 1) * (order == 2) + (-1/6 * (x < 1) + 4/3 * (x < 0.5)) * (order == 4) +
-                  (1/20 * (x < 1) - 9/20 * (x < 2/3) + 9/4 * (x < 1/3)) * (order == 6),
-      triangular = (1 - x) * (x < 1),
-      epanechnikov = 3/4 * (1 - x^2) * (x < 1),
-      quartic = 15/16 * (1 - x^2)^2 * (x < 1),
-      gaussian = stats::dnorm(x)
-    )
-    if (order > 2 && kernel != "uniform") {
-      polynomial <- abc[1] + abc[2] * x^2 + abc[3] * x^4
-      k <- k * polynomial
-    }
-  } else { # Convolution kernel
-    if (order == 2) {
-      k <- switch(kernel,
-                  uniform = 1 / 4 * (2 - x) * (x < 2),
-                  triangular = 1 / 6 * ((3 * x^3 - 6 * x^2 + 4) * (x <= 1) + (8 - 12 * x + 6 * x^2 - x^3) * (x > 1 & x < 2)),
-                  epanechnikov = 3 / 160 * (2 - x)^3 * (x^2 + 6*x + 4) * (x < 2),
-                  quartic = 5 / 3584 * (2 - x)^5 * (16 + (2*x + x^2) * (20 + 8*x + x^2)) * (x < 2),
-                  gaussian = stats::dnorm(x, sd = sqrt(2))
-      )
-    } else if (order == 4) {
-    k <- switch(kernel,
-                uniform = 1/36*(64*(1 - x)*(x < 1) - 16*(1*(2*x < 1) + (3/2 - x)*(1/2 <= x & x < 3/2)) + (2 - x)*(x<2)),
-                triangular = 3/343 * ((152 + x^2*(-616 + x*(238 + x*(560 + x*(-322 + 5*x*(-14 + 9*x))))))*(x<1) + (2-x)^3 *
-                                        (30 + x*(-4 + x*(-74 + 5*x*(4 + 3*x))))*(x>=1 & x<2)),
-                epanechnikov = 1/2048 * (5*(2-x)^3*(64 + x*(96 + x*(-144 + x*(-160 + x*(48 + 7*x*(6 + x))))))) * (x < 2),
-                quartic = 1/2342912 * (35*(2 - x)^5*(2944 + x*(7360 + x*(-1440 + x*(-18320 + x*(-9896 + 9*x*(560 + x*(536 + 15*x*(10 + x))))))))) * (x < 2),
-                gaussian = 1/64 * stats::dnorm(x, sd = sqrt(2)) * (108 - 28*x^2 + x^4)
-    )
-  } else if (order == 6) {
-    k <- switch(kernel,
-                uniform = 1/400*(956 - 2107*x)*(x<1/3) + 1/400*(680 - 1279*x)*(x>=1/3 & x<2/3) + (-61/40 + 41/25*x)*(x>=2/3 & x<1) +
-                  (1/2 - 77/200*x)*(x>=1 & x<4/3) + 1/400*(-28 + 17*x)*(x>=4/3 & x<5/3) + (2-x)/400*(x>=5/3 & x<2),
-                triangular = 1/466489*((15/22)*(1353180 + x^2*(-10733690 + x*(3663605 + 2*x*(11535524 + x*(-6217288 +
-                  x*(-8435812 + 3*x*(1846130 + 133*x*(4400 + x*(-3168 + 19*x*(-22 + 15*x))))))))))*(x<1) +
-                  (-(15/22))*(-2 + x)^3*(240311 + 2*x*(-24496 + x*(-770780 + x*(257608 + x*(1018338 + 133*x*(-3072 + x*(-2180 + 57*x*(8 + 5*x))))))))*(x>=1 & x<2)),
-                epanechnikov = -((105*(-61440 + x^2*(465920 + x*(-232960 + x*(-838656 + x*(640640 + x*(439296 - 486720*x + 84448*x^3 - 9828*x^5 + 495*x^7)))))))/3407872) * (x < 2),
-                quartic = (-((315*(-2 + x)^5*(380928 + x*(952320 + x*(-1739776 + x*(-6254080 + x*(478464 + x*(9024512 +
-                            x*(2918912 + x*(-3982464 + x*(-2272576 + 143*x*(1000 + x*(3012 + 91*x*(10 + x)))))))))))))/1853882368)) * (x < 2),
-                gaussian = stats::dnorm(x, sd = sqrt(2)) * (36240 - 19360*x^2 + 2312*x^4 - 88*x^6 + x^8)/16384
-    )
-  }
-  }
-  k <- k / adj.factor
-  return(k)
+  order <- order[1]
+  .Call(`_smoothemplik_kernelFunCPP`, x, kernel, order, convolution)
 }

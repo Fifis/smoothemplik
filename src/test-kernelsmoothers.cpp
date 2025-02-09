@@ -3,10 +3,6 @@
 
 extern arma::vec kernelFunCPP(arma::vec, std::string, int, bool);
 
-/*
- cat(kernelFun(a, "uniform", 2, rescale = FALSE), sep = ", ")
-*/
-
 context("C++ kernel functions") {
   test_that("2nd-order kernel take correct values") {
     double macheps = std::numeric_limits<double>::epsilon();

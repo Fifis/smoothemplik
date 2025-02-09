@@ -35,3 +35,15 @@ test_that("de-duplication works in kernelSmooth", {
   m2 <- kernelSmooth(x, y, xout, w, kernel = "triangular", bw = 1, no.dedup = TRUE)
   expect_equal(as.numeric(m1), as.numeric(m2), tolerance = 1e-5)
 })
+
+test_that("prediction on arbitrary grids works", {
+  set.seed(1)
+  x <- rnorm(50)
+  y <- 1 + rt(50, df = 2)
+  xgrid <- seq(-1.2, 1.2, 0.05)
+  yhat0 <- kernelSmooth(x, y, xgrid, bw = 1, degree = 1, robust.iterations = 0, no.dedup = TRUE)
+  yhat1 <- kernelSmooth(x, y, xgrid, bw = 1, degree = 1, robust.iterations = 1, no.dedup = TRUE)
+  # plot(x, y); lines(xgrid, yhat0); lines(xgrid, yhat1, col = 2)
+  expect_gt(var(yhat0), var(yhat1))
+})
+

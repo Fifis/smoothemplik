@@ -192,7 +192,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_smoothemplik_kernelDensityCPP", (DL_FUNC) &_smoothemplik_kernelDensityCPP, 8},
     {"_smoothemplik_kernelSmoothCPP", (DL_FUNC) &_smoothemplik_kernelSmoothCPP, 10},
     {"_smoothemplik_tlogCPP", (DL_FUNC) &_smoothemplik_tlogCPP, 4},
-    {"run_testthat_tests",    (DL_FUNC) &run_testthat_tests,    1},
+    {"run_testthat_tests",         (DL_FUNC) &run_testthat_tests,         1},
     {NULL, NULL, 0}
 };
 
