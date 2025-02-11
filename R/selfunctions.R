@@ -567,7 +567,7 @@ smoothEmplik <- function(rho, theta, data,
         w <- suppressWarnings(as.numeric(sel.weights(i, data)))
         w <- w / sum(w)
         if (is.null(weight.tolerance)) weight.tolerance <- max(w) * sqrt(.Machine$double.eps)
-        empliklist[[i]] <- weightedEL(rho.series, ct = w, SEL = TRUE,
+        empliklist[[i]] <- weightedEL(rho.series, ct = w, mu = 0, SEL = TRUE,
                                       weight.tolerance = weight.tolerance, return.weights = attach.probs)
         if (print.progress && (i %% floor(n / 50) == 0)) utils::setTxtProgressBar(pb, i)
       }
@@ -602,7 +602,7 @@ smoothEmplik <- function(rho, theta, data,
             wi <- w[[i]]$ct
             wi <- wi / sum(wi)
             if (is.null(weight.tolerance)) weight.tolerance <- max(wi) * sqrt(.Machine$double.eps)
-            weightedEL(rho.series[ii], ct = wi, SEL = TRUE, chull.fail = chull.fail,
+            weightedEL(rho.series[ii], ct = wi, mu = 0, SEL = TRUE, chull.fail = chull.fail,
                        weight.tolerance = weight.tolerance, return.weights = attach.probs)
           }
         } else if (is.matrix(w)) {
@@ -610,7 +610,7 @@ smoothEmplik <- function(rho, theta, data,
             wi <- w[i, ]
             wi <- wi / sum(wi)
             if (is.null(weight.tolerance)) weight.tolerance <- max(wi) * sqrt(.Machine$double.eps)
-            weightedEL(rho.series, ct = wi, SEL = TRUE, chull.fail = chull.fail,
+            weightedEL(rho.series, ct = wi, mu = 0, SEL = TRUE, chull.fail = chull.fail,
                        weight.tolerance = weight.tolerance, return.weights = attach.probs)
           }
         } else {

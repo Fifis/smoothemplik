@@ -11,7 +11,7 @@ These bug fixes and features are scheduled for the upcoming releases.
 - BUG: If `x` contains duplicates, `DCV(x, bw = bw.grid, weights = w)` complains that no duplicates were found (see the example)
 - BUG: `smoothEmplikDiscrete()`: if the split variable does not take contiguous values from 1 to the number of categories, estimation fails.
 - BUG: LOO estimation: instead of dropping unique (X, Y) observations, leave each conditioning points (only X)
-- BUG: Fix the optimiser control argument in `bw.CV()`.
+- BUG: Fix the optimiser control argument in `bw.CV()`, add `log()` for non-negativity and better scaling.
 - SYNTAX: `kernelSmooth()`, being a local average, should have `na.rm` and check the inputs
 - SYNTAX: In `kernelDiscreteDensitySmooth()`, remove the `table` attribute and change the test.
 - SYNTAX: Create a summary class for SEL; print numerical gradients of lambdas; print the number of converged inner optimisation problems

@@ -1284,7 +1284,15 @@ kernelFun <- function(x,
                       order = c(2, 4),
                       convolution = FALSE
 ) {
+  is.arr <- !is.null(d <- dim(x))
   kernel <- kernel[1]
   order <- order[1]
-  .Call(`_smoothemplik_kernelFunCPP`, x, kernel, order, convolution)
+  ret <- .Call(`_smoothemplik_kernelFunCPP`, x, kernel, order, convolution)
+  if (is.arr) {
+    ret <- array(ret, dim = d, dimnames = dimnames(x))
+  } else {
+    ret <- drop(ret)
+    names(ret) <- names(x)
+  }
+  return(ret)
 }
