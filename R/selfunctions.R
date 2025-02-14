@@ -1,7 +1,7 @@
 # Get the coefficients of a parabola passing through (x, y)
-# getParabola(c(-1, 0, 1), c(2, 0, 2))
+# getParabola3(c(-1, 0, 1), c(2, 0, 2))
 # x0 <- c(-1, 0, 2); y0 <- c(0, 1, 1)
-# abc <- getParabola(x0, y0)
+# abc <- getParabola3(x0, y0)
 # f <- function(x) abc[1]*x^2 + abc[2]*x + abc[3]
 # curve(f, -1.5, 2.5); points(x0, y0)
 getParabola3 <- function(x, y) {
@@ -261,8 +261,10 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       l <- length(z)
       zo <- order(z)
       zsort <- z[zo]
-      z12 <- zsort[1:2]
-      znn <- zsort[l-1:0]
+      zu <- unique(zsort)
+      if (length(zu) < 2) stop("Even with Taylor extrapolation, at least two unique observations are required.")
+      z12 <- zu[1:2]
+      znn <- zu[length(zu)-1:0]
       iqr <- stats::IQR(z)
 
       # With f(x + (0, 1, 2, 3)h), one can estimate the following derivatives
@@ -290,7 +292,7 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
           w.fp <- c(-1/3, 1.5, -3, 11/6)
           w.fpp <- c(-1, 4, -5, 2)
         } else {
-          zgrid <- mu.limit + diff(z12)*0.01*c(-1, 0, 1)
+          zgrid <- mu.limit + diff(znn)*0.01*c(-1, 0, 1)
           w.fp <- c(-0.5, 0, 0.5)
           w.fpp <- c(1, -2, 1)
         }
