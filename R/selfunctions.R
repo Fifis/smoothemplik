@@ -152,7 +152,6 @@ getParabola <- function(x, f, fp, fpp) {
 #' # aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
 #' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
 #' @export
-
 weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
                        taylor.order = NA, lower = NULL, upper = NULL,
                        SEL = FALSE,
@@ -258,14 +257,13 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       int <- c(0, 0)
       exitcode <- 7
     } else if (chull.fail == "taylor") {
-      l <- length(z)
-      zo <- order(z)
-      zsort <- z[zo]
-      zu <- unique(zsort)
+      zu <- sort(unique(z))
+      l <- length(zu)
       if (length(zu) < 2) stop("Even with Taylor extrapolation, at least two unique observations are required.")
       z12 <- zu[1:2]
-      znn <- zu[length(zu)-1:0]
+      znn <- zu[l-1:0]
       iqr <- stats::IQR(z)
+      if (iqr == 0) iqr <- sd(z)
 
       # With f(x + (0, 1, 2, 3)h), one can estimate the following derivatives
       # 2nd: weights 2 -5 4 -1, error O(h^2)
@@ -274,42 +272,26 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       # Step size for noisy functions: for 3 wrong digits, multiply the optimum by 10
       if (z1 >= 0) {  # All non-negative values, sample average > 0
         # Larger step size for numerically more stable parabola estimates
-        # If the space between 2 points is too small, compute 1-sided derivatives
         mu.limit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
-        if (diff(z12)*0.01 < iqr*0.001) {  # Points very close to one another
-          zgrid <- mu.limit + iqr*0.001*(0:3)
-          w.fp <- c(-11/6, 3, -1.5, 1/3)  # These numbers are obtained from the pnd package
-          w.fpp <- c(2, -5, 4, -1)  # pnd::fdCoef(deriv.order = 2, stencil = 0:3)
-        } else {
-          zgrid <- mu.limit + diff(z12)*0.01*c(-1, 0, 1)
-          w.fp <- c(-0.5, 0, 0.5)
-          w.fpp <- c(1, -2, 1)
-        }
+        stepsize <- max(diff(z12)*0.01, iqr*0.001) # If the points are close, use IQR
+        zgrid <- mu.limit + stepsize*(0:3)
+        w.fp <- c(-11/6, 3, -1.5, 1/3)  # These numbers are obtained from the pnd package
+        w.fpp <- c(2, -5, 4, -1)  # pnd::fdCoef(deriv.order = 2, stencil = 0:3)
       } else if (zn <= 0) {
         mu.limit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
-        if (diff(znn)*0.01 < iqr*0.001) {
-          zgrid <- mu.limit + iqr*0.001*(-3:0)
-          w.fp <- c(-1/3, 1.5, -3, 11/6)
-          w.fpp <- c(-1, 4, -5, 2)
-        } else {
-          zgrid <- mu.limit + diff(znn)*0.01*c(-1, 0, 1)
-          w.fp <- c(-0.5, 0, 0.5)
-          w.fpp <- c(1, -2, 1)
-        }
+        stepsize <- max(diff(znn)*0.01, iqr*0.001)
+        zgrid <- mu.limit + stepsize*(-3:0)
+        w.fp <- c(-1/3, 1.5, -3, 11/6)
+        w.fpp <- c(-1, 4, -5, 2)
       }
 
       llgrid <- sapply(zgrid, function(m) weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
-      ss <- zgrid[2] - zgrid[1]
-      fp <- sum(llgrid * w.fp) / ss
-      fpp <- sum(llgrid * w.fpp) / ss^2
+      fp <- sum(llgrid * w.fp) / stepsize
+      fpp <- sum(llgrid * w.fpp) / stepsize^2
       # Check with
       # pnd::Grad(function(m) weightedEL(z = z, mu = m, ct = ct)$logelr, zgrid[1],
       #   elementwise = FALSE, vectorised = FALSE, multivalued = FALSE, h = 1e-5)
-      if (z1 >= 0) {
-        f <- if (length(zgrid) == 4) llgrid[1] else llgrid[2]
-      } else if (zn <= 0) {
-        f <- if (length(zgrid) == 4) llgrid[4] else llgrid[2]
-      }
+      f <- if (z1 >= 0) llgrid[1] else if (zn <= 0) llgrid[4]
       abc <- getParabola(x = mu.limit, f, fp, fpp)
       parab  <- function(x) abc[1]*x^2  + abc[2]*x  + abc[3]
       logelr <- parab(0)

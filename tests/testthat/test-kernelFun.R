@@ -30,7 +30,7 @@ test_that("C++ kernels integrate to 1, are symmetrical, and the order is correct
   expect_true(all(abs(m[, 7]) > 1e-8))
 })
 
-test_that("kernelFun preserves dimensions and names" {
+test_that("kernelFun preserves dimensions and names", {
   x <- matrix(1:9, nrow = 3, dimnames = list(c("r1", "r2", "r3"), c("A", "B", "C")))
   k <- kernelFun(x)
   expect_equal(dimnames(x), dimnames(k))
