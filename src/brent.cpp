@@ -592,11 +592,11 @@ List brentZeroCPP(
 
   int finalIter = iterCount;
   if (convFail) {
-    finalIter = -1; // like uniroot does: negative if not converged
+    finalIter = -iterCount; // like uniroot does: negative if not converged
   }
 
   // The total iteration is "main brent iteration + initSteps"
-  int totalIter = (finalIter < 0) ? -1 : (finalIter + initSteps);
+  int totalIter = (finalIter < 0) ? finalIter : (finalIter + initSteps);
 
   // Return
   return List::create(
