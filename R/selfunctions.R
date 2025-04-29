@@ -43,7 +43,7 @@ getParabola <- function(x, f, fp, fpp) {
 #' @param lower A positive scalar or numeric vector denoting the left cut-off before which log(weight)
 #'   in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order} is 2, 4, 6, or 8.
 #'   If \code{NULL} or \code{-Inf}, no such replacement is done. Recommended at a small number ct/sum(ct)
-#'   to ensure self-concordance of the log-likelihoogetParabola(-1, -6, -1, 4)d.
+#'   to ensure self-concordance of the log-likelihood.
 #' @param upper A positive scalar or numeric vector greater or equal to \code{lower} denoting the right cut-off
 #'   after which log(weight) in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order}
 #'   is 2, 4, 6, or 8. If \code{NULL} or \code{Inf}, no such replacement is done. Recommended at 1
@@ -238,12 +238,24 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
 
   # Weighted mean and variance for convenience
   wm <- stats::weighted.mean(z, ct)
-  wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)
+  wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)  # Variance of the mean; dividing by sum(ct) is not a mistake
 
   # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z),
   # or some form of Taylor expansion must be used to avoid this check an simply return a strongly negative
   # value (e.g. Euclidean LL, quartic LL etc.) without w_i > 0 or a Wald statistic instead of LR
-  spanning <- z1 < 0 && zn > 0
+  zu <- sort(unique(z))
+  l <- length(zu)
+  if (length(zu) >= 2) {
+    z12 <- zu[1:2]
+    znn <- zu[l-1:0]
+  } else {
+    z12 <- znn <- rep(zu[1], 2)
+  }
+  mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
+  mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
+
+  spanning <- ((z1 < 0 && zn > 0) && chull.fail == "none") || ((mu.llimit <= 0 && mu.rlimit >= 0) && chull.fail == "taylor")
+
   if (length(z) < 2) { # Codes > 5
     exitcode <- 6
   } else if (z1 == zn) { # The sample is degenerate without variance, no extrapolation possible
@@ -257,42 +269,37 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       int <- c(0, 0)
       exitcode <- 7
     } else if (chull.fail == "taylor") {
-      zu <- sort(unique(z))
-      l <- length(zu)
-      if (length(zu) < 2) stop("Even with Taylor extrapolation, at least two unique observations are required.")
-      z12 <- zu[1:2]
-      znn <- zu[l-1:0]
+      if (length(zu) < 2) stop("For Taylor extrapolation, at least two unique observations are required.")
       iqr <- stats::IQR(z)
-      if (iqr == 0) iqr <- sd(z)
-
+      if (iqr == 0) iqr <- stats::sd(z)
       # With f(x + (0, 1, 2, 3)h), one can estimate the following derivatives
       # 2nd: weights 2 -5 4 -1, error O(h^2)
       # 1st: weights -11/6 3 -1.5 1/3, error O(h^3)
       # With f(x + (-1, 0, 1)h), it is the standard 1 -2 1 for f'' and -0.5 0.5 for f'
       # Step size for noisy functions: for 3 wrong digits, multiply the optimum by 10
-      if (z1 >= 0) {  # All non-negative values, sample average > 0
+      if (mean(sign(zu)) >= 0) {  # All non-negative values, sample average > 0
+        # If the spanning condition holds but barely, we need to ignore one point
         # Larger step size for numerically more stable parabola estimates
-        mu.limit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
+        mu.limit <- mu.llimit
         stepsize <- max(diff(z12)*0.01, iqr*0.001) # If the points are close, use IQR
-        zgrid <- mu.limit + stepsize*(0:3)
-        w.fp <- c(-11/6, 3, -1.5, 1/3)  # These numbers are obtained from the pnd package
-        w.fpp <- c(2, -5, 4, -1)  # pnd::fdCoef(deriv.order = 2, stencil = 0:3)
-      } else if (zn <= 0) {
-        mu.limit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
+      } else if (mean(sign(zu)) <= 0) {
+        mu.limit <- mu.rlimit
         stepsize <- max(diff(znn)*0.01, iqr*0.001)
-        zgrid <- mu.limit + stepsize*(-3:0)
-        w.fp <- c(-1/3, 1.5, -3, 11/6)
-        w.fpp <- c(-1, 4, -5, 2)
+      } else if (mean(sign(zu)) == 0) {  # There are two unique points?
+        stop("Error checking the signs of the data for correct extrapolation. Please report this bug.")
       }
+      zgrid <- mu.limit + stepsize*(-1:1)
+      w.fp <- c(-0.5, 0, 0.5)  # These numbers are obtained from the pnd package
+      w.fpp <- c(1, -2, 1)  # pnd::fdCoef(deriv.order = 1, stencil = -1:1)
 
-      llgrid <- sapply(zgrid, function(m) weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
+      llgrid <- sapply(zgrid, function(m) weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr)
       fp <- sum(llgrid * w.fp) / stepsize
       fpp <- sum(llgrid * w.fpp) / stepsize^2
       # Check with
       # pnd::Grad(function(m) weightedEL(z = z, mu = m, ct = ct)$logelr, zgrid[1],
       #   elementwise = FALSE, vectorised = FALSE, multivalued = FALSE, h = 1e-5)
-      f <- if (z1 >= 0) llgrid[1] else if (zn <= 0) llgrid[4]
-      abc <- getParabola(x = mu.limit, f, fp, fpp)
+      f <- llgrid[2]
+      abc <- unname(getParabola(x = mu.limit, f, fp, fpp))
       parab  <- function(x) abc[1]*x^2  + abc[2]*x  + abc[3]
       logelr <- parab(0)
       # For z = 1:9
@@ -310,6 +317,7 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       exitcode <- 10
       }
     } else if (chull.fail == "wald") {  # Expansion of EL at 0
+      if (length(zu) < 2) stop("For Wald extrapolation, at least two unique observations are required.")
       logelr <- -0.5 * wm^2 / wv
       if (z1 == 0 || zn == 0) {
         converged <- TRUE
@@ -351,14 +359,9 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
 
     lam.list <- tryCatch(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (do.taylor) "yes" else "no",
                                  maxiter = con$maxiter, trace = con$trace),
-                       warning = function(w) return(list(brentZero(dllik, interval = int, tol = con$tol, extendInt = if (do.taylor) "yes" else "no",
-                                                                   maxiter = con$maxiter, trace = con$trace), w)),
-                       error = function(e) return(NULL)) # If there is a warning, we still return the object
+                       error = function(e) return(NULL))
+    # There can be only one kind of warning: maximum iterations reached
     if (!is.null(lam.list)) { # Some result with or without a warning as the second element of the list
-      if ("warning" %in% class(lam.list[[2]])) {
-        if (verbose) print(lam.list[[2]]) # The user should know that went wrong in uniroot()
-        lam.list <- lam.list[[1]]
-      }
       lam <- lam.list$root
       zlam1 <- 1 + z * lam + shift
       wvec <- ct * logTaylor(zlam1, der = 1, order = taylor.order, eps = lower, M = upper)[, "deriv1"]
@@ -368,12 +371,10 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       # Empirical fix for nonsensical probabilities
       # This should not happen unless the spanning condition fails and the Taylor expansion is very inaccurate
       if (any(wvec < 0) && logelr > 0) logelr <- -logelr
-      if (any(!is.infinite(wvec))) exitcode <- 14
+      if (any(!is.finite(wvec))) exitcode <- 14
 
-      converged <- if ("warning" %in% class(lam.list[[2]])) FALSE else TRUE
-      iter <- lam.list$iter
-      if (iter == con$maxiter) converged <- FALSE
-
+      # brentZero returns the number of iterations times -1 in case it exceeds the maximum number allowed
+      converged <- lam.list$iter  >= 0
       estim.prec <- lam.list$estim.prec
       f.root <- lam.list$f.root
       exitcode <- 0
@@ -625,137 +626,7 @@ smoothEmplik <- function(rho, theta, data,
   return(ret)
 }
 
-#' Constrained smoothed empirical likelihood
-#'
-#' This function takes two vectors of parameters: free and fixed ones, so that SEL could be optimised with equality constraints.
-#' The fixed parameter vector must have full length, and have NA's in places where the free parameters should go.
-#' Then, the free parameter values will be inserted in places with NA, and the entire vector passed to smoothEmplik.
-#'
-#' @param par.free A numeric vector of *only the free parameters* passed to \code{rho}.
-#'   In case of constrained optimisation, must be shorter than the number of parameters in the model.
-#' @param par.fixed A numeric vector of the same length as \code{par.free}:
-#'   numeric values should be in the places where the values are to be kept fixed,
-#'   and NA where the free parameters should be. Use NULL or a vector of NA's for unrestricted optimisation.
-#' @param ... Passed to \code{\link{smoothEmplik}}.
-#'
-#' @return A scalar with the constrained (or, if \code{par.fixed = NULL}, unconstrained SEL.)
-#' @export
-#'
-#' @examples
-constrSmoothEmplik <- function(par.free = NULL,
-                               par.fixed = NULL,
-                               ...
-) {
-  if (is.null(par.free)) { # No free parameters supplied
-    theta <- par.fixed
-  } else if (isTRUE(all(is.na(par.fixed))) || is.null(par.fixed)) { # All free parameters
-    theta <- par.free
-  } else { # Some free, some fixed parameters
-    theta <- par.fixed
-    theta[is.na(theta)] <- par.free
-  }
-  SEL <- smoothEmplik(theta = theta, ...)
-  return(SEL)
-}
 
-#' Optimise SEL with or without constraints
-#'
-#' @param start.values Initial values for unrestricted parameters.
-#' @param restricted.params Fixed parameter values used for constrained optimisation, hypothesis testing, power and size calculations etc.
-#' @param verbose If TRUE, reports optimisation progress, otherwise remains silent.
-#' @param optmethod A string indicating the optimisation method: "nlm" (the default,
-#'   invoking \code{stats::nlm}) is slightly quicker, and if it fails, "BFGS" is used.
-#' @param nlm.step.max Passed to \code{nlm} if \code{optmethod == "nlm"}; in case
-#'   of convergence issues, can be reduced, but if it is too small and 5 \code{nlm} iterations
-#'   are done with the maximum step size, optimisation is re-done via BFGS.
-#' @param maxit Maximum number of numerical optimiser steps. If it has not converged in this number of steps, fail gracefully with a meaningfull return.
-#' @param ... Passed to \code{\link{constrSmoothEmplik}} or, in case all parameters are fixed, \code{\link{smoothEmplik}}.
-#'
-#' @return A list with the following elements:
-#' \describe{
-#' \item{par}{The argmax of the SEL that was found by the optimiser.}
-#' \item{value}{The SEL value corresponding to \code{par}.}
-#' \item{restricted}{A logical vector of the same length as \code{par} indicating if the respective element was kept fixed during the optimisation.}
-#' \item{xtimes}{A vector with two components indicating time (in seconds) it took to find the candidate initial value and the final optimum respectively.}
-#' }
-#' @export
-#'
-#' @examples
-maximiseSEL <- function(start.values = NULL,
-                        restricted.params = NULL,
-                        verbose = FALSE,
-                        optmethod = c("nlm", "BFGS", "Nelder-Mead"),
-                        nlm.step.max = NULL,
-                        maxit = 50,
-                        ...) {
-  optError <- function(e = NULL) return(list(code = 5))
-  optmethod <- optmethod[1]
-  tic0 <- Sys.time()
-
-  # Case 1: If all parameters are restricted, just evaluate the SEL at the given point
-  if (!is.null(restricted.params) && all(is.finite(restricted.params))) {
-    SEL <- smoothEmplik(theta = restricted.params, ...)
-    diff.opt <- as.numeric(difftime(Sys.time(), tic0, units = "secs"))
-    return(list(par = restricted.params, value = SEL, restricted = rep(TRUE, length(restricted.params)), code = 0, xtimes = c(initial = 0, opt = diff.opt)))
-  }
-
-  # Case 2: # If the model is estimated without restrictions; safeguarging against logical(0)
-  if (isTRUE(all(is.na(restricted.params))) || is.null(restricted.params)) {
-    restricted <- rep(FALSE, length(start.values))
-  } else {
-    restricted <- !is.na(restricted.params)
-  }
-
-  if (verbose) cat("Maximising SEL.\n")
-  opt.controls <- list(trace = as.numeric(verbose), REPORT = 1, maxit = maxit, fnscale = -1)
-  if (!is.null(list(...)$minus)) stop("Do not pass 'minus' to 'maximiseSEL'.")
-  SELToOptim <- function(theta, ...) constrSmoothEmplik(par.free = theta, par.fixed = restricted.params, minus = FALSE, ...)
-  if (optmethod == "nlm") {
-    if (is.null(nlm.step.max)) nlm.step.max <- sqrt(sum(start.values^2)) / 3
-    optim.SEL <- tryCatch(stats::nlm(p = start.values, f = function(x, ...) -SELToOptim(x, ...), print.level = verbose * 2, stepmax = nlm.step.max, ...), error = optError)
-    if (optim.SEL$code %in% c(4, 5)) { # If there are optimisation issues
-      warning(paste0("nlm exit code: ", optim.SEL$code, ", restarting with BFGS."))
-      rm(optim.SEL) # Purging the faulty result
-    }
-  }
-  if (!exists("optim.SEL")) {
-    if (optmethod == "nlm") optmethod <- "BFGS" # Overriding the more fragile method
-    optim.SEL <- tryCatch(stats::optim(par = start.values, fn = SELToOptim, control = opt.controls, method = optmethod, ...), error = optError)
-  }
-
-  diff.opt <- as.numeric(difftime(Sys.time(), tic0, units = "secs"))
-  if (any(restricted)) {
-    thetahat <- restricted.params
-    thetahat[is.na(thetahat)] <- if (optmethod != "nlm") optim.SEL$par else optim.SEL$estimate
-  } else {
-    thetahat <- if (optmethod != "nlm") optim.SEL$par else optim.SEL$estimate
-  }
-  SEL <- if (optmethod != "nlm") optim.SEL$value else -optim.SEL$minimum
-  if (!isTRUE(abs(SEL) < 1e15)) {
-    SEL <- NA
-    thetahat <- rep(NA, length(thetahat))
-  }
-  names(thetahat) <- names(start.values)
-
-  iters <- if (optmethod != "nlm") min(optim.SEL$counts, na.rm = TRUE) else optim.SEL$iterations
-  code  <- if (optmethod != "nlm") optim.SEL$convergence else optim.SEL$code
-  if (iters == maxit) {
-    SEL <- NA
-    thetahat <- rep(NA, length(thetahat))
-    code <- 4
-  }
-  if (optmethod %in% c("BFGS", "L-BFGS-B")) {
-    if (code == 1) {
-      SEL <- NA
-      thetahat <- rep(NA, length(thetahat))
-      code <- 4
-    }
-  }
-  if (verbose) print(paste0("Unconstrained optimisation finished in ", round(diff.opt, 1), " secs; SEL(", paste(round(thetahat, 2), collapse = ","), ")=", round(SEL, 2), "."))
-
-  results <- list(par = thetahat, value = SEL, restricted = restricted, code = code, iterations = iters, xtimes = diff.opt)
-  return(results)
-}
 
 #' Convert a weight vector to list
 #'

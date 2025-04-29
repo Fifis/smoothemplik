@@ -85,6 +85,7 @@ test_that("exit codes of weightedEL", {
   expect_equal(weightedEL(rep(pi, 10), mu = pi, chull.fail = "taylor")$exitcode, 8)
   expect_equal(weightedEL(0:3, chull.fail = "taylor")$exitcode, 9)
   expect_equal(weightedEL(c(0.999, 1:9), chull.fail = "taylor")$exitcode, 10)
+  expect_equal(weightedEL(1:5, chull.fail = "wald")$exitcode, 12)
   expect_equal(weightedEL(z = -1:8, lower = 0.1, upper = 0.1, taylor.order = 2)$exitcode, 13)
   # Come up with ideas for 1, &, 4 exit code!
 })
