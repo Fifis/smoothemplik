@@ -39,7 +39,7 @@ cemplik(
 
 \item{M}{Upper cutoff for \code{logTaylor()}, default Inf}
 
-\item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to \code{logTaylor}.}
+\item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].}
 
 \item{wttol}{Weight tolerance for counts to improve numerical stability}
 

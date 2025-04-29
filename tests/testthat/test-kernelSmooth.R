@@ -31,8 +31,8 @@ test_that("de-duplication works in kernelSmooth", {
   y <- y.uniq[inds]
   xout <- x.uniq[sort(ceiling(runif(n.uniq*3, 0, n.uniq)))]
   w <- runif(n)
-  m1 <- kernelSmooth(x, y, xout, w, kernel = "triangular", bw = 1)
-  m2 <- kernelSmooth(x, y, xout, w, kernel = "triangular", bw = 1, no.dedup = TRUE)
+  m1 <- kernelSmooth(x, y, xout, weights = w, kernel = "triangular", bw = 1)
+  m2 <- kernelSmooth(x, y, xout, weights = w, kernel = "triangular", bw = 1, no.dedup = TRUE)
   expect_equal(as.numeric(m1), as.numeric(m2), tolerance = 1e-5)
 })
 

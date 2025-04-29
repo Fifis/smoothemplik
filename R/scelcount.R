@@ -30,7 +30,7 @@
 #' @param lam Starting lambda, default (0 ... 0)
 #' @param eps Lower cut-off for \code{logTaylor()}, default 1/nrow(z)
 #' @param M Upper cutoff for \code{logTaylor()}, default Inf
-#' @param order Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to \code{logTaylor}.
+#' @param order Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].
 #' @param wttol Weight tolerance for counts to improve numerical stability
 #' @param thresh Convergence threshold for log-likelihood (the default is aggressive)
 #' @param itermax Upper bound on number of Newton steps (seems ample)

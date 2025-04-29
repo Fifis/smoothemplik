@@ -2,7 +2,7 @@ citHeader("Please cite this material in publications as:")
 
 bibentry(
   bibtype="Manual",
-  title = "smoothemplik: Smoothed Empirikal Likelihood for efficient estimation and specification testing",
+  title = "smoothemplik: Smoothed Empirical Likelihood for efficient estimation and specification testing",
   author = person(given=c("Andreï", "Victorovitch"), family="Kostyrka", role = c("aut", "cre"), email = "andrei.kostyrka@gmail.com"),
   year = "2025",
   note = "R package version 0.0.13",

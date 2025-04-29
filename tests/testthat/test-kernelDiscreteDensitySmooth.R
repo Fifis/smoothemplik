@@ -5,7 +5,7 @@ test_that("kernelDiscreteDensitySmooth works", {
   ux <- -4:3+0.5
   x2 <- as.numeric(as.character(cut(x, -4:4, labels = ux)))
   yhat.comp <- kernelDiscreteDensitySmooth(x = x2, y = y, compact = TRUE)
-  z <- smoothemplik:::.prepareKernel(x = x2, y = y, bw = 1)
+  z <- prepareKernel(x = x2, y = y, bw = 1)
   wm <- sapply(ux[2:(length(ux)-1)], function(xx) {
     ii <- z$x == xx
     weighted.mean(z$y[ii], w = z$weights[ii])
