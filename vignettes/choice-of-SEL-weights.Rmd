@@ -1,0 +1,197 @@
+---
+title: "Choosing weights for empirical likelihood smoothing"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+bibliography: "../inst/REFERENCES.bib"
+author: "Andreï V. Kostyrka, University of Luxembourg"
+date: "Created: 2025-04-29, last modified: 2024-04-29, compiled: `r Sys.Date()`"
+abstract: "This vignette demonstrates how the choice of SEL weights for smoothing the empirical likelihood affects the final result."
+keywords: "smoothed empirical likelihood, bandwidth selection, semi-parametric efficiency"
+vignette: >
+  %\VignetteIndexEntry{Choosing weights for empirical likelihood smoothing}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::knit_hooks$set(pngquant = knitr::hook_pngquant)
+knitr::opts_chunk$set(
+  dev = "png",
+  dev.args = list(type = if (Sys.info()["sysname"] == "Darwin") "quartz" else "cairo-png"),
+  fig.width = 640 / 72,
+  fig.height = 480 / 72,
+  dpi = 72,
+  fig.retina = 1,
+  collapse = TRUE,
+  comment = "#>",
+  pngquant = "--speed=1 --quality=50-60"
+)
+```
+
+```{r setup}
+library(smoothemplik)
+
+quiet <- function(expr) {  # Suppressing all output
+  sink(if (.Platform$OS.type == "windows") "NUL" else "/dev/null")
+  ret <- expr
+  sink()
+  return(ret)
+}
+```
+
+
+
+## Kernel methods
+
+There are many approaches to choosing the smoothing weights for conditional empirical likelihood, and there is no consensus on the optimality of one or another weighting scheme.
+
+Recall that in the SEL approach, the empirical likelihood of the data in the observed sample is maximised subject to the constraint $\mathbb{E}(\rho(Z, \theta) \mid X) = 0$. Assume for simplicity that the dimension of the moment function $\rho$ is 1. The optimisation problem is therefore finding the optimal discrete distribution that enforces a sample analogue of this conditional moment restriction for any parameter $\theta$:
+\[
+\max_{0 < p_{ij} < 1} \sum_{i=1}^n \sum_{j=1}^n w_{ij} \log p_{ij},
+\]
+where $\sum_j p_{ij} = 1$ for $i=1,\ldots,n$ and $\sum_j p_{ij}\rho(Z_j, \theta) = 0$ for $i=1,\ldots,n$.
+
+The solution to this problem has a closed form:
+\[
+\hat p_{ij} = \frac{w_{ij}}{1 + \hat\lambda_i (\theta) \rho(Z_j, \theta)},
+\]
+where the Lagrange multipliers $\hat\lambda_i$ are the solution to the equality $\sum_{j=1}^n \frac{w_{ij} \rho(Z_j, \theta)}{1 + \lambda_i(\theta) \rho(Z_j, \theta)} = 0$ (the first-order condition for maximising the weighted empirical likelihood), found numerically.
+
+Typically, $w_{ij}$ are kernel weights. They can be obtained in a plethora of approaches:
+
+1. Directly apply popular kernels to the conditioning variables $X$;
+2. Transform $X$ coordinate-wise via any probability-integral-like transformation (empirical CDF, Gaussian CDF etc.) to map them into the $[0, 1]^{\dim X}$ hyper-cubel;
+3. For each $X$, find its $k$ nearest neighbours, rank them by proximity, and apply the kernel function to the ranks of the nearest  observations.
+4. Choose the adaptive bandwidth $b_n(X_i) = b_i$ such that there be exactly $k$ nearest neighbours in the vicinity defined by the kernel, without any rank transformation.
+
+Theoretically, approach (4) should work the best because it ensures that there are enough observations for smoothing, and that there is neither over- or under-smoothing. The latter two phenomena are a problem:
+
+* If the SEL bandwidth is too large, then, identification is lost because the conditional moment restriction becomes an unconditional one (‘the average residual is zero’), and the model parameters cannot be estimated.
+* If SEL bandwidth is too narrow, then, there is not enough smoothing of the likelihood; since the log-empirical-likelihood ratio is unbounded from below, the values of the SELR statistic can become arbitrarily small. In addition, too small a bandwidth limits the parameter space severely because for the SELR statistic to be finite, there must be at least one pair of opposite-sign residuals. This is known as the spanning condition, which means that the convex hull of the data must contain the zero,.
+
+Consider kernel weights of the form
+\[
+w_{ij} := k\left( \frac{X_i - X_j}{b} \right),
+\]
+where $k$ is a kernel function that is zero outside $[-1, 1]$, integrates to one, and is symmetric and non-negative within that interval. The most popular kernel functions are uniform, triangular (Bartlett), quadratic (Epanechnikov), quartic, and Gaussian.
+
+### Fixed bandwidth
+
+Using a fixed bandwidth for SEL smoothing is the simplest choice, yet it can be sub-optimal for many reasons. 
+In the regions where the observations are dense, the empirical likelihood may be over-smoothed, whereas in low-density regions, it may be undersmoothed, creating problems for the spanning condition.
+
+The obvious ‘crutch’ to fix the spanning condition failure is the use of some sort of extrapolation of the SELR function outside the convex hull.
+The present package offers two options for the `weightedEL()` function: `chull.fail = "taylor"` that extrapolates its branches halfway after the penultimate observation at each side, or `chull.fail = "wald"` that replaces the SELR function halfway between the outermost observations with a (discontinuous) Wald approximation.
+
+```{r}
+x <- c(-5, -3:3, 7)
+grid.full <- seq(-5.5, 7.5, 0.1)
+selr0 <- sapply(grid.full, function(m) -2*weightedEL(x, mu = m, chull.fail = "none")$logelr)
+selr <- sapply(grid.full, function(m) -2*weightedEL(x, mu = m, chull.fail = "taylor")$logelr)
+plot(grid.full, selr, ylim = c(0, 60), xlim = c(-5.5, 7.5),
+     col = 1 + (grid.full < -4 | grid.full > 5), bty = "n",
+     main = "-2 * weighted log-EL ratio")
+lines(grid.full, selr0, lty = 1)
+lines(grid.full, (grid.full - mean(x))^2 / (var(grid.full) / length(x)), lty = 2)
+rug(x, lwd = 2)
+```
+
+These extrapolations may certainly remedy the predicament of having negative infinity for the log-ELR statistic, which does not get accepted by most numerical optimisers -- but they should not be relied upon.
+It is normal to have ‘bad’ values for ‘bad’ guesses during the optimisation process, but at the initial value and at the optimum, the spanning condition should hold.
+
+### Nearest-neigbour weights
+
+
+### Adaptive weights
+
+Define a  function that chooses such a bandwidth that there be `ceiling(d/n)` nearest neighbours for each observation. It is assumed that the kernel in question is zero outside $[-1, 1]$.
+```{r}
+pickMinBW <- function(X, d = 2 / sqrt(length(X))) {
+  n <- length(X)
+  nd <- ceiling(d*n)
+  b <- numeric(n)
+  gaps <- pmin(c(NA, diff(X)), c(diff(X), NA))
+  gaps[1] <- X[2] - X[1]
+  gaps[n] <- X[n] - X[n-1]
+  for (i in 1:n) {
+    bw.start <- gaps[i] * 2
+    obs.neigh <- function(bw) sum(abs(X[i] - X) < bw) - 1
+    b[i] <- uniroot(function(bw) obs.neigh(bw) - nd, c(bw.start/2, bw.start/1.5), extendInt = "upX")$root
+  }
+  b
+}
+```
+
+
+### Simulation
+
+```{r}
+n <- 50
+set.seed(1)
+X <- sort(rchisq(n, df = 3))
+Y <- 1 + X + (rchisq(n, df = 3) - 3) * (1 + X)
+mod0 <- lm(Y ~ X)
+vhat0 <- kernelSmooth(X, mod0$residuals^2, bw = max(diff(X))*1.2, kernel = "epanechnikov")
+mod1 <- lm(Y ~ X, weights = 1 / vhat0)
+cbind(OLS = mod0$coefficients, WOLS = mod1$coefficients)
+```
+
+These values are far away from truth.
+
+Define four smoothing matrices:
+```{r}
+bw0 <- bw.CV(X, kernel = "epanechnikov")
+bw0 <- max(bw0, max(diff(X))*1.1)
+wF <- kernelWeights(X, bw = bw0, kernel = "epanechnikov")
+
+# Assuming Gaussian CDF, which is not true
+Xs <- scale(X)
+XP <- pnorm(Xs)
+wP <- kernelWeights(XP, bw = bw.CV(XP), kernel = "epanechnikov")
+rowMeans(wP > 0) - 1/n
+
+bw.adapt <- pickMinBW(X, d = 0.15)
+plot(X, bw.adapt, bty = "n", main = "Adaptive bandwidth ensuring 15% non-zero weights")
+wA <- kernelWeights(X, bw = bw.adapt, kernel = "epanechnikov")
+rowMeans(wA > 0) - 1/n
+
+rX <- rank(X)
+wNN <- kernelWeights(rX/max(rX), bw = 0.09, kernel = "epanechnikov")
+rowMeans(wNN > 0) - 1/n
+```
+
+
+
+```{r}
+g  <- function(theta, ...) Y - theta[1] - theta[2]*X
+
+wF <- wF / rowSums(wF)
+wP <- wP / rowSums(wP)
+wNN <- wNN / rowSums(wNN)
+wA <- wA / rowSums(wA)
+
+g1 <- function(theta) smoothEmplik(rho = g, theta = theta, data = NULL, sel.weights = wF, minus = TRUE)
+g2 <- function(theta) smoothEmplik(rho = g, theta = theta, data = NULL, sel.weights = wP, minus = TRUE)
+g3 <- function(theta) smoothEmplik(rho = g, theta = theta, data = NULL, sel.weights = wNN, minus = TRUE)
+g4 <- function(theta) smoothEmplik(rho = g, theta = theta, data = NULL, sel.weights = wA, minus = TRUE)
+  
+th1  <- optim(mod1$coefficients, g1, method = "BFGS", control = list(ndeps = rep(1e-5, 2)))
+th2  <- optim(mod1$coefficients, g2, method = "BFGS", control = list(ndeps = rep(1e-5, 2)))
+th3  <- optim(mod1$coefficients, g3, method = "BFGS", control = list(ndeps = rep(1e-5, 2)))
+th4  <- optim(mod1$coefficients, g4, method = "BFGS", control = list(ndeps = rep(1e-5, 2)))
+
+cbind(WOLS = mod1$coefficients, Fixed = th1$par, PIT = th2$par, NNeighb = th3$par, Adapt = th4$par)
+```
+
+
+## Conclusion
+
+This simulation emphasises the importance of careful bandwidth choice in efficient estimation via smoothing the empirical likelihood.
+Nearest-neighbour methods work well, whereas adaptive-bandwidth methods are comparable to them, but also possess lucrative theoretical proofs such as integrability.
+
+## References
+
+<div id="refs"></div>

@@ -67,7 +67,7 @@ quiet <- function(expr) {  # Suppressing all output
 
 Implementing kernel weights, kernel density estimation, and locally constant kernel regression in **R** is straightforward.
 
-Kernel weights define a local neighborhood for a point using the value of the kernel function:
+Kernel weights define a local neighbourhood for a point using the value of the kernel function:
 \[
 w_{ij} := k\left( \frac{X_i - X_j}{b} \right),
 \]
@@ -357,6 +357,8 @@ ys <- sapply(1:3, function(i) kernelSmooth(x = X,  y = Y, bw = bw.opt[i], degree
 colnames(ys) <- paste("Degree", 0:2)
 print(cor(cbind(Y, ys))[1, 2:4], 3)
 ```
+
+TODO: a vector of bandwidths (adaptive smoothing)
 
 ## Sparsity
 
