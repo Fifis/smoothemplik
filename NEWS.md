@@ -1,4 +1,4 @@
-# smoothemplik 0.next (2024-XX-XX)
+# smoothemplik 0.next (20245-XX-XX)
 
 These bug fixes and features are scheduled for the upcoming releases.
 
@@ -50,8 +50,16 @@ These bug fixes and features are scheduled for the upcoming releases.
 - DEV: Add tests reproducing simple hard-coded examples
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
+# smoothemplik 0.0.14 (2025-04-30)
 
-# smothemplik 0.0.13 (2025-02-05)
+- Fixed a bug in the Taylor expansion for the case of convex hull condition failures
+- Removed unfinished functions for optimisation and constrained optimisation
+- Implemented adaptive bandwidths at each point of the evaluation grid for better smoothing
+- Added a draft version of the vignette showcasing the use of adaptive kernels for smoothing
+- Implemented a Wald-like Taylor expansion to allow mu to be outside the convex hull in `weightedEL()`
+- Sped up the fourth-order triangular kernel
+
+# smoothemplik 0.0.13 (2025-02-05)
 
 - Implemented Taylor expansion to allow mu to be outside the convex hull in `weightedEL()`, as in Owen (2013)
 - Replaced `uniroot()` with a C++ version of Brent's zero search for speed
