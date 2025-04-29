@@ -135,8 +135,18 @@ getParabola <- function(x, f, fp, fpp) {
 #' abline(h = 0, lty = 2)
 #'
 #' # Handling the convex hull violation differently
-#' weightedEL(1:9)
+#' weightedEL(1:9, chull.fail = "none")
+#' weightedEL(1:9, chull.fail = "taylor")
 #' weightedEL(1:9, chull.fail = "wald")
+#'
+#' mu.seq <- seq(-1, 7, 0.1)
+#' wEL1 <- -2*sapply(mu.seq, function(m) weightedEL(1:9, mu = m, chull.fail = "none")$logelr)
+#' wEL2 <- -2*sapply(mu.seq, function(m) weightedEL(1:9, mu = m, chull.fail = "taylor")$logelr)
+#' wEL3 <- -2*sapply(mu.seq, function(m) weightedEL(1:9, mu = m, chull.fail = "wald")$logelr)
+#' plot(mu.seq, wEL1)
+#' lines(mu.seq, wEL2, col = 2)
+#' lines(mu.seq, wEL3, col = 4)
+#'
 #'
 #' # Warning: depending on the compiler, the discrepancy between cemplik and weightedEL
 #' # can be one million (1) times larger than the machine epsilon despite both of them
@@ -292,7 +302,7 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       w.fp <- c(-0.5, 0, 0.5)  # These numbers are obtained from the pnd package
       w.fpp <- c(1, -2, 1)  # pnd::fdCoef(deriv.order = 1, stencil = -1:1)
 
-      llgrid <- sapply(zgrid, function(m) weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr)
+      llgrid <- vapply(zgrid, function(m) weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
       fp <- sum(llgrid * w.fp) / stepsize
       fpp <- sum(llgrid * w.fpp) / stepsize^2
       # Check with
@@ -318,7 +328,22 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
       }
     } else if (chull.fail == "wald") {  # Expansion of EL at 0
       if (length(zu) < 2) stop("For Wald extrapolation, at least two unique observations are required.")
-      logelr <- -0.5 * wm^2 / wv
+
+      if (mean(sign(zu)) >= 0) {  # All non-negative values, sample average > 0
+        # Zero is to the left of the data --> left branch
+        mu.limit <- mu.llimit
+        gap <- if (l > 2) abs(diff(z12)) * 0.5 else abs(diff(z12)) * 0.05
+      } else if (mean(sign(zu)) <= 0) {
+        mu.limit <- mu.rlimit
+        gap <- if (l > 2) abs(diff(znn)) * 0.5 else abs(diff(znn)) * 0.05
+      }
+      # TODO: speed up the evaluation; extrapolate only where necessary; check the gap location
+      # Extract info from the interpTwo function
+      f <- function(mm) vapply(mm, function(m) -2*weightedEL(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
+      logelr <- interpTwo(x = 0, f = f, mean = wm, var = wv, at = mu.limit, gap = gap) * -0.5
+      # curve(f, 0, 9)
+      # abline(v = c(mu.limit, mu.limit - gap), lty = 3)
+      # curve((x-wm)^2/wv, 0, 4, col = 2, add = TRUE)
       if (z1 == 0 || zn == 0) {
         converged <- TRUE
         exitcode <- 11
