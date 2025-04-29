@@ -8,10 +8,10 @@ test_that("de-duplication in kernel preparation works correctly", {
   y <- runif(n.uniq)[inds]
   xout <- x.uniq[ceiling(runif(n.uniq*3, 0, n.uniq)), ]
   w <- runif(n)
-  a1 <- .prepareKernel(x, y, xout, w, bw = 0.5)
-  a2 <- .prepareKernel(x, y, xout, w, bw = 0.5,
+  a1 <- prepareKernel(x, y, xout, w, bw = 0.5)
+  a2 <- prepareKernel(x, y, xout, w, bw = 0.5,
                        deduplicate.x = FALSE, deduplicate.xout = FALSE)
-  a3 <- .prepareKernel(x, y, xout, w, bw = 0.5, no.dedup = TRUE)
+  a3 <- prepareKernel(x, y, xout, w, bw = 0.5, no.dedup = TRUE)
   expect_identical(a2, a3)
   expect_equal(sum(a1$weights), sum(a2$weights))
   expect_equal(unname(a2$duplicate.stats), rep(NA, 4))
