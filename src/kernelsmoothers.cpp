@@ -115,32 +115,29 @@ arma::vec ktriangular4(const arma::vec& x) {
 // Triangular kernel convolution (4th order)
 // t4 = piecewise([[(-1, 0), (1+x)*(12/7 - 30/7*x^2)], [(0, 1), (1-x)*(12/7 - 30/7*x^2)]])
 // t4c = t4.convolution(t4); t4c
+// However, this code was obtained in Mathematica in a convenient Horner form
+// Avoiding mutually exclusive checks yields a 3x speed-up, so this is a MORE efficient solution
+// because there are more correct CPU guesses and a mispredicted branch flushes the pipeline
 arma::vec ktriangular4conv(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
-  ax.for_each([](arma::vec::elem_type& val) {
-    if (val < 2.0) {
-      double y = val;
-      double y2 = y*y;
-      double y3 = y*y*y;
-      double k = 0.0;
+  ax.for_each([](arma::vec::elem_type& v) {
+    if (v < 2.0) {
 
-      if      (y < 0.159103584746285456968875)
-        k = 1.26275072097159918347946  - 5.8284271247461900976034*y2 + 6.7998316455372217805373*y3;
-      else if (y < 0.84089641525371454303113)
-        k = 1.27840020438083241247102  - 0.295081033545322291498316*y - 3.97377982678698142745338*y2 + 2.91421356237309504880169*y3;
-      else if (y < 1.0)
-        k = 5.8992048750628466606557   - 16.7803624077838925843085 *y + 15.6306340762793616226601*y2 - 4.85702260395515841466948*y3;
-      else if (y < 1.68179283050742908606225)
-        k = 2.01358679189871992892010  - 5.1235081582915123891017  *y + 3.97377982678698142745338*y2 - 0.97140452079103168293390*y3;
-      else if (y < 1.84089641525371454303113)
-        k = -16.4696318908293370638186 + 27.8470545901856281965186 *y - 15.6306340762793616226601*y2 + 2.91421356237309504880169*y3;
-      else {
-        double ym2 = y - 2;
-        k = -0.971404520791031682933897 * ym2 * ym2 * ym2;
-      }
-      val = k;
+      double seg1 =  1.2627507209715991834795    + v*v*(-5.828427124746190097603 + 6.799831645537221780537*v);
+      double seg2 =  1.2784002043808324124710    + v*(-0.29508103354532229149832 + v*(-3.9737798267869814274534 + 2.9142135623730950488017*v));
+      double seg3 =  5.89920487506284666066      + v*(-16.78036240778389258431 + (15.63063407627936162266 - 4.85702260395515841467*v)*v);
+      double seg4 =  2.0135867918987199289201    + v*(-5.123508158291512389102 + (3.9737798267869814274534 - 0.9714045207910316829339*v)*v);
+      double seg5 = -16.46963189082933706382     + v*(27.84705459018562819652 + v*(-15.63063407627936162266 + 2.914213562373095048802*v));
+      double seg6 =  7.7712361663282534634711699 + v*(-11.6568542494923801952067549 + (5.82842712474619009760337745 - 0.971404520791031682933896241*v)*v);
+
+      v = seg1 * (v <  0.159103584746285456968875) +
+        seg2 * (v >= 0.159103584746285456968875) * (v < 0.84089641525371454303113) +
+        seg3 * (v >= 0.84089641525371454303113)  * (v < 1.0) +
+        seg4 * (v >= 1.00000000000000000000000)  * (v < 1.68179283050742908606225) +
+        seg5 * (v >= 1.68179283050742908606225)  * (v < 1.84089641525371454303113) +
+        seg6 * (v >= 1.84089641525371454303113);
     } else {
-      val = 0.0; // Set to zero if val is >= 2.0
+      v = 0.0; // Set to zero if v is >= 2.0
     }
   });
   return ax;
@@ -397,29 +394,37 @@ arma::vec kernelFunCPP(arma::vec x, std::string kernel, int order, bool convolut
 }
 
 // [[Rcpp::export]]
-arma::mat kernelWeightsOneCPP(arma::vec x, arma::vec xout, double bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
+arma::mat kernelWeightsOneCPP(arma::vec x, arma::vec xout, arma::vec bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
   arma::uword ng = xout.n_elem;
+  arma::uword nb = bw.n_elem;
   arma::uword nx = x.n_elem;
-  arma::vec xs = x / bw; // Scaling by the bandwidth
-  arma::vec gs = xout / bw;
+  if (nb != ng)
+    Rcpp::stop("bw and xout must have the same length.");
+  // arma::vec xs = x / bw; // Scaling by the bandwidth
+  // arma::vec gs = xout / bw;
+  const arma::vec inv_bw = 1.0 / bw;
   arma::mat kw(ng, nx);
 
   for (arma::uword i = 0; i < nx; i++)
-    kw.col(i) = kernelFunCPP(gs - xs[i], kernel, order, convolution);
+    kw.col(i) = kernelFunCPP((xout - x[i]) % inv_bw, kernel, order, convolution);
 
   return kw;
 }
 
 // [[Rcpp::export]]
-arma::sp_mat sparseKernelWeightsOneCPP(arma::vec x, arma::vec xout, double bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
+arma::sp_mat sparseKernelWeightsOneCPP(arma::vec x, arma::vec xout, arma::vec bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
   arma::uword ng = xout.n_elem;
+  arma::uword nb = bw.n_elem;
   arma::uword nx = x.n_elem;
-  arma::vec xs = x / bw; // Scaling by the bandwidth
-  arma::vec gs = xout / bw;
+  if (nb != ng)
+    Rcpp::stop("bw and xout must have the same length.");
+  // arma::vec xs = x / bw; // Scaling by the bandwidth
+  // arma::vec gs = xout / bw;
+  const arma::vec inv_bw = 1.0 / bw;
   arma::sp_mat kw(ng, nx);
 
   for (arma::uword i = 0; i < nx; ++i) {
-    arma::vec ko = kernelFunCPP(gs - xs[i], kernel, order, convolution);
+    arma::vec ko = kernelFunCPP((xout - x[i]) % inv_bw, kernel, order, convolution);
     arma::uvec nzrind = find(ko); // Find non-zero indices for the rows
     arma::uvec nzcind = arma::ones<arma::uvec>(nzrind.n_elem) * i;
     arma::umat nzind = arma::join_cols(nzrind.t(), nzcind.t());
@@ -432,42 +437,46 @@ arma::sp_mat sparseKernelWeightsOneCPP(arma::vec x, arma::vec xout, double bw, s
 }
 
 // [[Rcpp::export]]
-arma::mat kernelWeightsCPP(arma::mat x, arma::mat xout, arma::vec bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
+arma::mat kernelWeightsCPP(arma::mat x, arma::mat xout, arma::mat bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
   arma::uword d = x.n_cols;
   // The product kernel matrix starts with the first dimension (there is at least one column or row)
   // We need to compute the product kernel starting from the 2nd till the last dimension
   // The loop from k=1, k<d ensures that
-  arma::mat pk = kernelWeightsOneCPP(x.col(0), xout.col(0), bw[0], kernel, order, convolution);
+  arma::mat pk = kernelWeightsOneCPP(x.col(0), xout.col(0), bw.col(0), kernel, order, convolution);
   for (arma::uword k = 1; k < d; ++k)
-    pk %= kernelWeightsOneCPP(x.col(k), xout.col(k), bw[k], kernel, order, convolution);
+    pk %= kernelWeightsOneCPP(x.col(k), xout.col(k), bw.col(k), kernel, order, convolution);
   return pk;
 }
 
 // [[Rcpp::export]]
-arma::sp_mat sparseKernelWeightsCPP(arma::mat x, arma::mat xout, arma::vec bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
+arma::sp_mat sparseKernelWeightsCPP(arma::mat x, arma::mat xout, arma::mat bw, std::string kernel = "gaussian", int order = 2, bool convolution = false) {
   arma::uword d = x.n_cols;
   // The product kernel matrix starts with the first dimension (there is at least one column or row)
   // We need to compute the product kernel starting from the 2nd till the last dimension
   // The loop from k=1, k<d ensures that
-  arma::sp_mat pk = sparseKernelWeightsOneCPP(x.col(0), xout.col(0), bw[0], kernel, order, convolution);
+  arma::sp_mat pk = sparseKernelWeightsOneCPP(x.col(0), xout.col(0), bw.col(0), kernel, order, convolution);
   for (arma::uword k = 1; k < d; ++k)
-    pk %= sparseKernelWeightsOneCPP(x.col(k), xout.col(k), bw[k], kernel, order, convolution);
+    pk %= sparseKernelWeightsOneCPP(x.col(k), xout.col(k), bw.col(k), kernel, order, convolution);
   return pk;
 }
 
 // [[Rcpp::export]]
-NumericVector kernelDensityCPP(arma::mat x, arma::mat xout, arma::vec weights, arma::vec bw, std::string kernel = "gaussian", int order = 2, bool convolution = false, int chunks = 0) {
+NumericVector kernelDensityCPP(arma::mat x, arma::mat xout, arma::vec weights, arma::mat bw, std::string kernel = "gaussian", int order = 2, bool convolution = false, int chunks = 0) {
   arma::uword ng = xout.n_rows;
+  arma::uword nbw = bw.n_rows;
+  if (nbw != ng)
+    Rcpp::stop("bw and xout must have the same number of rows.");
   arma::uword nx = x.n_rows;
-  arma::uword d = x.n_cols;
+  // arma::uword d = x.n_cols;
   if (chunks == 0) { // Auto-selection of matrix slices
     long long memuse = static_cast<long long>(ng) * static_cast<long long>(nx) * 8;
     int neededblks = std::max(1, static_cast<int>(memuse / 536870912)); // 2^29 = 512 MB RAM target use; not allowing more that double that amount
     chunks = neededblks;
   }
 
-  double nb = (double)arma::sum(weights); // n*prod(b) in the denominator
-  for (arma::uword k=0; k < d; k++) nb *= bw[k];
+  const double n = arma::sum(weights);
+  arma::vec prod_bw = arma::prod(bw, 1);
+  arma::vec nb   = n * prod_bw; // n*prod(b) in the denominator
 
   arma::vec out(ng);
   if (chunks == 1) {
@@ -488,8 +497,11 @@ NumericVector kernelDensityCPP(arma::mat x, arma::mat xout, arma::vec weights, a
 }
 
 // [[Rcpp::export]]
-NumericVector kernelSmoothCPP(arma::mat x, arma::vec y, arma::mat xout, arma::vec weights, arma::vec bw, std::string kernel = "gaussian", int order = 2, bool LOO = false, bool convolution = false, int chunks = 0) {
+NumericVector kernelSmoothCPP(arma::mat x, arma::vec y, arma::mat xout, arma::vec weights, arma::mat bw, std::string kernel = "gaussian", int order = 2, bool LOO = false, bool convolution = false, int chunks = 0) {
   arma::uword ng = xout.n_rows;
+  arma::uword nb = bw.n_rows;
+  if (nb != ng)
+    Rcpp::stop("bw and xout must have the same number of rows.");
   arma::uword nx = x.n_rows;
   if (chunks == 0) { // Auto-selection of matrix slices
     long long memuse = static_cast<long long>(ng) * static_cast<long long>(nx) * 8;

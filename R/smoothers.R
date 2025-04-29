@@ -201,6 +201,9 @@ pit <- function(x, xout = NULL) {
 #' checks the dimensions, provides the bandwidth, creates default arguments
 #' to pass to the C++ functions, carries out de-duplication for speed-up etc.
 #'
+#' @return A list of arguments that are taken by [kernelDensity()] and [kernelSmooth()].
+#' @export
+#'
 #' @examples
 #' # De-duplication facilities
 #' set.seed(1)  # Creating a data set with many duplicates
@@ -212,15 +215,15 @@ pit <- function(x, xout = NULL) {
 #' y <- runif(n.uniq)[inds]
 #' xout <- x.uniq[ceiling(runif(n.uniq*3, 0, n.uniq)), ]
 #' w <- runif(n)
-#' print(system.time(a1 <- smoothemplik:::.prepareKernel(x, y, xout, w, bw = 0.5)))
-#' print(system.time(a2 <- smoothemplik:::.prepareKernel(x, y, xout, w, bw = 0.5,
+#' print(system.time(a1 <- prepareKernel(x, y, xout, w, bw = 0.5)))
+#' print(system.time(a2 <- prepareKernel(x, y, xout, w, bw = 0.5,
 #'                   deduplicate.x = FALSE, deduplicate.xout = FALSE)))
 #' print(c(object.size(a1), object.size(a2)) / 1024) # Kilobytes used
 #' # Speed-memory trade-off: 4 times smaller, takes 0.2 s, but reduces the
 #' # number of matrix operations by a factor of
 #' 1 - prod(1 - a1$duplicate.stats[1:2])    # 95% fewer operations
 #' sum(a1$weights) - sum(a2$weights)  # Should be 0 or near machine epsilon
-.prepareKernel <- function(x,
+prepareKernel <- function(x,
                            y = NULL,
                            xout = NULL,
                            weights = NULL,
@@ -248,6 +251,7 @@ pit <- function(x, xout = NULL) {
     if (!is.null(dim(y))) y <- drop(y)
     if (length(y) != nrow(x)) stop("The length of 'y' must be equal to the number of obervations (NROW(x)).")
   }
+  n <- NROW(x)
 
   x.matches <- xout.matches <- NULL
   duplicate.stats <- c(dup.rate.x = NA, dup.rate.xout = NA, seconds.x = NA, seconds.xout = NA)
@@ -260,6 +264,7 @@ pit <- function(x, xout = NULL) {
   }
   if (is.data.frame(xout)) xout <- as.matrix(xout)
   if (is.vector(xout)) xout <- matrix(xout, ncol = 1)
+
 
   d <- ncol(x) # Dimension of the problem
   if (d != ncol(xout)) stop("x and xout must be have the same number of columns (i.e. the same dimension).")
@@ -308,11 +313,12 @@ pit <- function(x, xout = NULL) {
       }
     }
   }
+  nout <- NROW(xout)
 
   if (PIT) {
     for (i in 1:d) {
-      x[, i] <- pit(x[, i])
       xout[, i] <- pit(x = x[, i], xout = xout[, i])
+      x[, i] <- pit(x[, i])
     }
   }
 
@@ -321,8 +327,15 @@ pit <- function(x, xout = NULL) {
     warning("No bandwidth supplied, using Silverman's multi-dimensional rule of thumb: bw = (",
             paste(sprintf("%1.2e", bw), collapse = ", "), ").")
   }
-  if (length(bw) == 1) bw <- rep(bw, d)
-  if (length(bw) != d) stop("The vector of bandwidths must be of length 1 or ncol(x)!")
+  if (length(bw) == 1) {
+    bw <- matrix(bw, nrow = nout, ncol = d)
+  } else if (length(bw) == nout) {
+    bw <- matrix(rep(bw, d), nrow = nout, ncol = d)
+  } else if (length(bw) == d) {
+    bw <- t(replicate(nout, bw))
+  } else if (length(bw) != d*nout) {
+    stop("The bandwidths must be a vector of length 1, or ncol(xout), or nrow(xout), or a matrix with the same dimensions as xout.")
+  }
 
   return(list(x = x, y = y, xout = xout, weights = weights,
               order = order, bw = bw, kernel = kernel,
@@ -334,7 +347,7 @@ pit <- function(x, xout = NULL) {
 
 #' Kernel-based weights
 #'
-#' @inheritParams .prepareKernel
+#' @inheritParams prepareKernel
 #' @param sparse Logical: TODO (should be ignored?)
 #'
 #' Note that if \code{pit = TRUE}, then the kernel-based weights become nearest-neighbour weights (i.e. not much different from the ones used
@@ -378,7 +391,7 @@ kernelWeights <- function(x,
                           deduplicate.xout = FALSE,
                           no.dedup = FALSE
 ) {
-  arg <- .prepareKernel(x = x, xout = xout, weights = NULL, bw = bw, kernel = kernel, PIT = PIT, order = order, convolution = convolution,
+  arg <- prepareKernel(x = x, xout = xout, weights = NULL, bw = bw, kernel = kernel, PIT = PIT, order = order, convolution = convolution,
                         deduplicate.x = deduplicate.x, deduplicate.xout = deduplicate.xout, no.dedup = no.dedup)
   if (!sparse)
     result <- kernelWeightsCPP(x = arg$x, xout = arg$xout, bw = arg$bw, kernel = arg$kernel, order = arg$order, convolution = convolution) else
@@ -393,7 +406,7 @@ kernelWeights <- function(x,
 #' Kernel density estimation
 #'
 #' @inheritParams kernelWeights
-#' @inheritParams .prepareKernel
+#' @inheritParams prepareKernel
 #' @param chunks Integer: the number of chunks to split the task into (limits
 #'   RAM usage but increases overhead). \code{0} = auto-select (making sure that
 #'   no matrix has more than 2^27 elements).
@@ -453,7 +466,7 @@ kernelDensity <- function(x,
                           no.dedup = FALSE,
                           return.grid = FALSE
 ) {
-  arg <- .prepareKernel(x = x, xout = xout, weights = weights, bw = bw,
+  arg <- prepareKernel(x = x, xout = xout, weights = weights, bw = bw,
                         kernel = kernel, PIT = PIT, order = order, convolution = convolution,
                         deduplicate.x = deduplicate.x, deduplicate.xout = deduplicate.xout, no.dedup = no.dedup)
   tic0 <- Sys.time()
@@ -573,6 +586,7 @@ kernelSmooth <- function(x,
                          no.dedup = FALSE,
                          return.grid = FALSE
 ) {
+  bw0 <- bw  # To be used later if there are robust iterations
   if (!(degree %in% 0:2)) stop("kernelSmooth: degree must be 0, 1, or 2.")
   robust <- robust[1]
   if (!(robust %in% c("huber", "bisquare"))) stop("kernelSmooth: 'robust' must be Huber (less robust) or 'bisquare' (redescending, robust).")
@@ -580,7 +594,7 @@ kernelSmooth <- function(x,
     warning("kernelSmooth: Leave-One-Out estimation requested, but a custom xout passed! Ignoring it.")
     xout <- NULL
   }
-  arg <- .prepareKernel(x = x, y = y, xout = xout, weights = weights, bw = bw, kernel = kernel,
+  arg <- prepareKernel(x = x, y = y, xout = xout, weights = weights, bw = bw, kernel = kernel,
                         PIT = PIT, order = order, convolution = convolution,
                         deduplicate.x = deduplicate.x, deduplicate.xout = deduplicate.xout, no.dedup = no.dedup)
 
@@ -613,7 +627,11 @@ kernelSmooth <- function(x,
     needs.full <- (!is.exact) & robust.iterations > 0
     if (needs.full) { # for final weights on x & xout because they are not equal
       # No PIT here because arg$x is already transformed
-      K.full <- kernelWeights(x = x, bw = bw, kernel = kernel, order = order, convolution = convolution)
+      # However, we require a bandwidth matrix for X, not xout, hence we can use only the initial v
+      arg.full <- prepareKernel(x = x, y = y, xout = x, weights = weights, bw = bw0, kernel = kernel,
+                           order = order, convolution = convolution,
+                           deduplicate.x = deduplicate.x, deduplicate.xout = deduplicate.xout, no.dedup = no.dedup)
+      K.full <- kernelWeights(x = arg.full$x, bw = arg.full$bw, kernel = arg.full$kernel, order = arg.full$order, convolution = convolution)
       K.full <- sweep(K.full, 2, weights, "*")
       if (LOO) diag(K.full) <- 0
       K.full <- K.full / rowSums(K.full)
@@ -886,7 +904,7 @@ kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NUL
   if (is.null(y) && type == "smooth") stop("Supply the mandatory 'y' argument to obtain a kernel regression smoother.")
   if (any(by != round(by))) stop("'by' must be an integer (consider using 'as.integer').")
   if (length(by) != NROW(x)) stop("The length of 'byout' must be the same as NROW(xout) (because they correspond to the same observations).")
-  if (is.null(xout)) xout <- x # This is not a redundancy; .prepareKernel must receive full data for de-duplication
+  if (is.null(xout)) xout <- x # This is not a redundancy; prepareKernel must receive full data for de-duplication
   if (is.null(byout)) byout <- by
   if (length(byout) != NROW(xout)) stop("The length of 'byout' must be the same as NROW(xout) (because they correspond to the same observations).")
   if (!all(unique(byout) %in% unique(by))) stop("The unique 'byout' prediction categories have new values not present in the input training data.")
@@ -896,7 +914,7 @@ kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NUL
 
   if (any(table(by) < 2)) warning("Some categories have only 1 observation; the distribution is degenerate. At least 2 obs. per category are needed.")
 
-  arg <- .prepareKernel(x = cbind(x, by), y = y, xout = cbind(xout, byout),
+  arg <- prepareKernel(x = cbind(x, by), y = y, xout = cbind(xout, byout),
                         weights = weights, bw = 1, PIT = PIT,
                         deduplicate.x = deduplicate.x, deduplicate.xout = deduplicate.xout, no.dedup = no.dedup)
   arg$by <- as.integer(arg$x[, ncol(arg$x)])
@@ -962,7 +980,7 @@ kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NUL
 #' plot(bws, DCV(x, bws), log = "x", bty = "n", main = "Density CV")
 DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order = 2,
                 PIT = FALSE, chunks = 0, no.dedup = FALSE) {
-  arg <- .prepareKernel(x = x, weights = weights, bw = bw[1],
+  arg <- prepareKernel(x = x, weights = weights, bw = bw[1],
                         # bw[1] skips the length check in case multiple bw values are given as a vector not equal to NCOL(x)
                         kernel = kernel, PIT = PIT, order = order,
                         convolution = FALSE, deduplicate.x = !no.dedup)
@@ -1046,7 +1064,7 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
 #' points(g, yhat, pch = 16, col = 2, cex = 0.5)
 LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "gaussian",
                  order = 2, PIT = FALSE, chunks = 0, robust.iterations = 0, no.dedup = FALSE) {
-  arg <- .prepareKernel(x = x, y = y, weights = weights, bw = bw[1],
+  arg <- prepareKernel(x = x, y = y, weights = weights, bw = bw[1],
                         # bw[1] skips the length check in case multiple bw values are given as a vector not equal to NCOL(x)
                         kernel = kernel, PIT = PIT, order = order,
                         convolution = FALSE, deduplicate.x = !no.dedup)
@@ -1096,7 +1114,7 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
 #' @inheritParams kernelDensity
 #' @inheritParams kernelSmooth
 #' @inheritParams kernelWeights
-#' @inheritParams .prepareKernel
+#' @inheritParams prepareKernel
 #' @param y A numeric vector of responses (dependent variable) if the user wants least-squares cross-validation.
 #' @param robust.iterations Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).
 #' @param degree Passed to \code{kernelSmooth} if \code{y} is not \code{NULL} (for least-squares CV).
@@ -1149,7 +1167,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
                   ...) {
   dot.args <- list(...)
   CV <- if (!is.null(y)) "LSCV" else "DCV"
-  arg <- .prepareKernel(x = x, y = y, weights = weights, bw = 1,
+  arg <- prepareKernel(x = x, y = y, weights = weights, bw = 1,
                         # The value '1' skips the bw length check
                         kernel = kernel, PIT = PIT, order = order,
                         convolution = FALSE, deduplicate.x = TRUE)

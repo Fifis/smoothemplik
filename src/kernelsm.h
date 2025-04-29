@@ -4,39 +4,36 @@
 #include <RcppArmadillo.h>
 #include <RcppParallel.h>
 
-arma::mat kernelWeightsCPP(arma::mat x, arma::mat xout, arma::vec bw, std::string kernel, int order, bool convolution);
+arma::mat kernelWeightsCPP(arma::mat x, arma::mat xout, arma::mat bw, std::string kernel, int order, bool convolution);
 
 struct KernelDensityWorker : public RcppParallel::Worker {
-  const arma::mat x;
-  const arma::mat xout;
+  const arma::mat x; const arma::mat xout;
   const arma::vec weights;
-  const arma::vec bw;
-  const std::string kernel;
-  const int order;
-  const bool convolution;
-  const arma::uvec starts;
+  const arma::mat bw;
+  const std::string kernel; const int order; const bool convolution; const arma::uvec starts;
   const arma::uvec ends;
   arma::vec& out;
-  const double nb;
+  const arma::vec nb;
 
   KernelDensityWorker(const arma::mat x, const arma::mat xout, const arma::vec weights,
-                      const arma::vec bw, const std::string kernel,
+                      const arma::mat bw, const std::string kernel,
                       const int order, const bool convolution,
                       const arma::uvec starts, const arma::uvec ends,
-                      arma::vec& out, const double nb)
+                      arma::vec& out, const arma::vec nb)
     : x(x), xout(xout), weights(weights), bw(bw), kernel(kernel), order(order), convolution(convolution), starts(starts), ends(ends), out(out), nb(nb) {}
 
   void operator()(std::size_t begin, std::size_t end) {
     for (std::size_t j = begin; j < end; j++) {
       arma::mat xsubgrid = xout.rows(starts[j], ends[j]);
-      arma::mat kw = kernelWeightsCPP(x, xsubgrid, bw, kernel, order, convolution);
+      arma::mat bwsub = bw.rows(starts[j], ends[j]);
+      arma::mat kw = kernelWeightsCPP(x, xsubgrid, bwsub, kernel, order, convolution);
       kw.each_row() %= weights.t();
-      out.subvec(starts[j], ends[j]) = arma::sum(kw, 1) / nb;
+      out.subvec(starts[j], ends[j]) = arma::sum(kw, 1) / nb.subvec(starts[j], ends[j]);
     }
   }
 };
 
-Rcpp::NumericVector kernelDensityCPP(arma::mat x, arma::mat xout, arma::vec weights, arma::vec bw, std::string kernel, int order, bool convolution, int chunks);
+Rcpp::NumericVector kernelDensityCPP(arma::mat x, arma::mat xout, arma::vec weights, arma::mat bw, std::string kernel, int order, bool convolution, int chunks);
 #endif // KERNEL_DENSITY_H
 
 #ifndef KERNEL_SMOOTH_H
@@ -52,7 +49,7 @@ struct KernelSmoothWorker : public RcppParallel::Worker {
   const arma::vec y;
   const arma::mat xout;
   const arma::vec weights;
-  const arma::vec bw;
+  const arma::mat bw;
   const std::string kernel;
   const int order;
   const bool convolution;
@@ -63,7 +60,7 @@ struct KernelSmoothWorker : public RcppParallel::Worker {
   arma::vec& ysum;
 
   KernelSmoothWorker(const arma::mat x, const arma::vec y, const arma::mat xout,
-                     const arma::vec weights, const arma::vec bw, const std::string kernel,
+                     const arma::vec weights, const arma::mat bw, const std::string kernel,
                      const int order, const bool convolution, const bool LOO,
                      const arma::uvec starts, const arma::uvec ends,
                      arma::vec& ksum, arma::vec& ysum)
@@ -86,6 +83,6 @@ struct KernelSmoothWorker : public RcppParallel::Worker {
   }
 };
 
-Rcpp::NumericVector kernelSmoothCPP(arma::mat x, arma::mat xout, arma::vec weights, arma::vec bw, std::string kernel, int order, bool convolution, int chunks);
+Rcpp::NumericVector kernelSmoothCPP(arma::mat x, arma::vec y, arma::mat xout, arma::vec weights, arma::mat bw, std::string kernel, int order, bool convolution, int chunks);
 #endif // KERNEL_SMOOTH_H
 
