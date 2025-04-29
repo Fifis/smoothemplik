@@ -40,7 +40,7 @@ to be outside the convex hull of \code{z}.}
 \item{lower}{A positive scalar or numeric vector denoting the left cut-off before which log(weight)
 in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order} is 2, 4, 6, or 8.
 If \code{NULL} or \code{-Inf}, no such replacement is done. Recommended at a small number ct/sum(ct)
-to ensure self-concordance of the log-likelihoogetParabola(-1, -6, -1, 4)d.}
+to ensure self-concordance of the log-likelihood.}
 
 \item{upper}{A positive scalar or numeric vector greater or equal to \code{lower} denoting the right cut-off
 after which log(weight) in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order}
