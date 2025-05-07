@@ -10,7 +10,7 @@ interpToHigher <- function(x, f, mean, var, at, gap) {
     if (all(x >= max(xright))) return(fa(x))  # Speed-up: far away = extrapolate for sure
     fleft <- f(xleft)
     fright <- fa(xright)
-    s <- splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
+    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
     ifelse(x < at, f(x), ifelse(x < at + gap, s(x), fa(x)))
   } else {
     xleft  <- at - c(0.9, 0.95, 1)*gap
@@ -18,7 +18,7 @@ interpToHigher <- function(x, f, mean, var, at, gap) {
     if (all(x <= min(xleft))) return(fa(x))
     fleft <- fa(xleft)
     fright <- f(xright)
-    s <- splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
+    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
     ifelse(x > at, f(x), ifelse(x > at - gap, s(x), fa(x)))
   }
 }
@@ -33,7 +33,7 @@ interpToLower <- function(x, f, mean, var, at, gap) {
     if (all(x >= max(xright))) return(fa(x))
     fleft <- f(xleft)
     fright <- fa(xright)
-    s <- splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
+    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
     ifelse(x < at, f(x), ifelse(x < at2 + gap, s(x), fa(x)))
   } else {
     xright <- at - c(0.02, 0.01, 0)*gap
@@ -42,7 +42,7 @@ interpToLower <- function(x, f, mean, var, at, gap) {
     if (all(x <= min(xleft))) return(fa(x))
     fleft <- fa(xleft)
     fright <- f(xright)
-    s <- splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
+    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
     ifelse(x > at, f(x), ifelse(x > at2 - gap, s(x), fa(x)))
   }
 }
