@@ -1,4 +1,4 @@
-# smoothemplik 0.next (20245-XX-XX)
+# smoothemplik 0.next (2025-XX-XX)
 
 These bug fixes and features are scheduled for the upcoming releases.
 
@@ -6,7 +6,6 @@ These bug fixes and features are scheduled for the upcoming releases.
 - BUG: `bw.CV(x, y = y, kernel = "quartic", order = 4)` and `bw.CV(x, y = y, kernel = "quartic")`
 - BUG: `maximiseSEL()` fails if no weights are provided -- check and auto-generate
 - BUG: Fix the DCV code with convolutions (especially the quartic one)
-- BUG: `smoothEmplik()` with `attach.attributes = TRUE` should be converted to `"all"`
 - BUG: The check `CV = "DCV"` and `is.null(y)` seems redundant.
 - BUG: If `x` contains duplicates, `DCV(x, bw = bw.grid, weights = w)` complains that no duplicates were found (see the example)
 - BUG: `smoothEmplikDiscrete()`: if the split variable does not take contiguous values from 1 to the number of categories, estimation fails.
@@ -49,6 +48,12 @@ These bug fixes and features are scheduled for the upcoming releases.
 - DEV: Check compatibility with R 3.0.0
 - DEV: Add tests reproducing simple hard-coded examples
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
+
+# smoothemplik 0.0.15 (2025-XX-XX)
+
+- Added weighted Euclidean likelihood
+- `smoothEmplik()` accepts `attach.attributes = TRUE` as a synonym for `"all"`
+- Fixed a bug in the Taylor expansion that could cause a violation of the spanning condition
 
 # smoothemplik 0.0.14 (2025-04-30)
 

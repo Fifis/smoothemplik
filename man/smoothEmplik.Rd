@@ -9,15 +9,16 @@ smoothEmplik(
   theta,
   data,
   sel.weights = NULL,
-  chull.fail = c("taylor", "wald", "none"),
-  weight.tolerance = NULL,
-  trim = NULL,
+  type = c("EL", "EuL"),
+  kernel.args = list(bw = NULL, kernel = "epanechnikov", order = 2, PIT = TRUE, sparse =
+    TRUE),
+  EL.args = list(chull.fail = "taylor", weight.tolerance = NULL),
   minus = FALSE,
   parallel = FALSE,
   cores = 1,
-  memory.saving = c("none", "full", "partial"),
-  chunks = 10,
-  print.progress = FALSE,
+  chunks = NULL,
+  sparse = FALSE,
+  verbose = FALSE,
   bad.value = -Inf,
   attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "nabla", "converged",
     "exitcode", "probabilities"),
@@ -32,22 +33,14 @@ smoothEmplik(
 \item{data}{A data object on which the moment function is computed.}
 
 \item{sel.weights}{Either a matrix with valid kernel smoothing weights with rows adding up to 1,
-or a list of kernel weights for smoothing where the sum of each element is 1
-(must be returned by \code{sparseVectorToList}), or a function that computes
-the kernel weights based on the \code{data} argument passed to \code{...}.
-If \code{memory.saving} is \code{"partial"} or \code{"full"}, then it must
-be a function that computes the kernel weights for the data set.}
+or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.}
 
-\item{chull.fail}{A character: what to do if the convex hull of \code{z} does not contain \code{mu}
-(spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
-of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
-\code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
-with the Wald statistic (testing if the weighted mean of \code{z} is zero).}
+\item{type}{Character: "EL" for empirical likelihood, "EuL" for Euclidean likelihood.}
 
-\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
-(similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+\item{kernel.args}{A list of arguments passed to \code{kernelWeights()} if
+\code{sel.weights} is a function.}
 
-\item{trim}{A vector of trimming function values to multiply the output of \code{rho(...)} with. If NULL, no trimming is done.}
+\item{EL.args}{A list of arguments passed to \code{weightedEL()} or \code{weightedEuL}.}
 
 \item{minus}{If TRUE, returns SEL times -1 (for optimisation via minimisation).}
 
@@ -55,21 +48,15 @@ with the Wald statistic (testing if the weighted mean of \code{z} is zero).}
 
 \item{cores}{The number of cores used by \code{parallel::mclapply}.}
 
-\item{memory.saving}{A string. \code{"none"} implies no memory-saving tricks,
-and the entire problem is processed in the computer memory at once (good for
-sample sizes 2000 and below; if \code{sel.weights} is not provided or is a function,
-the weight matrix / list is computed at once.). If \code{"full"}, then, the smoothed
-likelihoods are computed in series, which saves memory but computes kernel weights at
-every step of a loop, increasing CPU time; the SEL weights, normally found in the rows
-of the \code{sel.weights} matrix, are computed on the fly. If \code{"partial"}, then,
-the problem is split into \code{chunks} sub-problems with smaller weight matrices / lists.
+\item{chunks}{The number of chunks into which the weight matrix is split for memory saving.
+One chunk is good for sample sizes 2000 and below. If equal to the number of observations, then,
+the smoothed likelihoods are computed in series, which saves memory but computes kernel weights at
+every step of a loop, increasing CPU time.
 If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.}
 
-\item{chunks}{The number of chunks into which the weight matrix is split.
-Only used if \code{memory.saving} is \code{"partial"}. If there are too many chunks
-(resulting in fewer than 2 observations per chunk), then it is treated as if \code{memory.saving} were \code{"full"}.}
+\item{sparse}{Logical: convert the weight matrix to a sparse one?}
 
-\item{print.progress}{If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.}
+\item{verbose}{If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.}
 
 \item{bad.value}{Replace non-finite individual SEL values with this value.
 May be useful if the optimiser does not allow specific non-finite values (like L-BFGS-B).}
@@ -94,42 +81,55 @@ Evaluates SEL function for a given moment function at a certain parameter value.
 }
 \examples{
 set.seed(1)
-x <- sort(rlnorm(100))
+x <- sort(rlnorm(50))
 # Heteroskedastic DGP
-y <- abs(1 + 1*x + rnorm(100) * (1 + x + sin(x)))
+y <- abs(1 + 1*x + rnorm(50) * (1 + x + sin(x)))
 mod.OLS <- lm(y ~ x)
 rho <- function(theta, ...) y - theta[1] - theta[2]*x  # Moment fn
 w <- kernelWeights(x, PIT = TRUE, bw = 0.25, kernel = "epanechnikov")
 w <- w / rowSums(w)
 image(x, x, w, log = "xy")
 theta.vals <- list(c(1, 1), coef(mod.OLS))
-SEL <- function(b, ...) smoothEmplik(rho = rho, theta = b, sel.weights = w)
+SEL <- function(b, ...) smoothEmplik(rho = rho, theta = b, sel.weights = w, ...)
 sapply(theta.vals, SEL) # Smoothed empirical likelihood
 # SEL maximisation
-b.SEL <- optim(coef(mod.OLS), SEL, method = "BFGS",
-               control = list(fnscale = -1, reltol = 1e-6))
+ctl <- list(fnscale = -1, reltol = 1e-6, ndeps = rep(1e-5, 2),
+            trace = 1, REPORT = 5)
+b.SEL <- optim(coef(mod.OLS), SEL, method = "BFGS", control = ctl)
 print(b.SEL$par) # Closer to the true value (1, 1) than OLS
 plot(x, y)
 abline(1, 1, lty = 2)
 abline(mod.OLS, col = 2)
 abline(b.SEL$par, col = 4)
 
+# Euclidean likelihood
+SEuL <- function(b, ...)  smoothEmplik(rho = rho, theta = b,
+                                       type = "EuL", sel.weights = w, ...)
+b.SEuL <- optim(coef(mod.OLS), SEuL, method = "BFGS", control = ctl)
+abline(b.SEuL$par, col = 3)
+cbind(SEL = b.SEL$par, SEuL = b.SEuL$par)
+
 # Now we start from (0, 0), for which the Taylor expansion is necessary
 # because all residuals at this starting value are positive and the
 # unmodified EL ratio for the test of equality to 0 is -Inf
-smoothEmplik(rho=rho, theta=c(0, 0), sel.weights=w, chull.fail="none")
-smoothEmplik(rho=rho, theta=c(0, 0), sel.weights=w)
-# The next example is very slow; approx. 5 s
+smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w, EL.args = list(chull.fail = "none"))
+smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
+
+# The next example is very slow; approx. 1 minute
 \dontrun{
 # Experiment: a small bandwidth so that the spanning condition should fail
-w <- kernelWeights(x, PIT = TRUE, bw = 0.10, kernel = "epanechnikov")
+# It yields an appalling estimator
+w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
 w <- w / rowSums(w)
-b.SELt <- optim(c(0, 0), SEL, chull.fail = "taylor",  # This is more reliable
-                method = "BFGS", control = list(fnscale = -1))
-b.SELw <- optim(c(0, 0), SEL, chull.fail = "wald",  # This is more reliable
-                method = "BFGS", control = list(fnscale = -1))
-b0grid <- seq(-0.75, 4.5, length.out = 51)
-b1grid <- seq(-0.75, 2.5, length.out = 51)
+# The first option is faster but it may sometimes fails
+b.SELt <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "taylor"),
+                method = "BFGS", control = ctl)
+b.SELw <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "wald"),
+                method = "BFGS", control = ctl)
+# In this sense, Euclidean likelihood is robust to convex hull violations
+b.SELu <- optim(c(0, 0), SEuL, method = "BFGS", control = ctl)
+b0grid <- seq(-1.5, 7, length.out = 51)
+b1grid <- seq(-1.5, 4.5, length.out = 51)
 bgrid <- as.matrix(expand.grid(b0grid, b1grid))
 selgrid <- unlist(parallel::mclapply(1:nrow(bgrid), function(i)
   smoothEmplik(rho, bgrid[i, ], sel.weights = w, chull.fail = "taylor"),
@@ -147,5 +147,16 @@ contour(b0grid, b1grid, -2*(selgrid - max(selgrid, na.rm = TRUE)), levels = levs
 image(b0grid, b1grid, log1p(-2*(selgrid - max(selgrid, na.rm = TRUE))))
 # The narrow lines are caused by the fact that if two observations are close together
 # at the edge, the curvature at that point is extreme
+
+# The same with Euclidean likelihood
+seulgrid <- unlist(parallel::mclapply(1:nrow(bgrid), function(i)
+  smoothEmplik(rho, bgrid[i, ], sel.weights = w, type = "EuL"),
+    mc.cores = 1))
+seulgrid <- matrix(seulgrid, nrow = length(b0grid))
+par(mar = c(4, 4, 2, 0) + .1)
+contour(b0grid, b1grid, -50*(seulgrid - max(seulgrid, na.rm = TRUE)), levels = levs,
+        labels = labs, col = cols, lwd = 1.5, bty = "n",
+        main = "'Safe' likelihood contours", asp = 1)
+image(b0grid, b1grid, log1p(-2*(seulgrid - max(seulgrid, na.rm = TRUE))))
 }
 }

@@ -44,3 +44,7 @@ tlogCPP <- function(x, a = as.numeric( c(1.0)), k = 4L, d = 0L) {
     .Call(`_smoothemplik_tlogCPP`, x, a, k, d)
 }
 
+weightedEuLCPP <- function(z, mu, ct, shift, n_orig, weight_tolerance, trunc_to = 0.0, SEL = TRUE, return_weights = FALSE, verbose = FALSE, chull_diag = FALSE) {
+    .Call(`_smoothemplik_weightedEuLCPP`, z, mu, ct, shift, n_orig, weight_tolerance, trunc_to, SEL, return_weights, verbose, chull_diag)
+}
+

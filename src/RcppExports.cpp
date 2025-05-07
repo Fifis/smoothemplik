@@ -178,6 +178,27 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// weightedEuLCPP
+Rcpp::List weightedEuLCPP(const arma::mat& z, arma::vec mu, arma::vec ct, arma::vec shift, const double n_orig, double weight_tolerance, const double trunc_to, const bool SEL, const bool return_weights, const bool verbose, const bool chull_diag);
+RcppExport SEXP _smoothemplik_weightedEuLCPP(SEXP zSEXP, SEXP muSEXP, SEXP ctSEXP, SEXP shiftSEXP, SEXP n_origSEXP, SEXP weight_toleranceSEXP, SEXP trunc_toSEXP, SEXP SELSEXP, SEXP return_weightsSEXP, SEXP verboseSEXP, SEXP chull_diagSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type ct(ctSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type shift(shiftSEXP);
+    Rcpp::traits::input_parameter< const double >::type n_orig(n_origSEXP);
+    Rcpp::traits::input_parameter< double >::type weight_tolerance(weight_toleranceSEXP);
+    Rcpp::traits::input_parameter< const double >::type trunc_to(trunc_toSEXP);
+    Rcpp::traits::input_parameter< const bool >::type SEL(SELSEXP);
+    Rcpp::traits::input_parameter< const bool >::type return_weights(return_weightsSEXP);
+    Rcpp::traits::input_parameter< const bool >::type verbose(verboseSEXP);
+    Rcpp::traits::input_parameter< const bool >::type chull_diag(chull_diagSEXP);
+    rcpp_result_gen = Rcpp::wrap(weightedEuLCPP(z, mu, ct, shift, n_orig, weight_tolerance, trunc_to, SEL, return_weights, verbose, chull_diag));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 RcppExport SEXP run_testthat_tests(SEXP);
 
@@ -192,6 +213,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_smoothemplik_kernelDensityCPP", (DL_FUNC) &_smoothemplik_kernelDensityCPP, 8},
     {"_smoothemplik_kernelSmoothCPP", (DL_FUNC) &_smoothemplik_kernelSmoothCPP, 10},
     {"_smoothemplik_tlogCPP", (DL_FUNC) &_smoothemplik_tlogCPP, 4},
+    {"_smoothemplik_weightedEuLCPP", (DL_FUNC) &_smoothemplik_weightedEuLCPP, 11},
     {"run_testthat_tests",         (DL_FUNC) &run_testthat_tests,         1},
     {NULL, NULL, 0}
 };
