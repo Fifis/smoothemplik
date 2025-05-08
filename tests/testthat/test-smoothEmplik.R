@@ -25,6 +25,24 @@ test_that("smoothEmplik works for a simple linear model", {
   expect_lt(max(abs(sapply(1:50, function(i) sum(w[i, ]*r / (1 + a$lam[i]*r))))), 1e-15)
 })
 
+test_that("Chunking of weight matrices works", {
+  set.seed(1)
+  x <- sort(rlnorm(50))
+  y <- rlnorm(50) - 1
+  w <- kernelWeights(pit(x), bw = 0.2, kernel = "epanechnikov")
+  w <- w / rowSums(w)
+  d <- data.frame(x = x, y = y)
+  wfun <- function(ii, data) {
+    px <- pit(data$x)
+    kernelWeights(x = px, xout = px[ii], bw = 0.2, kernel = "epanechnikov")
+  }
+  rho <- function(theta, ...) y - theta  # For mean estimation
+
+  a1 <- smoothEmplik(rho, theta = 0, data = NULL, sel.weights = w, chunks = 1)
+  a2 <- smoothEmplik(rho, theta = 0, data = d, sel.weights = wfun, chunks = 5)
+  expect_equal(a1, a2)
+})
+
 test_that("The parabola calculator is working", {
   expect_equal(getParabola3(c(-1, 0, 2), c(-5, -4, 10)), c(a=2, b=3, c=-4))
   expect_equal(getParabola(3, 23, 15, 4), c(a=2, b=3, c=-4))
