@@ -43,6 +43,11 @@ In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable s
 Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
 
 \item{verbose}{Logical: if \code{TRUE}, prints warnings.}
+
+\item{chull.diag}{Logical: if \code{TRUE}, checks if there is a definite convex hull failure
+in at least one dimension (\code{mu} being smaller than the smallest or larger
+than the largest element). Note that it does not check if \code{mu} is strictly in the
+convex hull because this procedure is much slower and is probably unnecessary.}
 }
 \value{
 A list with the same structure as that in [weightedEL()].

@@ -452,6 +452,10 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
 #'
 #' @param z Numeric data vector.
 #' @inheritParams weightedEL
+#' @param chull.diag Logical: if \code{TRUE}, checks if there is a definite convex hull failure
+#'   in at least one dimension (\code{mu} being smaller than the smallest or larger
+#'   than the largest element). Note that it does not check if \code{mu} is strictly in the
+#'   convex hull because this procedure is much slower and is probably unnecessary.
 #'
 #' @return A list with the same structure as that in [weightedEL()].
 #' @seealso [weightedEL()]
@@ -460,7 +464,7 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
 #' @examples
 #' set.seed(1)
 #' z <- cbind(rnorm(10), runif(10))
-  #' colMeans(z)
+#' colMeans(z)
 #' a <- weightedEuL(z, return.weights = TRUE)
 #' a$wts
 #' sum(a$wts)  # Unity
@@ -478,7 +482,8 @@ weightedEuL <- function(z, mu = NULL, ct = NULL, shift = NULL,
   if (is.null(ct)) ct <- rep(1, n)
   if (is.null(shift)) shift <- rep(0, n)
   if (is.null(n.orig)) n.orig <- n
-  if (is.null(weight.tolerance)) weight.tolerance <- if (!SEL) me^(1/3) else max(ct) * sqrt(.Machine$double.eps)
+  if (is.null(weight.tolerance))
+    weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
   ret <- weightedEuLCPP(z = z, mu = mu, ct = ct, shift = shift, n_orig = n.orig,
                         weight_tolerance = weight.tolerance, trunc_to = trunc.to, SEL = SEL,
                         return_weights = return.weights, verbose = verbose, chull_diag = chull.diag)

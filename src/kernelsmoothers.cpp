@@ -398,8 +398,9 @@ arma::mat kernelWeightsOneCPP(arma::vec x, arma::vec xout, arma::vec bw, std::st
   arma::uword ng = xout.n_elem;
   arma::uword nb = bw.n_elem;
   arma::uword nx = x.n_elem;
+  // Rcout << "ngrid: " << ng << ", nbw: " << nb << "\n";
   if (nb != ng)
-    Rcpp::stop("bw and xout must have the same length.");
+    Rcpp::stop("kernelWeightsOneCPP: bw and xout must have the same length.");
   // arma::vec xs = x / bw; // Scaling by the bandwidth
   // arma::vec gs = xout / bw;
   const arma::vec inv_bw = 1.0 / bw;
@@ -417,7 +418,7 @@ arma::sp_mat sparseKernelWeightsOneCPP(arma::vec x, arma::vec xout, arma::vec bw
   arma::uword nb = bw.n_elem;
   arma::uword nx = x.n_elem;
   if (nb != ng)
-    Rcpp::stop("bw and xout must have the same length.");
+    Rcpp::stop("sparseKernelWeightsOneCPP: bw and xout must have the same length.");
   // arma::vec xs = x / bw; // Scaling by the bandwidth
   // arma::vec gs = xout / bw;
   const arma::vec inv_bw = 1.0 / bw;
@@ -465,7 +466,7 @@ NumericVector kernelDensityCPP(arma::mat x, arma::mat xout, arma::vec weights, a
   arma::uword ng = xout.n_rows;
   arma::uword nbw = bw.n_rows;
   if (nbw != ng)
-    Rcpp::stop("bw and xout must have the same number of rows.");
+    Rcpp::stop("kernelDensityCPP: bw and xout must have the same number of rows.");
   arma::uword nx = x.n_rows;
   // arma::uword d = x.n_cols;
   if (chunks == 0) { // Auto-selection of matrix slices
@@ -501,7 +502,7 @@ NumericVector kernelSmoothCPP(arma::mat x, arma::vec y, arma::mat xout, arma::ve
   arma::uword ng = xout.n_rows;
   arma::uword nb = bw.n_rows;
   if (nb != ng)
-    Rcpp::stop("bw and xout must have the same number of rows.");
+    Rcpp::stop("kernelSmoothCPP: bw and xout must have the same number of rows.");
   arma::uword nx = x.n_rows;
   if (chunks == 0) { // Auto-selection of matrix slices
     long long memuse = static_cast<long long>(ng) * static_cast<long long>(nx) * 8;

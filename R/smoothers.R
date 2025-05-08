@@ -566,25 +566,18 @@ kernelDensity <- function(x,
 #'
 #' # Example in 2 dimensions
 #' # TODO
-kernelSmooth <- function(x,
-                         y,
-                         xout = NULL,
-                         weights = NULL,
+kernelSmooth <- function(x, y, xout = NULL, weights = NULL,
                          bw = NULL,
                          kernel = c("gaussian", "uniform", "triangular", "epanechnikov", "quartic"),
                          order = 2,
                          convolution = FALSE,
                          chunks = 0,
-                         PIT = FALSE,
-                         LOO = FALSE,
+                         PIT = FALSE, LOO = FALSE,
                          degree = 0,
                          trim = function(x) 0.01 / length(x),
-                         robust.iterations = 0,
-                         robust = c("bisquare", "huber"),
-                         deduplicate.x = TRUE,
-                         deduplicate.xout = TRUE,
-                         no.dedup = FALSE,
-                         return.grid = FALSE
+                         robust.iterations = 0, robust = c("bisquare", "huber"),
+                         deduplicate.x = TRUE, deduplicate.xout = TRUE,
+                         no.dedup = FALSE, return.grid = FALSE
 ) {
   bw0 <- bw  # To be used later if there are robust iterations
   if (!(degree %in% 0:2)) stop("kernelSmooth: degree must be 0, 1, or 2.")
