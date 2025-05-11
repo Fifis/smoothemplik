@@ -1,51 +1,123 @@
-# Interpolate monotonically from a lower to a higher parabola function
-# defined by the equation (x - mean)^2 / var
-# after a certain point over an interval of the chosen length
-interpToHigher <- function(x, f, mean, var, at, gap) {
-  fa <- function(x) (x-mean)^2/var
-  incr <- at > mean
-  if (incr) {
-    xleft  <- at + c(0, 0.05, 0.1)*gap
-    xright <- at + c(0.9, 0.95, 1)*gap
-    if (all(x >= max(xright))) return(fa(x))  # Speed-up: far away = extrapolate for sure
-    fleft <- f(xleft)
-    fright <- fa(xright)
-    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
-    ifelse(x < at, f(x), ifelse(x < at + gap, s(x), fa(x)))
-  } else {
-    xleft  <- at - c(0.9, 0.95, 1)*gap
-    xright <- at - c(0.1, 0.05, 0)*gap
-    if (all(x <= min(xleft))) return(fa(x))
-    fleft <- fa(xleft)
-    fright <- f(xright)
-    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
-    ifelse(x > at, f(x), ifelse(x > at - gap, s(x), fa(x)))
-  }
+# d-th derivative of the k-th-order Taylor expansion of log(x)
+dlog <- function(x, d = 0L) dlogCPP(x, d)
+
+#' d-th derivative of the k-th-order Taylor expansion of log(x)
+#'
+#' @param x Numeric: a vector of points for which the logarithm is to be evaluated
+#' @param a Scalar: the point at which the polynomial approximation is computed
+#' @param k Non-negative integer: maximum polynomial order in the Taylor expansion
+#'   of the original function. \code{k = 0} returns a constant.
+#' @param d Non-negative integer: derivative order
+#'
+#' Note that this function returns the d-th derivative of the k-th-order Taylor expansion, not the
+#' k-th-order approximation of the d-th derivative. Therefore, the degree of the resulting polynomial
+#' is \eqn{d-k}{d-k}.
+#'
+#' @return The approximating Taylor polynomial around \code{a} of the order \code{d-k} evaluated at \code{x}.
+#' @export
+#'
+#' @examples
+#' cl <- rainbow(9, end = 0.8, v = 0.8, alpha = 0.8)
+#' a <- 1.5
+#' x <- seq(a*2, a/2, length.out = 101)
+#' f <- function(x, d = 0)  if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
+#' par(mfrow = c(2, 3), mar = c(2, 2, 2.5, 0.2))
+#' for (d in 0:5) {
+#' y <- f(x, d = d)
+#' plot(x, y, type = "l", lwd = 7, bty = "n", ylim = range(0, y),
+#'        main = paste0("d^", d, "/dx^", d, " Taylor(Log(x))"))
+#'   for (k in 0:8) lines(x, tlog(x, a = a, k = k, d = d), col = cl[k+1], lwd = 1.5)
+#'   points(a, f(a, d = d), pch = 16, cex = 1.5, col = "white")
+#' }
+#' legend("topright", as.character(0:8), title = "Order", col = cl, lwd = 1)
+tlog <- function(x, a = as.numeric(c(1.0)), k = 4L, d = 0L) tlogCPP(x, a, k, d)
+
+
+#' Least-squares regression via SVD
+#'
+#' @param x Model matrix.
+#' @param y Response vector.
+#' @param rel.tol Relative zero tolerance for generalised inverse via SVD.
+#' @param abs.tol Absolute zero tolerance for generalised inverse via SVD.
+#'
+#' Newton steps for many empirical likelihoods are of least-squares type.
+#' Denote \eqn{x^+} to be the generalised inverse of \code{x}.
+#' If SVD algorithm failures are encountered, it sometimes helps to try
+#' \code{svd(t(x))} and translate back. First check to ensure that
+#' \code{x} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.
+#'
+#' The tolerances are used to check the closeness of singular values to zero. The values of the
+#' singular-value vector \code{d} that are less than
+#' \code{max(rel.tol * max(d), abs.tol)} are set to zero.
+#'
+#' @return A vector of coefficients.
+#' @export
+#'
+#' @examples
+#' b.svd <- svdlm(x = cbind(1, as.matrix(mtcars[, -1])), y = mtcars[, 1])
+#' b.lm  <- coef(lm(mpg ~ ., data = mtcars))
+#' b.lm - b.svd  # Negligible differences
+svdlm <- function(x, y, rel.tol = 1e-9, abs.tol = 1e-100) {
+  if (is.null(dim(x))) x <- as.matrix(x)
+  svdlmCPP(x = x, y = y, rel_tol = rel.tol, abs_tol = abs.tol)
 }
 
-interpToLower <- function(x, f, mean, var, at, gap) {
-  fa <- function(x) (x-mean)^2/var
-  incr <- at > mean
-  if (incr) {
-    xleft  <- at + c(0, 0.01, 0.02)*gap
-    at2 <- sqrt(f(at) * var) + mean
-    xright <- at2 + c(0.98, 0.99, 1)*gap
-    if (all(x >= max(xright))) return(fa(x))
-    fleft <- f(xleft)
-    fright <- fa(xright)
-    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
-    ifelse(x < at, f(x), ifelse(x < at2 + gap, s(x), fa(x)))
-  } else {
-    xright <- at - c(0.02, 0.01, 0)*gap
-    at2 <- -sqrt(f(at) * var) + mean
-    xleft  <- at2 - c(0.98, 0.99, 1)*gap
-    if (all(x <= min(xleft))) return(fa(x))
-    fleft <- fa(xleft)
-    fright <- f(xright)
-    s <- stats::splinefun(c(xleft, xright), c(fleft, fright), method = "monoH.FC")
-    ifelse(x > at, f(x), ifelse(x > at2 - gap, s(x), fa(x)))
-  }
+
+#' Modified logarithm with derivatives
+#'
+#' @param x Numeric vector for which approximated logarithm is to be computed.
+#' @param order Positive integer: Taylor approximation order. If \code{NA}, returns \code{log(x)} or its derivative.
+#' @param lower Lower threshold below which approximation starts; can be a scalar of a vector of the same length as \code{x}.
+#' @param upper Upper threshold above which approximation starts; can be a scalar of a vector of the same length as \code{x}.
+#' @param der Non-negative integer: 0 yields the function, 1 and higher yields derivatives
+#'
+#' @details
+#' Provides a family of alternatives to -log() and derivative thereof in order to attain self-concordance and
+#' computes the modified negative logarithm and its first derivatives.
+#' For lower <= x <= upper, returns just the logarithm. For x < lower and x > upper, returns the Taylor approximation of the given \code{order}.
+#' 4th order is the lowest that gives self concordance.
+#'
+#' @return A numeric matrix with \code{(order+1)} columns containing the values of the modified log and its derivatives.
+#' @export
+#'
+#' @examples
+#' x <- seq(0.01^0.25, 2^0.25, length.out = 51)^4 - 0.11 # Denser where |f'| is higher
+#' plot(x,  log(x)); abline(v = 0, lty = 2) # Observe the warning
+#' lines(x, logTaylor(x, lower = 0.2), col = 2)
+#' lines(x, logTaylor(x, lower = 0.5), col = 3)
+#' lines(x, logTaylor(x, lower = 1, upper = 1.2, order = 6), col = 4)
+#'
+#' # Substitute log with its Taylor approx. around 1
+#' x <- seq(0.1, 2, 0.05)
+#' ae <- abs(sapply(2:6, function(o) log(x) - logTaylor(x, lower=1, upper=1, order=o)))
+#' matplot(x[x!=1], ae[x!=1,], type = "l", log = "y", lwd = 2,
+#'   main = "Abs. trunc. err. of Taylor expansion at 1", ylab = "")
+logTaylor <- function(x, lower = NULL, upper = NULL, der = 0, order = 4) {
+  n <- length(x)
+  if (is.null(lower)) lower <- rep(1/n, n)
+  if (is.null(upper)) upper <- rep(Inf, n)
+  logTaylorCPP(x, lower, upper, der, order)
 }
+
+
+# Solve for coefficients a, b, c of the parabola y = a*x^2 + b*x + c
+# using the three points (x0, y0), (x1, y1), (x2, y2) using Cramer's rule
+# smoothemplik:::getParabola3(c(-1, 0, 1), c(2, 0, 2))
+# x0 <- c(-1, 0, 2); y0 <- c(0, 1, 1)
+# abc <- smoothemplik:::getParabola3(x0, y0)
+# f <- function(x) abc[1]*x^2 + abc[2]*x + abc[3]
+# curve(f, -1.5, 2.5); points(x0, y0)
+getParabola3 <- function(x, y) getParabola3CPP(x, y)
+
+
+# Get the coefficients of a parabola with f(x), f'(x), f''
+# f(x) = 2x^2 + 3x - 5
+# f' = 4x + 3
+# f'' = 4
+# If x = -1, (f, f', f'') = (-6, -1, 4)
+# smoothemplik:::getParabola(-1, -6, -1, 4)
+getParabola <- function(x, f, fp, fpp) getParabolaCPP(x, f, fp, fpp)
+
 
 #' Monotone interpolation between a function and a reference parabola
 #'
@@ -75,7 +147,7 @@ interpToLower <- function(x, f, mean, var, at, gap) {
 #' `f(at)`, and the transition interval has to be extended to ensure that the spline does not descend.
 #'
 #' Internally, the helpers build a **monotone Hermite cubic spline** via
-#' `splinefun(..., method = "monoH.FC")`.  Anchor points on each side of the
+#' Fritsch--Carlson tangents.  Anchor points on each side of the
 #' transition window are chosen so that the spline’s one edge matches `f`
 #' while the other edge matches the reference parabola, ensuring strict
 #' monotonicity between the two curves.
@@ -91,7 +163,7 @@ interpToLower <- function(x, f, mean, var, at, gap) {
 #' w <- 10:1
 #' w <- w / sum(w)
 #'
-#' f <- Vectorize(function(m) -2*weightedEL(xx, mu = m, ct = w, chull.fail = "none")$logelr)
+#' f <- Vectorize(function(m) -2*weightedEL0(xx, mu = m, ct = w, chull.fail = "none")$logelr)
 #' museq <- seq(-6, 6, 0.1)
 #' LRseq <- f(museq)
 #' plot(museq, LRseq, bty = "n")
@@ -109,9 +181,9 @@ interpToLower <- function(x, f, mean, var, at, gap) {
 interpTwo <- function(x, f, mean, var, at, gap) {
   fa <- function(x) (x-mean)^2/var
   if (f(at) <= fa(at))
-    interpToHigher(x, f, mean, var, at, gap)
+    interpToHigherCPP(x, f, mean, var, at, gap)
   else
-    interpToLower(x, f, mean, var, at, gap)
+    interpToLowerCPP(x, f, mean, var, at, gap)
 }
 
 
