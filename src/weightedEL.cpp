@@ -2,6 +2,7 @@
 using namespace Rcpp;
 using namespace arma;
 
+
 // Forward declarations in other functions
 SEXP logTaylorCPP(const NumericVector& x, NumericVector lower, NumericVector upper,
                   IntegerVector der, int order);
@@ -11,7 +12,7 @@ NumericVector svdlmCPP(const arma::mat& X, const arma::vec& y, double rel_tol = 
 List dampedNewtonCPP(Function fn, NumericVector par, double thresh, int itermax,
                      bool verbose, double alpha, double beta, double backeps);
 
-// [[Rcpp::export]]
+// Taylor-expanded log-likelihood and its derivatives
 List wEL(const arma::vec& lambda,
          const arma::mat& Z,         // n*d centred data
          const arma::vec& ct,        // n weights
@@ -81,7 +82,7 @@ List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericV
   if (g_lower.size() == 1) g_lower = NumericVector(n, g_lower[0]);
   g_upper = as<NumericVector>(upper);
   if (g_upper.size() == 1) g_upper = NumericVector(n, g_upper[0]);
-  for (int i = 0;i < n; ++i) if (g_lower[i] > g_upper[i]) stop("weightedELCPP: lower > upper");
+  for (int i = 0; i < n; ++i) if (g_lower[i] > g_upper[i]) stop("weightedELCPP: lower > upper");
 
   g_order = order;   // Taylor order  (>=4)
 

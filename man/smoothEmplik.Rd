@@ -40,7 +40,7 @@ or a function that computes the kernel weights based on the \code{data} argument
 \item{kernel.args}{A list of arguments passed to \code{kernelWeights()} if
 \code{sel.weights} is a function.}
 
-\item{EL.args}{A list of arguments passed to \code{weightedEL()} or \code{weightedEuL}.}
+\item{EL.args}{A list of arguments passed to \code{weightedEL()}, \code{weightedEL0()}, or \code{weightedEuL}.}
 
 \item{minus}{If TRUE, returns SEL times -1 (for optimisation via minimisation).}
 

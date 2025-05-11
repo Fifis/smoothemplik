@@ -37,7 +37,7 @@ These bug fixes and features are scheduled for the upcoming releases.
 - FEATURE: Like in the SEL application: de-duplicate the input matrix, replace with weights; allow the user to disable it
 - FEATURE: Merging cells: allow arbitrary variables (including continuous ones) for proximity.
 - FEATURE: robustify SEL against spanning condition violation based on weighted quantiles, not simply midpoint of x1 and x2
-- MISC: Test the previous output of `weightedEL()` and `cemplik()` with the new version, reproduce Owen's examples, add tests
+- MISC: Test the previous output of `weightedEL()` and `weightedEL0()` with the new version, reproduce Owen's examples, add tests
 - MISC: Check analytical expressions for all combinations of kernels, convolutions, and orders in Sage and Mathematica, publish the reproducing codes
 - MISC: Reproduce the CKT (2019) results with the `shift` argument (i.e. test the shift)
 - MISC: Add a vignette for non-parametric methods to GitHub, finish the mixed-smoothing part
@@ -51,6 +51,8 @@ These bug fixes and features are scheduled for the upcoming releases.
 
 # smoothemplik 0.0.15 (2025-XX-XX)
 
+- Rewrote most of the internal functions in Rcpp for higher speed
+- Moved `weightedEL` to `weightedEL0` and `cemplik` -- now that it is in C++ -- to `weightedEL`
 - Added weighted Euclidean likelihood
 - `smoothEmplik()` accepts `attach.attributes = TRUE` as a synonym for `"all"`
 - Fixed a bug in the Taylor expansion that could cause a violation of the spanning condition

@@ -2,175 +2,130 @@
 % Please edit documentation in R/elfunctions.R
 \name{weightedEL}
 \alias{weightedEL}
-\title{Empirical likelihood for one-dimensional vectors}
+\title{Self-concordant multi-variate empirical likelihood with counts}
+\source{
+This original code was written for \insertCite{owen2013self}{smoothemplik}
+and [published online](https://artowen.su.domains/empirical/) by Art B. Owen
+(February 2014) and slightly reworked to contain fewer inner functions and loops.
+}
 \usage{
 weightedEL(
   z,
-  mu = 0,
   ct = NULL,
-  shift = NULL,
-  taylor.order = NA,
+  mu = NULL,
+  lambda.init = NULL,
+  return.weights = FALSE,
   lower = NULL,
   upper = NULL,
-  SEL = FALSE,
-  n.orig = NULL,
-  weight.tolerance = NULL,
-  boundary.tolerance = 1e-09,
-  trunc.to = 0,
-  chull.fail = c("taylor", "wald", "none"),
-  uniroot.control = list(),
-  return.weights = FALSE,
-  verbose = FALSE
+  order = 4L,
+  wttol = 0.001,
+  thresh = 1e-16,
+  itermax = 100L,
+  verbose = FALSE,
+  alpha = 0.3,
+  beta = 0.8,
+  backeps = 0
 )
 }
 \arguments{
-\item{z}{Numeric data vector.}
+\item{z}{A numeric vector or a matrix with one data vector per column.}
 
-\item{mu}{Hypothesized mean of \code{z} in the moment condition.}
+\item{ct}{A numeric vector of non-negative counts.}
 
-\item{ct}{Numeric count variable with positive values that indicates the multiplicity of observations.
-Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.}
+\item{mu}{Hypothesised mean, default (0 ... 0) in R^ncol(z)}
 
-\item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
+\item{lambda.init}{Starting lambda, default (0 ... 0)}
 
-\item{taylor.order}{If \code{NA}, then the sum of log-weights is maximised. If 2, 4, 6, or 8,
-replaces the left branch of the log with its Taylor expansion, allowing for \code{mu}
-to be outside the convex hull of \code{z}.}
+\item{return.weights}{Logical: if \code{TRUE}, returns the empirical probabilities. Default is memory-saving (\code{FALSE}).}
 
-\item{lower}{A positive scalar or numeric vector denoting the left cut-off before which log(weight)
-in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order} is 2, 4, 6, or 8.
-If \code{NULL} or \code{-Inf}, no such replacement is done. Recommended at a small number ct/sum(ct)
-to ensure self-concordance of the log-likelihood.}
+\item{lower}{Lower cut-off for [logTaylor()], default 1/nrow(z)}
 
-\item{upper}{A positive scalar or numeric vector greater or equal to \code{lower} denoting the right cut-off
-after which log(weight) in the maximisation problem is replaced by its Taylor expansion if \code{taylor.order}
-is 2, 4, 6, or 8. If \code{NULL} or \code{Inf}, no such replacement is done. Recommended at 1
-if \code{mu} is not in the convex hull of \code{z} to ensure that a finite solution exists.}
+\item{upper}{Upper cutoff for [logTaylor()], default Inf}
 
-\item{SEL}{If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
-due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
+\item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].}
 
-\item{n.orig}{An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).}
+\item{wttol}{Weight tolerance for counts to improve numerical stability}
 
-\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
-(similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+\item{thresh}{Convergence threshold for log-likelihood (the default is aggressive)}
 
-\item{boundary.tolerance}{Relative tolerance for determining when the lambda is not an interior
-solution because it is too close to the boundary. Corresponds to a fraction of the
-interval range length.}
+\item{itermax}{Upper bound on number of Newton steps (seems ample)}
 
-\item{trunc.to}{Counts under \code{weight.tolerance} will be set to this value.
-In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
+\item{verbose}{Logical: print output diagnostics?}
 
-\item{chull.fail}{A character: what to do if the convex hull of \code{z} does not contain \code{mu}
-(spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
-of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
-\code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
-with the Wald statistic (testing if the weighted mean of \code{z} is zero).}
+\item{alpha}{Backtracking line search parameter: acceptance of a decrease in function value by ALPHA*f of the prediction
+based on the linear extrapolation.}
 
-\item{uniroot.control}{A list passed to the \code{uniroot}.}
+\item{beta}{Backtracking line search reduction factor. 0.1 corresponds to a very crude search, 0.8 corresponds
+to a less crude search.}
 
-\item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned.
-Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
-
-\item{verbose}{Logical: if \code{TRUE}, prints warnings.}
+\item{backeps}{Backtrack threshold: the search can miss by this much. Consider setting it to 1e-10
+if backtracking seems to be failing due to round-off.}
 }
 \value{
-A list with the following elements:
-
+A list with the following values:
 \describe{
-  \item{logelr}{Logarithm of the empirical likelihood ratio.}
-  \item{lam}{The Lagrange multiplier.}
-  \item{wts}{Observation weights/probabilities (of the same length as \code{z}).}
-  \item{converged}{\code{TRUE} if the algorithm converged, \code{FALSE} otherwise (usually means that \code{mu} is not within the range of \code{z}, i.e. the one-dimensional convex hull of \code{z}).}
-  \item{iter}{The number of iterations used (from \code{uniroot}).}
-  \item{bracket}{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
-  \item{estim.prec}{The approximate estimated precision of lambda (from \code{uniroot}).}
-  \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
-  \item{exitcode}{An integer indicating the reason of termination.}
-  \item{message}{Character string describing the optimisation termination status.}
+    \item{logelr}{Log of empirical likelihood ratio (equal to 0 if the hypothesised mean is equal to the sample mean)}
+    \item{lam}{Vector of Lagrange multipliers}
+    \item{wts}{Observation weights/probabilities (vector of length n)}
+    \item{converged}{\code{TRUE} if algorithm converged. \code{FALSE} usually means that mu is not in the convex hull of the data. Then, a very small likelihood is returned (instead of zero).}
+    \item{iter}{Number of iterations taken.}
+    \item{ndec}{Newton decrement (see Boyd & Vandenberghe).}
+    \item{gradnorm}{Norm of the gradient of log empirical likelihood.}
 }
 }
 \description{
-Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
-Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}.
-The names of the elements in the returned list are consistent with the original R code in \insertCite{owen2017weighted}{smoothemplik}.
+Implements the empirical-likelihood-ratio test for the mean of the coordinates of \code{z}
+(with the hypothesised value \code{mu}). The counts need not be integer;
+in the context of local likelihoods, they can be kernel observation weights.
 }
 \details{
-This function provides the core functionality for univariate empirical likelihood.
-The technical details is given in \insertCite{cosma2019inference}{smoothemplik},
-although the algorithm used in that paper is slower than the one provided by this function.
+Negative weights are not allowed. They could be useful in some applications, but they can destroy
+convexity or even boundedness. They also make the Newton step fail to be of least squares type.
 
-Since we know that the EL probabilities belong to (0, 1), the interval (bracket) for \eqn{\lambda}{l} search
-can be determined in the spirit of formula (2.9) from \insertCite{owen2001empirical}{smoothemplik}. Let
-\eqn{z^*_i := z_i - \mu}{Z[i] := z[i] - mu} be the recentred observations.
-\deqn{p_i = c_i/N \cdot (1 + \lambda z^*_i + s)^{-1}}{p[i] = c[i]/N * 1/(1 + l*Z[i] + s)}
-The probabilities are bounded from above: \eqn{p_i<1}{p[i] < 1} for all \emph{i}, therefore,
-\deqn{c_i/N \cdot (1 + \lambda z^*_i + s)^{-1} < 1}{c[i]/N * 1/(1 + l*Z[i] + s) < 1}
-\deqn{c_i/N - 1 - s < \lambda z^*_i}{c[i]/N - 1 - s < l*Z[i]}
-Two cases: either \eqn{z^*_i<0}{Z[i] < 0}, or \eqn{z^*_i>0}{Z[i] > 0}
-(cases with \eqn{z^*_i=0}{Z[i] = 0} are trivially excluded because they do not affect the EL). Then,
-\deqn{(c_i/N - 1 - s)/z^*_i > \lambda,\ \forall i: z^*_i<0}{(c[i]/N - 1 - s)/Z[i] > l,  such i that Z[i]<0}
-\deqn{(c_i/N - 1 - s)/z^*_i < \lambda,\ \forall i: z^*_i>0}{(c[i]/N - 1 - s)/Z[i] < l,  such i that Z[i]>0}
-which defines the search bracket:
-\deqn{\lambda_{\min} := \max_{i: z^*_i>0} (c_i/N - 1 - s)/z^*_i}{l > max_{i: Z[i]>0} (c_i/N - 1 - s)/Z[i]}
-\deqn{\lambda_{\max} := \min_{i: z^*_i<0} (c_i/N - 1 - s)/z^*_i}{l < min_{i: Z[i]<0} (c_i/N - 1 - s)/Z[i]}
-\deqn{\lambda_{\min} < \lambda < \lambda_{\max}}
+This function relies on the improved computational strategy for the empirical likelihood.
+The search of the lambda multipliers is carried out via a dampened Newton method with guaranteed
+convergence owing to the fact that the log-likelihood is replaced by its Taylor approximation
+of any desired order (default: 4, the minimum value that ensures self-concordance).
 
-(This derivation contains \emph{s}, which is the extra shift that extends the
-function to allow mixed conditional and unconditional estimation;
-Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
+Tweak \code{alpha} and \code{beta} with extreme caution. See \insertCite{boyd2004convex}{smoothemplik},
+pp. 464--466 for details. It is necessary that \code{0 < alpha < 1/2} and \code{0 < beta < 1}.
+\code{alpha = 0.03} seems better than 0.01 on some 2-dimensional test data (sometimes fewer iterations).
 
-The actual tolerance of the lambda search in \code{uniroot} is
-\eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
-where \code{tol} can be set in \code{uniroot.control} and
-\eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
-
-TODO: write a section of the concondant minus-log expansion
+The argument names, except for \code{lambda.init}, are matching the original names in Art B. Owen's implementation.
+The highly optimised one-dimensional counterpart, \code{weightedEL0}, is designed to return a faster
+and a more accurate solution in the one-dimensional case.
 }
 \examples{
-# Figure 2.4 from Owen (2001) -- with a slightly different data point
 earth <- c(
   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 )
-set.seed(1)
-system.time(r1 <- replicate(40, cemplik(sample(earth, replace = TRUE), mu = 5.517)))
-set.seed(1)
-system.time(r2 <- replicate(40, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
-plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
-     bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
-     main = "Discrepancy between cemplik and weightedEL", ylab = "")
-abline(h = 0, lty = 2)
+weightedEL(earth, mu = 5.517, verbose = TRUE) # 5.517 is the modern accepted value
 
-# Handling the convex hull violation differently
-weightedEL(1:9, chull.fail = "none")
-weightedEL(1:9, chull.fail = "taylor")
-weightedEL(1:9, chull.fail = "wald")
+# Linear regression through empirical likelihood
+coef.lm <- coef(lm(mpg ~ hp + am, data = mtcars))
+xmat <- cbind(1, as.matrix(mtcars[, c("hp", "am")]))
+yvec <- mtcars$mpg
+foc.lm <- function(par, x, y) {  # The sample average of this
+  resid <- y - drop(x \%*\% par)   # must be 0
+  resid * x
+}
+minusEL <- function(par) -weightedEL(foc.lm(par, xmat, yvec), itermax = 10)$logelr
+coef.el <- optim(c(mean(yvec), 0, 0), minusEL)$par
+abs(coef.el - coef.lm) / coef.lm  # Relative difference
 
-# Interpolation to well-defined branches outside the convex hull
-mu.seq <- seq(-1, 7, 0.1)
-wEL1 <- -2*sapply(mu.seq, function(m) weightedEL(1:9, mu = m, chull.fail = "none")$logelr)
-wEL2 <- -2*sapply(mu.seq, function(m) weightedEL(1:9, mu = m, chull.fail = "taylor")$logelr)
-wEL3 <- -2*sapply(mu.seq, function(m) weightedEL(1:9, mu = m, chull.fail = "wald")$logelr)
-plot(mu.seq, wEL1)
-lines(mu.seq, wEL2, col = 2)
-lines(mu.seq, wEL3, col = 4)
-
-# Warning: depending on the compiler, the discrepancy between cemplik and weightedEL
-# can be one million (1) times larger than the machine epsilon despite both of them
-# being written in pure R
-# The results from Apple clang-1400.0.29.202 and Fortran GCC 12.2.0 are different from
-# those obtained under Ubuntu 22.04.4 + GCC 11.4.0-1ubuntu1~22.04,
-# Arch Linux 6.6.21 + GCC 14.1.1, and Windows Server 2022 + GCC 13.2.0
-out1 <- cemplik(earth, mu = 5.517)[1:4]
-out2 <- weightedEL(earth, mu = 5.517, return.weights = TRUE)[1:4]
-print(c(out1$lam, out2$lam), 16)
-
-# Value of lambda                            cemplik           weightedEL
-# aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
-# Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
+# Likelihood ratio testing without any variance estimation
+# Define the profile empirical likelihood for the coefficient on am
+minusPEL <- function(par.free, par.am)
+  -weightedEL(foc.lm(c(par.free, par.am), xmat, yvec), itermax = 20)$logelr
+# Constrained maximisation assuming that the coef on par.am is 3.14
+coef.el.constr <- optim(coef.el[1:2], minusPEL, par.am = 3.14)$par
+print(-2 * weightedEL(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
+# Exceeds the critical value qchisq(0.95, df = 1)
 }
 \references{
 \insertAllCited{}
+}
+\seealso{
+[logTaylor()], [weightedEL0()]
 }

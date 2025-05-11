@@ -8,7 +8,7 @@
 #' @param type Character: "EL" for empirical likelihood, "EuL" for Euclidean likelihood.
 #' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 #'   or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.
-#' @param EL.args A list of arguments passed to \code{weightedEL()} or \code{weightedEuL}.
+#' @param EL.args A list of arguments passed to \code{weightedEL()}, \code{weightedEL0()}, or \code{weightedEuL}.
 #' @param kernel.args A list of arguments passed to \code{kernelWeights()} if
 #'   \code{sel.weights} is a function.
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).
@@ -135,7 +135,7 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
   if (is.null(chunks)) chunks <- ceiling(n / 2000)
   if (any("none" %in% attach.attributes)) attach.attributes <- "none"
   if (isTRUE(attach.attributes)) attach.attributes <- "all"
-  # Special treatment for attach.probs because this is passed to the weightedE[u]L call to same memory
+  # Special treatment for attach.probs because this is passed to the weighted(EuL|EL0) call to same memory
   attach.probs <- ("probabilities" %in% attach.attributes) | isTRUE(attach.attributes == "all")
 
   # Since SEL is a non-parametric method and relies on smoothing with kernel weights,
@@ -164,7 +164,7 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
 
   calcOne <- function(i) { # Call the appropriate weighted likelihood function based on `type`
     if (type == "EL") {
-      return(weightedEL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+      return(weightedEL0(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
                         chull.fail = EL.args$chull.fail, weight.tolerance = EL.args$weight.tolerance,
                         return.weights = attach.probs))
     } else if (type == "EuL") {

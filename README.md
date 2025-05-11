@@ -94,7 +94,7 @@ This software is released under the free/open-source [EUPL 1.2 licence](https://
 - **The behaviour of R is hardware-dependent.** Different compilers on different
   architectures can produce R binaries that yield different outputs for the same R script.
   This variability particularly affects numerical searches for lambda in functions
-  `weightedEL()` or `cemplik()` for one-dimensional data. This is not a bug in
+  `weightedEL0()` or `weightedEL()` for one-dimensional data. This is not a bug in
   `smoothemplik`, but a consequence of the differences in machine code. Testing showed that
   running these two functions for Figure 2.4 from Owen (2001) on R compiled for
   `aarch64-apple-darwin20` produced slightly different results compared to running the same
