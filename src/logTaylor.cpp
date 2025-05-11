@@ -1,35 +1,52 @@
 #include <RcppArmadillo.h>
-
 using namespace Rcpp;
-
 // [[Rcpp::depends(RcppArmadillo)]]
 
-// Pre-computed factorials from 0! through 10!
-static const double factorial_table[11] = {
-  1.0, 1.0, 2.0, 6.0, 24.0, 120.0, // 0! ... 5!
-  720.0, 5040.0, 40320.0, 362880.0, 3628800.0 // 6! ... 10!
-};
-
+// Functions related to the logarithm, its derivatives, its Taylor expansions,
+// and the derivatives thereof
 
 // Factorial for non-negative integers
-double factorialC(int m) {
-  if (m < 0) {
-    Rcpp::stop("factorialC is not defined for negative integers.");
-  }
+inline double factorialCPP(int n) {
+  if (n < 0)
+    Rcpp::stop("factorial is not defined for negative integers.");
 
-  if (m <= 10) {
-    return factorial_table[m];
-  }
+  static constexpr double table[16] = {
+    1.0,
+    1.0, 2.0, 6.0, 24.0, 120.0,  // 1..5
+    720.0, 5040.0, 40320.0, 362880.0, 3628800.0,  // 6..10
+    39916800.0, 479001600.0, 6227020800.0, 87178291200.0, 1307674368000.0 // 11..15
+  };
 
-  double result = factorial_table[10]; // 10!
-  for (int i = 11; i <= m; i++) {
-    result *= i;
-  }
-  return result;
+  return n <= 15 ? table[n] : std::tgamma(static_cast<double>(n) + 1.0);
 }
 
 
-// Taylor expansion of the logarithm
+// Scalar d-th derivative of log(x); d = 0 gives log itself
+// dlog(x, d) = (-1)^(d-1) * (d-1)! / x^d   for d ≥ 1
+inline double dlog_scalarCPP(double x, int d) {
+  if (d == 0) return std::log(x);
+  if (d < 0)
+    Rcpp::stop("dlog_scalarCPP: derivative order must be non-negative");
+  // (d-1)!  --- very small d (<= 10) in practice, so looping is fine
+  double fac  = factorialCPP(d - 1);
+  double sign = ((d - 1) % 2 == 0) ? 1.0 : -1.0;
+  return sign * fac / std::pow(x, d);
+}
+
+
+// Vectorised wrapper around the scalar version above
+
+// [[Rcpp::export]]
+NumericVector dlogCPP(const NumericVector& x, int d) {
+  int n = x.size();
+  NumericVector out(n);
+  for (int i = 0; i < n; ++i)
+    out[i] = dlog_scalarCPP(x[i], d);
+  return out;
+}
+
+
+// Taylor expansion of the logarithm and its derivatives
 
 // [[Rcpp::export]]
 NumericVector tlogCPP(NumericVector x,
@@ -40,16 +57,12 @@ NumericVector tlogCPP(NumericVector x,
   if (!(len_a == 1 || len_a == n_x)) {
     stop("'a' must be either length 1 or the same length as 'x'.");
   }
-  if (a.size() == 1) {
+  if (a.size() == 1)
     a = NumericVector(n_x, a[0]);
-  }
 
-  if (k < 0) {
-    stop("The polynomial order 'k' must be a non-negative integer scalar.");
-  }
-  if (d < 0) {
-    stop("The derivative order 'd' must be a non-negative integer scalar.");
-  }
+  if (k < 0 || d < 0)
+    stop("The polynomial order 'k' and derivative order 'd' must be non-negative integer scalars.");
+
   if (d > k) {
     // If derivative order is greater than polynomial order, everything is zero
     // Return a zero vector of the same length as x
@@ -67,12 +80,12 @@ NumericVector tlogCPP(NumericVector x,
           // Special case: n == d, lowest order: constant log(a)
           accum += std::log(a[i]);
         } else {
-          double gamma_n = factorialC(n - 1);     // gamma(n)
+          double gamma_n = factorialCPP(n - 1);     // gamma(n)
           double denom   = std::pow(-a[i], (double)d);
           accum += -gamma_n / denom;
         }
       } else {
-        double mult  = (d == 0) ? 1.0 : factorialC(n) / factorialC(n - d);
+        double mult  = (d == 0) ? 1.0 : factorialCPP(n) / factorialCPP(n - d);
         double sign  = ((n - 1) % 2 == 0) ? 1.0 : -1.0;
         double denom = (double)n * std::pow(a[i], (double)d);
         double factor = sign * mult / denom;
@@ -84,3 +97,71 @@ NumericVector tlogCPP(NumericVector x,
 
   return wrap(out);
 }
+
+
+// The big wrapper to do this expansion for vector inputs and cut-off points
+// [[Rcpp::export]]
+SEXP logTaylorCPP(const NumericVector&  x,
+                  NumericVector lower,
+                  NumericVector upper,
+                  IntegerVector der  = IntegerVector::create(0),
+                  int order  = 4     // pass NA_integer_ for 'use pure log / derivs, no Taylor'
+) {
+  const int n = x.size();
+  const int m = der.size();  // number of derivative orders requested
+
+  // Check lower and upper
+  if (lower.size() == 1) lower = NumericVector(n, lower[0]);
+  if (upper.size()   == 1) upper   = NumericVector(n, upper[0]);
+  if (lower.size() != upper.size())
+    stop("`lower` and `upper` must have the same length.");
+  for (int i = 0; i < n; ++i) {
+    if (lower[i] > upper[i]) stop("Thresholds not ordered: lower[i] must be <= upper[i].");
+  }
+  for (int d : der)
+    if (d < 0) stop("All derivative orders must be non-negative.");
+
+  NumericMatrix out(n, m);
+
+  // Flag: should we *skip* Taylor and use plain log / derivatives only?
+  bool noTaylorApprox = Rcpp::traits::is_na<INTSXP>(order) || order < 0;
+
+  NumericVector x1(1), a1(1);  // Small buffers to avoid reallocating each loop
+
+  // Main loop
+  for (int j = 0; j < m; ++j) {
+    const int d = der[j];  // Fix a column corresponding to a derivative order
+
+    for (int i = 0; i < n; ++i) {   // Fix an observation
+
+      const double xi   = x[i];
+      const double loweri = lower[i];
+      const double upperi   = upper[i];
+
+      double val;
+
+      if (noTaylorApprox) {  // plain derivative of log
+        val = dlog_scalarCPP(xi, d);
+      } else if (xi < loweri) { // left Taylor tail
+        x1[0] = xi;  a1[0] = loweri;
+        val = tlogCPP(x1, a1, order, d)[0];
+      } else if (xi > upperi) { // right Taylor tail
+        x1[0] = xi;  a1[0] = upperi;
+        val = tlogCPP(x1, a1, order, d)[0];
+      } else { // middle region: exact derivative
+        val = dlog_scalarCPP(xi, d);
+      }
+      out(i, j) = val;
+    }
+  }
+
+  // Drop dimensions to vector if requested
+  if (m == 1) {
+    NumericVector v(n);
+    std::copy(out.begin(), out.begin() + n, v.begin());
+    return v;
+  }
+
+  return out;
+}
+

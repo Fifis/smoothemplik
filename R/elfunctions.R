@@ -378,8 +378,8 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
     if (length(upper) == 1) upper <- rep(upper, n.final)
     if (length(lower) != n.final || length(upper) != n.final)
       stop("'lower' and 'upper' must have length 1 or length(z).")
-    # logELr <- function(lambda) sum(ct * logTaylor(1 + z * lambda + shift, eps = lower, M = upper, der = 0, order = taylor.order, drop = TRUE))
-    dllik <- function(lambda) sum(ct * z * logTaylor(1 + z * lambda + shift, eps = lower, M = upper, der = 1, order = taylor.order)[, "deriv1"])
+    # logELr <- function(lambda) sum(ct * logTaylor(1 + z * lambda + shift, lower = lower, M = upper, der = 0, order = taylor.order))
+    dllik <- function(lambda) sum(ct * z * logTaylor(1 + z * lambda + shift, lower = lower, upper = upper, der = 1, order = taylor.order))
     # xs <- seq(int[1], int[2], length.out = 51)
     # ys <- sapply(xs, logELr)
     # ys1 <- sapply(xs, dllik)
@@ -393,10 +393,10 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
     if (!is.null(lam.list)) { # Some result with or without a warning as the second element of the list
       lam <- lam.list$root
       zlam1 <- 1 + z * lam + shift
-      wvec <- ct * logTaylor(zlam1, der = 1, order = taylor.order, eps = lower, M = upper)[, "deriv1"]
+      wvec <- ct * logTaylor(zlam1, der = 1, order = taylor.order, lower = lower, upper = upper)
       if (!SEL) wvec <- wvec / N
       if (return.weights) wts[nonz] <- wvec
-      logelr <- -sum(ct * logTaylor(zlam1, der = 0, order = taylor.order, eps = lower, M = upper))
+      logelr <- -sum(ct * logTaylor(zlam1, der = 0, order = taylor.order, lower = lower, upper = upper))
       # Empirical fix for nonsensical probabilities
       # This should not happen unless the spanning condition fails and the Taylor expansion is very inaccurate
       if (any(wvec < 0) && logelr > 0) logelr <- -logelr
@@ -469,7 +469,6 @@ weightedEL <- function(z, mu = 0, ct = NULL, shift = NULL,
 #' a$wts
 #' sum(a$wts)  # Unity
 #' colSums(a$wts * z)  # Zero
-#  smoothemplik:::weightedEuL_cpp(z, return_weights = TRUE)
 weightedEuL <- function(z, mu = NULL, ct = NULL, shift = NULL,
                         SEL = TRUE, n.orig = NULL,
                         weight.tolerance = NULL, trunc.to = 0,
