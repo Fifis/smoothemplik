@@ -6,6 +6,9 @@ using arma::vec;
 using arma::uvec;
 using arma::rowvec;
 
+// weighted Euclidean likelihood: the C++ implementation is ~4 times faster than
+// the R one
+
 // [[Rcpp::export]]
 Rcpp::List weightedEuLCPP(const arma::mat& z, arma::vec mu,
                           arma::vec ct, arma::vec shift,
@@ -82,16 +85,16 @@ Rcpp::List weightedEuLCPP(const arma::mat& z, arma::vec mu,
     rowvec zbar = arma::mean(zz, 0);
     mat zc = zz.each_row() - zbar;
     vec m = zz.t() * ct;  // Count-weighted average of z
-    mat z_zc = zz.t() * zc;
+    mat zc_zc = zc.t() * zc;
 
     // Debug
     // Rcout << "zc: " << zc << "\n";
     // Rcout << "m: " << m << "\n";
-    // Rcout << "z'zc: " << z_zc << "\n";
+    // Rcout << "zc'zc: " << zc_zc << "\n";
 
     bool solver_ok = true;
     try {
-      lam = -arma::solve(z_zc, m, arma::solve_opts::no_approx);
+      lam = -arma::solve(zc_zc, m, arma::solve_opts::no_approx);
     } catch (const std::runtime_error& e) {
       solver_ok = false;
     }
