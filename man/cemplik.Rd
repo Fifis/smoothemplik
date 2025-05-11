@@ -13,17 +13,18 @@ cemplik(
   z,
   ct = NULL,
   mu = NULL,
-  lam = NULL,
-  eps = NULL,
-  M = Inf,
-  order = 4,
+  lambda.init = NULL,
+  return.weights = FALSE,
+  lower = NULL,
+  upper = NULL,
+  order = 4L,
   wttol = 0.001,
-  thresh = 1e-30,
-  itermax = 100,
-  ALPHA = 0.3,
-  BETA = 0.8,
-  BACKEPS = 0,
-  verbose = FALSE
+  thresh = 1e-16,
+  itermax = 100L,
+  verbose = FALSE,
+  alpha = 0.3,
+  beta = 0.8,
+  backeps = 0
 )
 }
 \arguments{
@@ -33,11 +34,13 @@ cemplik(
 
 \item{mu}{Hypothesised mean, default (0 ... 0) in R^ncol(z)}
 
-\item{lam}{Starting lambda, default (0 ... 0)}
+\item{lambda.init}{Starting lambda, default (0 ... 0)}
 
-\item{eps}{Lower cut-off for \code{logTaylor()}, default 1/nrow(z)}
+\item{return.weights}{Logical: if \code{TRUE}, returns the empirical probabilities. Default is memory-saving (\code{FALSE}).}
 
-\item{M}{Upper cutoff for \code{logTaylor()}, default Inf}
+\item{lower}{Lower cut-off for [logTaylor()], default 1/nrow(z)}
+
+\item{upper}{Upper cutoff for [logTaylor()], default Inf}
 
 \item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].}
 
@@ -47,16 +50,16 @@ cemplik(
 
 \item{itermax}{Upper bound on number of Newton steps (seems ample)}
 
-\item{ALPHA}{Backtracking line search parameter: acceptance of a decrease in function value by ALPHA*f of the prediction
+\item{verbose}{Logical: print output diagnostics?}
+
+\item{alpha}{Backtracking line search parameter: acceptance of a decrease in function value by ALPHA*f of the prediction
 based on the linear extrapolation.}
 
-\item{BETA}{Backtracking line search reduction factor. 0.1 corresponds to a very crude search, 0.8 corresponds
+\item{beta}{Backtracking line search reduction factor. 0.1 corresponds to a very crude search, 0.8 corresponds
 to a less crude search.}
 
-\item{BACKEPS}{Backtrack threshold: the search can miss by this much. Consider setting it to 1e-10
+\item{backeps}{Backtrack threshold: the search can miss by this much. Consider setting it to 1e-10
 if backtracking seems to be failing due to round-off.}
-
-\item{verbose}{Logical: print output diagnostics?}
 }
 \value{
 A list with the following values:
@@ -84,11 +87,11 @@ The search of the lambda multipliers is carried out via a dampened Newton method
 convergence owing to the fact that the log-likelihood is replaced by its Taylor approximation
 of any desired order (default: 4, the minimum value that ensures self-concordance).
 
-Tweak \code{ALPHA} and \code{BETA} with extreme caution. See \insertCite{boyd2004convex}{smoothemplik},
-pp. 464--466 for details. It is necessary that \code{0 < ALPHA < 1/2} and \code{0 < BETA < 1}.
-\code{ALPHA = 0.03} seems better than 0.01 on some 2-dimensional test data (sometimes fewer iterations).
+Tweak \code{alpha} and \code{beta} with extreme caution. See \insertCite{boyd2004convex}{smoothemplik},
+pp. 464--466 for details. It is necessary that \code{0 < alpha < 1/2} and \code{0 < beta < 1}.
+\code{alpha = 0.03} seems better than 0.01 on some 2-dimensional test data (sometimes fewer iterations).
 
-The argument names are matching the original names in Art B. Owen's implementation.
+The argument names, except for \code{lambda.init}, are matching the original names in Art B. Owen's implementation.
 The highly optimised one-dimensional counterpart, \code{weightedEL}
 }
 \examples{
@@ -121,4 +124,7 @@ print(-2 * cemplik(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
 }
 \references{
 \insertAllCited{}
+}
+\seealso{
+[logTaylor()], [weightedEL()]
 }

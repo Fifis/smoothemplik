@@ -4,7 +4,16 @@
 \alias{ctracelr}
 \title{Compute empirical likelihood on a trajectory}
 \usage{
-ctracelr(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...)
+ctracelr(
+  z,
+  ct = NULL,
+  mu0,
+  mu1,
+  N = 5,
+  verbose = FALSE,
+  verbose.solver = FALSE,
+  ...
+)
 }
 \arguments{
 \item{z}{Passed to \code{cemplik}.}
@@ -18,6 +27,8 @@ ctracelr(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE, ...)
 \item{N}{Number of segments into which the path is split (i. e. \code{N+1} steps are used).}
 
 \item{verbose}{Logical: report iteration data?}
+
+\item{verbose.solver}{Logical: report internal iteration data from the optimiser? Very verbose.}
 
 \item{...}{Passed to \code{cemplik}.
 
@@ -36,11 +47,12 @@ earth <- c(
   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 )
-logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 100, verbose = TRUE)
+cemplik(earth, mu = 5.1,  verbose = TRUE)
+logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 55, verbose = TRUE)
 hist(earth, breaks = seq(4.75, 6, 1/8))
 plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
      xlab = "Earth density", ylab = "ELR")
-# TODO: why is there non-convergence in row 59?
+# TODO: why is there non-convergence in row 0?
 
 # Two-dimensional trajectory
 set.seed(1)

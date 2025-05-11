@@ -1,7 +1,7 @@
 test_that("weightedEL and cemplik are almost identical, but platform-dependent", {
   earth <- c(5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
              5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85)
-  out1 <- cemplik(earth, mu = 5.517)[1:4]
+  out1 <- cemplik(earth, mu = 5.517, return.weights = TRUE)[1:4]
   out2 <- weightedEL(earth, mu = 5.517, return.weights = TRUE)[1:4]
   expect_equal(names(out1), names(out2))
 
