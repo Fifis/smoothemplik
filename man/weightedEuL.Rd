@@ -2,7 +2,7 @@
 % Please edit documentation in R/elfunctions.R
 \name{weightedEuL}
 \alias{weightedEuL}
-\title{Euclidean likelihood for vectors of arbitrary dimensions}
+\title{Multi-variate Euclidean likelihood with analytical solution}
 \usage{
 weightedEuL(
   z,
@@ -53,7 +53,7 @@ convex hull because this procedure is much slower and is probably unnecessary.}
 A list with the same structure as that in [weightedEL()].
 }
 \description{
-Euclidean likelihood for vectors of arbitrary dimensions
+Multi-variate Euclidean likelihood with analytical solution
 }
 \examples{
 set.seed(1)

@@ -5,7 +5,7 @@ test_that("smoothEmplik works for a simple linear model", {
   y <- 1 + 1*x + rnorm(50) * (1 + x + sin(x))
   mod.OLS <- lm(y ~ x)
   rho <- function(theta, ...) y - theta[1] - theta[2]*x  # Moment function
-  w <- kernelWeights(x, PIT = TRUE, bw = 0.3)
+  w <- kernelWeights(x, PIT = TRUE, bw = 0.25)
   w <- w / rowSums(w)
   SEL <- function(b) smoothEmplik(rho = rho, theta = b, sel.weights = w)
   expect_type(SEL(coef(mod.OLS)), "double")
@@ -44,8 +44,8 @@ test_that("Chunking of weight matrices works", {
 })
 
 test_that("The parabola calculator is working", {
-  expect_equal(getParabola3(c(-1, 0, 2), c(-5, -4, 10)), c(a=2, b=3, c=-4))
-  expect_equal(getParabola(3, 23, 15, 4), c(a=2, b=3, c=-4))
+  expect_equal(getParabola3(c(-1, 0, 2), c(-5, -4, 10)), c(2, 3, -4))
+  expect_equal(getParabola(3, 23, 15, 4), c(2, 3, -4))
 })
 
 test_that("Sparse matrix to list conversion is working", {

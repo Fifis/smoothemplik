@@ -43,7 +43,7 @@ the spline climbs from `f` up to the parabola, and `interpToLower()` when the pa
 `f(at)`, and the transition interval has to be extended to ensure that the spline does not descend.
 
 Internally, the helpers build a **monotone Hermite cubic spline** via
-`splinefun(..., method = "monoH.FC")`.  Anchor points on each side of the
+Fritsch--Carlson tangents.  Anchor points on each side of the
 transition window are chosen so that the spline’s one edge matches `f`
 while the other edge matches the reference parabola, ensuring strict
 monotonicity between the two curves.
@@ -53,7 +53,7 @@ xx <- -4:5  # Global data for EL evaluation
 w <- 10:1
 w <- w / sum(w)
 
-f <- Vectorize(function(m) -2*weightedEL(xx, mu = m, ct = w, chull.fail = "none")$logelr)
+f <- Vectorize(function(m) -2*weightedEL0(xx, mu = m, ct = w, chull.fail = "none")$logelr)
 museq <- seq(-6, 6, 0.1)
 LRseq <- f(museq)
 plot(museq, LRseq, bty = "n")

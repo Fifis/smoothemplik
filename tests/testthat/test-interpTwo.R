@@ -3,7 +3,7 @@ test_that("interpolation works and is monotone", {
   xt <- c(-3, 2.5)  # Transition at these points
   w <- c(9, rep(1, 8))
   w <- w / sum(w)
-  f <- Vectorize(function(m) -2*weightedEL(xx, mu = m, ct = w, chull.fail = "none", SEL = TRUE)$logelr)
+  f <- Vectorize(function(m) -2*weightedEL0(xx, mu = m, ct = w, chull.fail = "none", SEL = TRUE)$logelr)
   xl <- seq(xt[1]-1, xt[1]+1, 0.1)
   xr <- seq(xt[2]-1, xt[2]+1, 0.1)
   fl <- f(xl)
@@ -44,7 +44,7 @@ test_that("interpolation works and is monotone", {
   expect_equal(head(fr, 6), head(fr, 6))
   expect_true(all(sign(diff(fil)) == -1))
   expect_true(all(sign(diff(fir)) == 1))
-  expect_true(all(tail(fil >= fl, 16)))  # Extrapolation to a highrt function
+  expect_true(all(tail(fil >= fl, 16)))  # Extrapolation to a higher function
   expect_true(all((fir <= fr)[is.finite(fr)]))  # Extrapolation to a lower function
 })
 

@@ -13,6 +13,14 @@ dampedNewtonCPP <- function(fn, par, thresh = 1e-16, itermax = 100L, verbose = F
     .Call(`_smoothemplik_dampedNewtonCPP`, fn, par, thresh, itermax, verbose, alpha, beta, backeps)
 }
 
+interpToHigherCPP <- function(x, f, mean, var, at, gap) {
+    .Call(`_smoothemplik_interpToHigherCPP`, x, f, mean, var, at, gap)
+}
+
+interpToLowerCPP <- function(x, f, mean, var, at, gap) {
+    .Call(`_smoothemplik_interpToLowerCPP`, x, f, mean, var, at, gap)
+}
+
 #' @importFrom RcppParallel RcppParallelLibs
 NULL
 
@@ -56,12 +64,16 @@ logTaylorCPP <- function(x, lower, upper, der = as.integer( c(0)), order = 4L) {
     .Call(`_smoothemplik_logTaylorCPP`, x, lower, upper, der, order)
 }
 
-svdlmCPP <- function(x, y, rel_tol = 1e-9, abs_tol = 1e-100) {
-    .Call(`_smoothemplik_svdlmCPP`, x, y, rel_tol, abs_tol)
+getParabola3CPP <- function(x, y) {
+    .Call(`_smoothemplik_getParabola3CPP`, x, y)
 }
 
-wEL <- function(lambda, Z, ct, lower, upper, taylorOrd) {
-    .Call(`_smoothemplik_wEL`, lambda, Z, ct, lower, upper, taylorOrd)
+getParabolaCPP <- function(x, f, fp, fpp) {
+    .Call(`_smoothemplik_getParabolaCPP`, x, f, fp, fpp)
+}
+
+svdlmCPP <- function(x, y, rel_tol = 1e-9, abs_tol = 1e-100) {
+    .Call(`_smoothemplik_svdlmCPP`, x, y, rel_tol, abs_tol)
 }
 
 weightedELCPP <- function(z, ct, mu, lambda_init, return_weights, lower, upper, order, wttol, thresh, itermax, verbose = FALSE, alpha = 0.3, beta = 0.8, backeps = 0.0) {

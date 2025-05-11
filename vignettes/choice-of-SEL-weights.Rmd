@@ -84,19 +84,25 @@ Using a fixed bandwidth for SEL smoothing is the simplest choice, yet it can be 
 In the regions where the observations are dense, the empirical likelihood may be over-smoothed, whereas in low-density regions, it may be undersmoothed, creating problems for the spanning condition.
 
 The obvious ‘crutch’ to fix the spanning condition failure is the use of some sort of extrapolation of the SELR function outside the convex hull.
-The present package offers two options for the `weightedEL()` function: `chull.fail = "taylor"` that extrapolates its branches halfway after the penultimate observation at each side, or `chull.fail = "wald"` that replaces the SELR function halfway between the outermost observations with a (discontinuous) Wald approximation.
+The present package offers three options for the `weightedEL0()` function: `chull.fail = "taylor"` that extrapolates its branches halfway after the penultimate observation at each side, or `chull.fail = "wald"` that replaces the SELR function halfway between the outermost observations with a smooth transition to a Wald approximation, or `chull.fail = "none"` for returning `-Inf`.
 
 ```{r}
-x <- c(-5, -3:3, 7)
-grid.full <- seq(-5.5, 7.5, 0.1)
-selr0 <- sapply(grid.full, function(m) -2*weightedEL(x, mu = m, chull.fail = "none")$logelr)
-selr <- sapply(grid.full, function(m) -2*weightedEL(x, mu = m, chull.fail = "taylor")$logelr)
-plot(grid.full, selr, ylim = c(0, 60), xlim = c(-5.5, 7.5),
-     col = 1 + (grid.full < -4 | grid.full > 5), bty = "n",
-     main = "-2 * weighted log-EL ratio")
-lines(grid.full, selr0, lty = 1)
-lines(grid.full, (grid.full - mean(x))^2 / (var(grid.full) / length(x)), lty = 2)
+x  <- c(-3, -2, 2, 3, 4)
+ct <- c(10, 4:1)
+grid.full <- seq(-3.5, 5.5, 0.05)
+grid.keep <- grid.full < -2.25 | grid.full > 3.25
+selr0 <- sapply(grid.full, function(m) -2*weightedEL0(x, ct, mu = m, chull.fail = "none")$logelr)
+selr1 <- sapply(grid.full, function(m) -2*weightedEL0(x, ct, mu = m, chull.fail = "taylor")$logelr)
+selr2 <- sapply(grid.full, function(m) -2*weightedEL0(x, ct, mu = m, chull.fail = "wald")$logelr)
+plot(grid.full, selr0, ylim = c(0, 120), xlim = c(-3.5, 4.5), bty = "n",
+     main = "-2 * weighted log-EL", ylab = "")
+points(grid.full[grid.keep], selr1[grid.keep], col = 4, pch = 0)
+wm <- weighted.mean(x, ct)
+wv <- weighted.mean((x - wm)^2, ct) / sum(ct)
+points(grid.full[grid.keep], selr2[grid.keep], col = 2, pch = 2)
+lines(grid.full, (grid.full - wm)^2 / wv, col = 2, pch = 2)
 rug(x, lwd = 2)
+abline(v = c(-2.5, 3.5), lty = 3)
 ```
 
 These extrapolations may certainly remedy the predicament of having negative infinity for the log-ELR statistic, which does not get accepted by most numerical optimisers -- but they should not be relied upon.
