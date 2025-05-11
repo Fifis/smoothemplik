@@ -4,25 +4,26 @@
 \alias{svdlm}
 \title{Least-squares regression via SVD}
 \usage{
-svdlm(X, y, rel.tol = 1e-09, abs.tol = 1e-100)
+svdlm(x, y, rel.tol = 1e-09, abs.tol = 1e-100)
 }
 \arguments{
-\item{X}{Model matrix.}
+\item{x}{Model matrix.}
 
 \item{y}{Response vector.}
 
 \item{rel.tol}{Relative zero tolerance for generalised inverse via SVD.}
 
-\item{abs.tol}{Relative zero tolerance for generalised inverse via SVD.
+\item{abs.tol}{Absolute zero tolerance for generalised inverse via SVD.
 
-Empirical likelihood's Newton steps are of least-squares type.
-Denote \eqn{X^+} to be the generalised inverse of X. If SVD algorithm failures are encountered,
-it sometimes helps to try \code{svd(t(X))} and translate back. First check to ensure that
-\code{X} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.
+Newton steps for many empirical likelihoods are of least-squares type.
+Denote \eqn{x^+} to be the generalised inverse of \code{x}.
+If SVD algorithm failures are encountered, it sometimes helps to try
+\code{svd(t(x))} and translate back. First check to ensure that
+\code{x} does not contain \code{NaN}, or \code{Inf}, or \code{-Inf}.
 
 The tolerances are used to check the closeness of singular values to zero. The values of the
-singular-value vector \code{d} that are
-less than \code{rel.tol * max(d) + abs.tol} are set to zero.}
+singular-value vector \code{d} that are less than
+\code{max(rel.tol * max(d), abs.tol)} are set to zero.}
 }
 \value{
 A vector of coefficients.
@@ -31,7 +32,7 @@ A vector of coefficients.
 Least-squares regression via SVD
 }
 \examples{
-b.svd <- svdlm(X = cbind(1, as.matrix(mtcars[, -1])), y = mtcars[, 1])
+b.svd <- svdlm(x = cbind(1, as.matrix(mtcars[, -1])), y = mtcars[, 1])
 b.lm  <- coef(lm(mpg ~ ., data = mtcars))
 b.lm - b.svd  # Negligible differences
 }
