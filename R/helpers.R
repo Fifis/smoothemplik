@@ -113,3 +113,45 @@ interpTwo <- function(x, f, mean, var, at, gap) {
   else
     interpToLower(x, f, mean, var, at, gap)
 }
+
+
+#' Damped Newton optimiser
+#'
+#' @param fn A function that returns a list: f, f', f''.
+#' If the function takes vector arguments, the dimensions of the list components must
+#' be 1, \code{dim X}, \code{(dim X) x (dim X)}. The function must be (must be twice continuously
+#' differentiable at x)
+#' @param par Numeric vector: starting point.
+#' @param thresh A small scalar: stop when Newton decrement squared falls belowe \code{thresh}.
+#' @param itermax Maximum iterations. Consider optimisation failed if the maximum is reached.
+#' @param alpha Back-tracking parameter strictly between 0 and 0.5: acceptance of a decrease in function value by alpha*f of the prediction.
+#' @param beta Back-tracking parameter strictly between 0 and 1: reduction of the step size until
+#'   the stopping criterion is met. 0.1 corresponds to a very crude search, 0.8 corresponds
+#'   to a less crude search.
+#' @param backeps Back-tracking threshold: the search can miss by this much. Consider setting it to 1e-10
+#'   if backtracking seems to be failing due to round-off.
+#' @param verbose Logical: if true, prints the tracing infornation (iteration log).
+#'
+#' This is a translation of Algorithm 9.5 from \insertCite{boyd2004convex}{smoothemplik} into C++.
+#'
+#' @references
+#' \insertAllCited{}
+#'
+#' @return A list:
+#' @export
+#'
+#' @examples
+#' f1 <- function(x)
+#'   list(fn = x - log(x), gradient = 1 - 1/x, Hessian = matrix(1/x^2, 1, 1))
+#' optim(2, function(x) f1(x)[["fn"]], gr = function(x) f1(x)[["gradient"]], method = "BFGS")
+#' dampedNewton(f1, 2, verbose = TRUE)
+#'
+#' # The minimum of f3 should be roughly at -0.57
+#' f3 <- function(x)
+#'   list(fn = sum(exp(x) + 0.5 * x^2), gradient = exp(x) + x, Hessian =  diag(exp(x) + 1))
+#' dampedNewton(f3, seq(0.1, 5, length.out = 11), verbose = TRUE)
+dampedNewton <- function(fn, par, thresh  = 1e-30, itermax = 100,
+                         verbose = FALSE, alpha = 0.3, beta = 0.8, backeps = 0.0) {
+  dampedNewtonCPP(fn = fn, par = par, thresh = thresh, itermax = itermax, verbose = verbose,
+                  alpha = alpha, beta = beta, backeps = backeps)
+}
