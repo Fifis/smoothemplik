@@ -45,7 +45,7 @@ For a linear model, the user can define the residuals like this:
 ```{r}
 resFun <- function(theta, data) data$Y - data[, c("X1", "X2")] %*% theta
 ```
-Then, `maximiseSEL()` takes it as the input, and the optimiser will find the value of `theta` that yields the ‘best’ fit of the model to the data.
+Then, `smoothEmplik()` takes it as the input, and the optimiser will find the value of `theta` that yields the ‘best’ fit of the model to the data.
 Here, ‘best’ means that these residuals are closest to zero as measured by the sum of local ELR statistics for each observation.
 
 Unlike functions for unconditional-moment-restriction models that typically require input matrices obtained by taking products of GMM instruments with the residuals, the input to SEL is just a function that computes a vector of residuals (or their close analogues).

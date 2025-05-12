@@ -1044,23 +1044,25 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
 #' x <- x.uniq[inds]
 #' y <- y.uniq[inds]
 #' w <- 1 + runif(n, 0, 2) # Relative importance
-#' data.table::setDTthreads(1) # For measuring the pure gains and overhead
+#' data.table::setDTthreads(1) # For measuring pure gains and overhead
 #' RcppParallel::setThreadOptions(numThreads = 1)
 #' bw.grid <- seq(0.1, 1.2, 0.05)
-#' CV <- LSCV(x, y, bw.grid, weights = w)
+#' ncores <- if (.Platform$OS.type == "windows") 1 else 2
+#' CV <- LSCV(x, y, bw.grid, weights = w, cores = ncores)  # Parallel capabilities
 #' bw.opt <- bw.grid[which.min(CV)]
 #' g <- seq(-3.5, 3.5, 0.05)
-#' yhat <- kernelSmooth(x, y, g, w, bw.opt, deduplicate.xout = FALSE)
+#' yhat <- kernelSmooth(x, y, xout = g, weights = w,
+#'                      bw = bw.opt, deduplicate.xout = FALSE)
 #' par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
 #' plot(bw.grid, CV, bty = "n", xlab = "", ylab = "", main = "Cross-validation")
 #' plot(x.uniq, y.uniq, bty = "n", xlab = "", ylab = "", main = "Optimal fit")
 #' points(g, yhat, pch = 16, col = 2, cex = 0.5)
 LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "gaussian",
-                 order = 2, PIT = FALSE, chunks = 0, robust.iterations = 0, no.dedup = FALSE) {
+                 order = 2, PIT = FALSE, chunks = 0, robust.iterations = 0, cores = 1) {
   arg <- prepareKernel(x = x, y = y, weights = weights, bw = bw[1],
-                        # bw[1] skips the length check in case multiple bw values are given as a vector not equal to NCOL(x)
-                        kernel = kernel, PIT = PIT, order = order,
-                        convolution = FALSE, deduplicate.x = !no.dedup)
+                       # bw[1] skips the length check in case multiple bw values are given as a vector not equal to NCOL(x)
+                       kernel = kernel, PIT = PIT, order = order,
+                       convolution = FALSE, deduplicate.x = TRUE)
   one.dim <- ncol(arg$x) == 1 # Are the data one-dimensional? Determines how vector bw is handled.
   n <- sum(arg$weights)
 
@@ -1086,7 +1088,7 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
     if (!is.finite(m)) m <- Inf
     return(m)
   }
-  ASE.values <- vapply(bw, ASE, FUN.VALUE = numeric(1))
+  ASE.values <- unlist(parallel::mclapply(bw, ASE, mc.cores = cores))
   attr(ASE.values, "duplicate.stats") <- arg$duplicate.stats
   return(ASE.values)
 }
@@ -1165,7 +1167,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
                         kernel = kernel, PIT = PIT, order = order,
                         convolution = FALSE, deduplicate.x = TRUE)
   arg.list <- list(x = arg$x, weights = arg$weights, kernel = arg$kernel, order = arg$order,
-                   chunks = chunks, same = same, no.dedup = TRUE) # Processed data to pass further
+                   chunks = chunks, same = same) # Processed data to pass further
   if (CV == "LSCV") arg.list <- c(arg.list, list(y = arg$y), degree = degree, robust.iterations = robust.iterations)
 
   ctrl <- dot.args[["control"]]
