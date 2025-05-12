@@ -62,7 +62,7 @@ static SEXP wELlambda(SEXP lambdaSEXP) {
 // [[Rcpp::export]]
 List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init,
                    bool return_weights, NumericVector lower, NumericVector upper,
-                   int order, double wttol, double thresh, int itermax, bool verbose = false,
+                   int order, double weight_tolerance, double thresh, int itermax, bool verbose = false,
                    double alpha = 0.3, double beta = 0.8, double backeps = 0.0) {
   const int n = z.nrow();
   const int d = z.ncol();
@@ -73,7 +73,7 @@ List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericV
 
   // Observation weights = counts
   if (min(ct) < 0) stop("Negative weights are not allowed.");
-  for (double& w : ct) if (w > 0 && w < wttol) w = 0;
+  for (double& w : ct) if (w > 0 && w < weight_tolerance) w = 0;
   if (sum(ct) == 0) stop("Total weight must be positive.");
   g_ct = arma::vec(ct.begin(), n,  /*copy_aux_mem =*/ true);
 
@@ -112,7 +112,6 @@ List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericV
   double logelr = opt["value"];
   NumericVector par = opt["par"];
   int it  = opt["counts"];
-  bool ok  = (int)opt["convergence"] == 0;
 
   // Probabilities if asked for
   SEXP wts = R_NilValue;
@@ -124,7 +123,7 @@ List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericV
 
   return List::create(
     _["logelr"] = logelr, _["lam"] = par, _["wts"] = wts,
-    _["converged"] = ok, _["iter"] = it,
+    _["exitcode"] = opt["convergence"], _["iter"] = it,
     _["ndec"] = opt["ndec"], _["gradnorm"]  = opt["gradnorm"]
   );
 }

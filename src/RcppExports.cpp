@@ -296,8 +296,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // weightedELCPP
-List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper, int order, double wttol, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps);
-RcppExport SEXP _smoothemplik_weightedELCPP(SEXP zSEXP, SEXP ctSEXP, SEXP muSEXP, SEXP lambda_initSEXP, SEXP return_weightsSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP orderSEXP, SEXP wttolSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP) {
+List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper, int order, double weight_tolerance, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps);
+RcppExport SEXP _smoothemplik_weightedELCPP(SEXP zSEXP, SEXP ctSEXP, SEXP muSEXP, SEXP lambda_initSEXP, SEXP return_weightsSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP orderSEXP, SEXP weight_toleranceSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -309,14 +309,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type lower(lowerSEXP);
     Rcpp::traits::input_parameter< NumericVector >::type upper(upperSEXP);
     Rcpp::traits::input_parameter< int >::type order(orderSEXP);
-    Rcpp::traits::input_parameter< double >::type wttol(wttolSEXP);
+    Rcpp::traits::input_parameter< double >::type weight_tolerance(weight_toleranceSEXP);
     Rcpp::traits::input_parameter< double >::type thresh(threshSEXP);
     Rcpp::traits::input_parameter< int >::type itermax(itermaxSEXP);
     Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
     Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< double >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< double >::type backeps(backepsSEXP);
-    rcpp_result_gen = Rcpp::wrap(weightedELCPP(z, ct, mu, lambda_init, return_weights, lower, upper, order, wttol, thresh, itermax, verbose, alpha, beta, backeps));
+    rcpp_result_gen = Rcpp::wrap(weightedELCPP(z, ct, mu, lambda_init, return_weights, lower, upper, order, weight_tolerance, thresh, itermax, verbose, alpha, beta, backeps));
     return rcpp_result_gen;
 END_RCPP
 }

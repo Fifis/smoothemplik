@@ -5,7 +5,10 @@
 #' @param rho The moment function depending on parameters and data (and potentially other parameters). Must return a numeric vector.
 #' @param theta A parameter at which the moment function is evaluated.
 #' @param data A data object on which the moment function is computed.
-#' @param type Character: "EL" for empirical likelihood, "EuL" for Euclidean likelihood.
+#' @param type Character: \code{"EL"} for empirical likelihood, \code{"EuL"} for Euclidean likelihood, \code{"EL0"} for one-dimensional
+#'   empirical likelihood. \code{"EL0"} is *strongly* recommended for 1-dimensional moment functions because it is
+#'   faster and more robust: it searches for the Lagrange multiplier directly and has nice fail-safe options
+#'   for convex hull failure.
 #' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 #'   or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.
 #' @param EL.args A list of arguments passed to \code{weightedEL()}, \code{weightedEL0()}, or \code{weightedEuL}.
@@ -118,7 +121,7 @@
 #' image(b0grid, b1grid, log1p(-2*(seulgrid - max(seulgrid, na.rm = TRUE))))
 #' }
 smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
-                         type = c("EL", "EuL"),
+                         type = c("EL", "EuL", "EL0"),
                          kernel.args = list(bw = NULL, kernel = "epanechnikov", order = 2, PIT = TRUE, sparse = TRUE),
                          EL.args = list(chull.fail = "taylor", weight.tolerance = NULL),
                          minus = FALSE,
@@ -164,12 +167,15 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
 
   calcOne <- function(i) { # Call the appropriate weighted likelihood function based on `type`
     if (type == "EL") {
-      return(weightedEL0(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
-                        chull.fail = EL.args$chull.fail, weight.tolerance = EL.args$weight.tolerance,
-                        return.weights = attach.probs))
+      return(weightedEL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+                        weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
     } else if (type == "EuL") {
       return(weightedEuL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
                          weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
+    } else if (type == "EL0") {
+      return(weightedEL0(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+                         chull.fail = EL.args$chull.fail, weight.tolerance = EL.args$weight.tolerance,
+                         return.weights = attach.probs))
     } else {
       stop("The 'type' argument must be 'EL' or 'EuL'.")
     }
@@ -207,12 +213,15 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
   log.SELR <- sum(log.ELR.values)
   ret <- log.SELR
   if (isTRUE(attach.attributes == "none")) return(ret)
-  if ("ELRs" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "ELRs") <- log.ELR.values
-  if ("residuals" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "residuals") <- rho.series
-  if ("lam" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "lam") <- unlist(lapply(empliklist, "[[", "lam"))
-  if ("nabla" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "nabla") <- unlist(lapply(empliklist, "[[", "f.root"))
-  if ("converged" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "converged") <- unlist(lapply(empliklist, "[[", "converged"))
-  if ("exitcode" %in% attach.attributes || isTRUE(attach.attributes == "all")) attr(ret, "exitcode") <- unlist(lapply(empliklist, "[[", "exitcode"))
+  aa <- isTRUE(attach.attributes == "all")
+  if ("ELRs" %in% attach.attributes || aa) attr(ret, "ELRs") <- log.ELR.values
+  if ("residuals" %in% attach.attributes || aa) attr(ret, "residuals") <- rho.series
+  if ("lam" %in% attach.attributes || aa) attr(ret, "lam") <- unlist(lapply(empliklist, "[[", "lam"))
+  if ("nabla" %in% attach.attributes || aa)
+    attr(ret, "nabla") <- if (type == "EL0") unlist(lapply(empliklist, "[[", "f.root")) else unlist(lapply(empliklist, "[[", "gradnorm"))
+  if ("converged" %in% attach.attributes || aa)  # uniroot has many exit codes, but the custom optimiser has only 2 defined by the termination criterion
+    attr(ret, "converged") <- if (type == "EL0") unlist(lapply(empliklist, "[[", "converged")) else unlist(lapply(empliklist, "[[", "exitcode")) == 0
+  if ("exitcode" %in% attach.attributes || aa) attr(ret, "exitcode") <- unlist(lapply(empliklist, "[[", "exitcode"))
   if (attach.probs) attr(ret, "probabilities") <- lapply(empliklist, "[[", "wts")
   return(ret)
 }

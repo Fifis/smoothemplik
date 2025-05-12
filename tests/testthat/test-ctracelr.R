@@ -7,6 +7,7 @@ test_that("ctracelr constructs a correct path", {
   # lines(c(0.5, 1.5), c(0.5, 1.5), lwd = 2, col = 2)
   trc <- ctracelr(xy, mu0 = c(0.5, 0.5), mu1 = c(1.5, 1.5), N = 10)
   expect_equal(nrow(trc), 11)
-  expect_true(all(trc[, "conv"] == 1))
-  expect_lt(max(trc[, "gnorm"]), 1e-6)
+  expect_true(all(trc[, "exitcode"] == 0))
+  expect_lt(max(trc[, "gradnorm"]), 1e-6)
 })
+

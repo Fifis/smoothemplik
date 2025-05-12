@@ -2,20 +2,17 @@
 
 These bug fixes and features are scheduled for the upcoming releases.
 
-- BUG: `"downX"` does not work in `f <- function (x) 1 - x; brentZero(f, c(9, 10), extendInt = "downX")`
 - BUG: `bw.CV(x, y = y, kernel = "quartic", order = 4)` and `bw.CV(x, y = y, kernel = "quartic")`
-- BUG: `maximiseSEL()` fails if no weights are provided -- check and auto-generate
 - BUG: Fix the DCV code with convolutions (especially the quartic one)
 - BUG: The check `CV = "DCV"` and `is.null(y)` seems redundant.
 - BUG: If `x` contains duplicates, `DCV(x, bw = bw.grid, weights = w)` complains that no duplicates were found (see the example)
-- BUG: `smoothEmplikDiscrete()`: if the split variable does not take contiguous values from 1 to the number of categories, estimation fails.
 - BUG: LOO estimation: instead of dropping unique (X, Y) observations, leave each conditioning points (only X)
 - BUG: Fix the optimiser control argument in `bw.CV()`, add `log()` for non-negativity and better scaling.
 - SYNTAX: `kernelSmooth()`, being a local average, should have `na.rm` and check the inputs
 - SYNTAX: In `kernelDiscreteDensitySmooth()`, remove the `table` attribute and change the test.
 - SYNTAX: Create a summary class for SEL; print numerical gradients of lambdas; print the number of converged inner optimisation problems
 - FEATURE: Create a class for smoothing that would yield LOESS smoothing matrices, with ranks or distances
-- FEATURE: For sparseVectorToList, the default `trim(x)` should be such that the sum of sorted weights exceeds 0.99999999: `trim = \(w) min(which(cumsum(sort(w / sum(w), decreasing = TRUE)) > 1 - 1e-8))`
+- FEATURE: For `sparseVectorToList()`, the default `trim(x)` should be such that the sum of sorted weights exceeds 0.99999999: `trim = \(w) min(which(cumsum(sort(w / sum(w), decreasing = TRUE)) > 1 - 1e-8))`
 - FEATURE: Create convolution for kernel orders 4 and 6
 - FEATURE: add convergence check in `brentZero()`, like in `uniroot()`.
 - FEATURE: De-duplicate at kernel weights already (via `.prepareKernel()`), return the attribute
@@ -28,7 +25,6 @@ These bug fixes and features are scheduled for the upcoming releases.
 - FEATURE: Add weight support to `kernelDiscreteDensitySmooth()`
 - FEATURE: Eliminate matrices in smoothing completely, try only parallel loops
 - FEATURE: Extend the CV to non-Gaussian cases.
-- SYNTAX: In `maximiseSEL()` and `constrSmoothEmplik()`, add names to `$restricted`
 - FEATURE: CV: implement leave-K-out CV for speed
 - FEATURE: In `kernelMixedSmooth()`: if LOO, do not de-duplicate `xout`, copy it from `arg$x` (currently mitigated via `deduplicate.xout = FALSE`)
 - FEATURE: All LOO to the C++ density function
@@ -36,8 +32,6 @@ These bug fixes and features are scheduled for the upcoming releases.
 - FEATURE: Check: if the kernel is finite-support and bandwidth is smaller than the largest gap between two observations, then, set the bandwidth in that dimension to 1.1 times that gap. `kernelSmooth()` and `kernelDensity()` should have an argument for increasing small bandwidths in case of zero weights to match the largest gap divided by 2 (times 1.1 to have at least some coverage)
 - FEATURE: Like in the SEL application: de-duplicate the input matrix, replace with weights; allow the user to disable it
 - FEATURE: Merging cells: allow arbitrary variables (including continuous ones) for proximity.
-- FEATURE: robustify SEL against spanning condition violation based on weighted quantiles, not simply midpoint of x1 and x2
-- MISC: Test the previous output of `weightedEL()` and `weightedEL0()` with the new version, reproduce Owen's examples, add tests
 - MISC: Check analytical expressions for all combinations of kernels, convolutions, and orders in Sage and Mathematica, publish the reproducing codes
 - MISC: Reproduce the CKT (2019) results with the `shift` argument (i.e. test the shift)
 - MISC: Add a vignette for non-parametric methods to GitHub, finish the mixed-smoothing part
