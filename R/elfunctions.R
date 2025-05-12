@@ -414,11 +414,13 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
 #' @param ct A numeric vector of non-negative counts.
 #' @param mu Hypothesised mean, default (0 ... 0) in R^ncol(z)
 #' @param lambda.init Starting lambda, default (0 ... 0)
+#' @param SEL If \code{FALSE}, the default weight tolerance is \code{MachEps^(1/3)}, otherwise
+#'   it is \code{MachEps^(1/2)} of the maximum count.
 #' @param return.weights Logical: if \code{TRUE}, returns the empirical probabilities. Default is memory-saving (\code{FALSE}).
-#' @param lower Lower cut-off for [logTaylor()], default 1/nrow(z)
-#' @param upper Upper cutoff for [logTaylor()], default Inf
+#' @param lower Lower cut-off for [logTaylor()], default \code{1/nrow(z)}
+#' @param upper Upper cutoff for [logTaylor()], default \code{Inf}
 #' @param order Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].
-#' @param wttol Weight tolerance for counts to improve numerical stability
+#' @param weight.tolerance Weight tolerance for counts to improve numerical stability
 #' @param thresh Convergence threshold for log-likelihood (the default is aggressive)
 #' @param itermax Upper bound on number of Newton steps (seems ample)
 #' @param alpha Backtracking line search parameter: acceptance of a decrease in function value by ALPHA*f of the prediction
@@ -474,9 +476,9 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
 #' print(-2 * weightedEL(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
 #' # Exceeds the critical value qchisq(0.95, df = 1)
 #' @export
-weightedEL <- function(z, ct = NULL, mu = NULL, lambda.init = NULL,
+weightedEL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
                        return.weights = FALSE, lower = NULL, upper = NULL,
-                       order = 4L, wttol = 0.001,
+                       order = 4L, weight.tolerance = NULL,
                        thresh = 1e-16, itermax = 100L, verbose = FALSE,
                        alpha = 0.3, beta = 0.8, backeps = 0) {
   if (is.vector(z)) z <- matrix(z, ncol = 1)
@@ -490,18 +492,22 @@ weightedEL <- function(z, ct = NULL, mu = NULL, lambda.init = NULL,
   if (is.null(lower)) lower <- rep(1/n, n)
   if (is.null(upper)) upper <- rep(Inf, n)
 
+  if (is.null(weight.tolerance))
+    weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
+
   if (is.null(ct)) ct <- rep(1, n)
   if (min(ct) < 0) stop("Negative weights are not allowed.")
-  if (any(0 < ct & ct < wttol)) {
-    warning(paste("Positive counts below", wttol, "have been replaced by zero."))
-    ct[ct < wttol] <- 0
+  if (SEL) ct <- ct / sum(ct)
+  if (any(0 < ct & ct < weight.tolerance)) {
+    if (verbose) warning(paste("Positive counts below", weight.tolerance, "have been replaced by zero."))
+    ct[ct < weight.tolerance] <- 0
+    if (SEL) ct <- ct / sum(ct)  # Re-normalising again
   }
-  nonz <- (ct > 0) # These are observations with nonzero weight used in the Newton step below
   if (sum(ct) <= 0) stop("Total weight must be positive.")
 
   weightedELCPP(z = z, ct = ct, mu = mu, lambda_init = lambda.init,
                 return_weights = return.weights, lower = lower, upper = upper,
-                order = order, wttol = wttol, thresh = thresh,
+                order = order, weight_tolerance = weight.tolerance, thresh = thresh,
                 itermax = itermax, verbose = verbose,
                 alpha = alpha, beta = beta, backeps = backeps)
 }
@@ -545,20 +551,24 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
   if (is.vector(z)) z <- matrix(z, ncol = 1)
   d <- ncol(z)
 
-  ans <- matrix(0, nrow = N + 1, ncol = d + 1 + d + 4)
-  colnames(ans) <- c(paste("z", 1:d, sep = "."),
-                     "logelr",
-                     paste("lambda", 1:d, sep = "."),
-                     c("conv", "iter", "decr", "gnorm"))
   lam0 <- NULL
+  elr <- ec <- it <- nd <- gn <- numeric(N+1)
+  m <- l <- matrix(NA, N+1, ncol = d)
   for (i in 0:N) {
     mui <- (i*mu1 + (N-i)*mu0) / N
-    if (i > 0) lam0 <- if (all(is.finite(ansi$lam))) drop(ansi$lam) else NULL
-    ansi <- weightedEL(z = z, ct = ct, mu = mui, lambda.init = lam0, verbose = verbose.solver, ...)
-    ans[i + 1, ] <- c(mui, ansi$logelr, ansi$lam, ansi$converged, ansi$iter, ansi$ndec, ansi$gradnorm)
-    if (verbose) cat("Point ", i, "/", N, ", ", if (ansi$converged == 0) "NOT " else "", "converged",
-                     ", log(ELR) = ", ansi$logelr, "\n", sep = "")
+    if (i > 0) lam0 <- if (all(is.finite(x$lam))) drop(x$lam) else NULL
+    x <- weightedEL(z = z, ct = ct, mu = mui, lambda.init = lam0, verbose = verbose.solver, ...)
+    m[i+1, ] <- mui
+    l[i+1, ] <- x$lam
+    elr[i+1] <- x$logelr
+    ec[i+1] <- x$exitcode
+    it[i+1] <- x$iter
+    nd[i+1] <- x$ndec
+    gn[i+1] <- x$gradnorm
+    if (verbose) cat("Point ", i, "/", N, ", ", if (x$converged == 0) "NOT " else "", "converged",
+                     ", log(ELR) = ", x$logelr, "\n", sep = "")
   }
+  ans <- data.frame(mu = m, logelr = elr, lambda = l, exitcode = ec, iter = it, ndec = nd, gradnorm = gn)
   return(ans)
 }
 
