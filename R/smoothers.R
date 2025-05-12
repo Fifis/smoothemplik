@@ -1024,6 +1024,7 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
 #' @inheritParams kernelSmooth
 #' @param bw Candidate bandwidth values: scalar, vector, or a matrix (with columns corresponding to columns of \code{x}).
 #' @param same Logical: use the same bandwidth for all columns of \code{x}?
+#' @param cores Integer: the number of CPU cores to use. High core count = high RAM usage.
 #'
 #' Note: since LSCV requires zeroing out the diagonals of the weight matrix,
 #'   repeated observations are combined first; the de-duplication is therefore

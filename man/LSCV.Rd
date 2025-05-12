@@ -16,7 +16,7 @@ LSCV(
   PIT = FALSE,
   chunks = 0,
   robust.iterations = 0,
-  no.dedup = FALSE
+  cores = 1
 )
 }
 \arguments{
@@ -33,13 +33,7 @@ perform weighted operations. If null, \code{rep(1, NROW(x))} is used. In
 all calculations, the total number of observations is assumed to be the
 sum of \code{weights}.}
 
-\item{same}{Logical: use the same bandwidth for all columns of \code{x}?
-
-Note: since LSCV requires zeroing out the diagonals of the weight matrix,
-  repeated observations are combined first; the de-duplication is therefore
-  forced in cross-validation. The only situation where de-duplication can be
-  skipped is passing de-duplicated data sets from outside (e.g. inside
-  optimisers).}
+\item{same}{Logical: use the same bandwidth for all columns of \code{x}?}
 
 \item{degree}{Integer: 0 for locally constant estimator (Nadaraya--Watson), 1 for
 locally linear (Cleveland's LOESS), 2 for locally quadratic (use with care, less stable, requires larger bandwidths)}
@@ -59,8 +53,13 @@ no matrix has more than 2^27 elements).}
 
 \item{robust.iterations}{The number of robustifying iterations (due to Cleveland, 1979). If greater than 0, \code{xout} is ignored.}
 
-\item{no.dedup}{Logical: if TRUE, sets \code{deduplicate.x} and \code{deduplicate.xout}
-to FALSE (shorthand).}
+\item{cores}{Integer: the number of CPU cores to use. High core count = high RAM usage.
+
+Note: since LSCV requires zeroing out the diagonals of the weight matrix,
+  repeated observations are combined first; the de-duplication is therefore
+  forced in cross-validation. The only situation where de-duplication can be
+  skipped is passing de-duplicated data sets from outside (e.g. inside
+  optimisers).}
 }
 \value{
 A numeric vector of the same length as \code{bw} or \code{nrow(bw)}.
@@ -78,13 +77,15 @@ y.uniq <- 1 + 0.2*x.uniq + 0.3*sin(x.uniq) + rnorm(n.uniq)
 x <- x.uniq[inds]
 y <- y.uniq[inds]
 w <- 1 + runif(n, 0, 2) # Relative importance
-data.table::setDTthreads(1) # For measuring the pure gains and overhead
+data.table::setDTthreads(1) # For measuring pure gains and overhead
 RcppParallel::setThreadOptions(numThreads = 1)
 bw.grid <- seq(0.1, 1.2, 0.05)
-CV <- LSCV(x, y, bw.grid, weights = w)
+ncores <- if (.Platform$OS.type == "windows") 1 else 2
+CV <- LSCV(x, y, bw.grid, weights = w, cores = ncores)  # Parallel capabilities
 bw.opt <- bw.grid[which.min(CV)]
 g <- seq(-3.5, 3.5, 0.05)
-yhat <- kernelSmooth(x, y, g, w, bw.opt, deduplicate.xout = FALSE)
+yhat <- kernelSmooth(x, y, xout = g, weights = w,
+                     bw = bw.opt, deduplicate.xout = FALSE)
 par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
 plot(bw.grid, CV, bty = "n", xlab = "", ylab = "", main = "Cross-validation")
 plot(x.uniq, y.uniq, bty = "n", xlab = "", ylab = "", main = "Optimal fit")

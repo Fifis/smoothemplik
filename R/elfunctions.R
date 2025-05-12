@@ -565,7 +565,7 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
     it[i+1] <- x$iter
     nd[i+1] <- x$ndec
     gn[i+1] <- x$gradnorm
-    if (verbose) cat("Point ", i, "/", N, ", ", if (x$converged == 0) "NOT " else "", "converged",
+    if (verbose) cat("Point ", i, "/", N, ", ", if (x$exitcode != 0) "NOT " else "", "converged",
                      ", log(ELR) = ", x$logelr, "\n", sep = "")
   }
   ans <- data.frame(mu = m, logelr = elr, lambda = l, exitcode = ec, iter = it, ndec = nd, gradnorm = gn)
