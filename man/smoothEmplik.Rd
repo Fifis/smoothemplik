@@ -9,7 +9,7 @@ smoothEmplik(
   theta,
   data,
   sel.weights = NULL,
-  type = c("EL", "EuL"),
+  type = c("EL", "EuL", "EL0"),
   kernel.args = list(bw = NULL, kernel = "epanechnikov", order = 2, PIT = TRUE, sparse =
     TRUE),
   EL.args = list(chull.fail = "taylor", weight.tolerance = NULL),
@@ -35,7 +35,10 @@ smoothEmplik(
 \item{sel.weights}{Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.}
 
-\item{type}{Character: "EL" for empirical likelihood, "EuL" for Euclidean likelihood.}
+\item{type}{Character: \code{"EL"} for empirical likelihood, \code{"EuL"} for Euclidean likelihood, \code{"EL0"} for one-dimensional
+empirical likelihood. \code{"EL0"} is *strongly* recommended for 1-dimensional moment functions because it is
+faster and more robust: it searches for the Lagrange multiplier directly and has nice fail-safe options
+for convex hull failure.}
 
 \item{kernel.args}{A list of arguments passed to \code{kernelWeights()} if
 \code{sel.weights} is a function.}

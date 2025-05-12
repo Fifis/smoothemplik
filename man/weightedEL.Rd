@@ -11,14 +11,15 @@ and [published online](https://artowen.su.domains/empirical/) by Art B. Owen
 \usage{
 weightedEL(
   z,
-  ct = NULL,
   mu = NULL,
+  ct = NULL,
   lambda.init = NULL,
+  SEL = FALSE,
   return.weights = FALSE,
   lower = NULL,
   upper = NULL,
   order = 4L,
-  wttol = 0.001,
+  weight.tolerance = NULL,
   thresh = 1e-16,
   itermax = 100L,
   verbose = FALSE,
@@ -30,21 +31,24 @@ weightedEL(
 \arguments{
 \item{z}{A numeric vector or a matrix with one data vector per column.}
 
-\item{ct}{A numeric vector of non-negative counts.}
-
 \item{mu}{Hypothesised mean, default (0 ... 0) in R^ncol(z)}
+
+\item{ct}{A numeric vector of non-negative counts.}
 
 \item{lambda.init}{Starting lambda, default (0 ... 0)}
 
+\item{SEL}{If \code{FALSE}, the default weight tolerance is \code{MachEps^(1/3)}, otherwise
+it is \code{MachEps^(1/2)} of the maximum count.}
+
 \item{return.weights}{Logical: if \code{TRUE}, returns the empirical probabilities. Default is memory-saving (\code{FALSE}).}
 
-\item{lower}{Lower cut-off for [logTaylor()], default 1/nrow(z)}
+\item{lower}{Lower cut-off for [logTaylor()], default \code{1/nrow(z)}}
 
-\item{upper}{Upper cutoff for [logTaylor()], default Inf}
+\item{upper}{Upper cutoff for [logTaylor()], default \code{Inf}}
 
 \item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].}
 
-\item{wttol}{Weight tolerance for counts to improve numerical stability}
+\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability}
 
 \item{thresh}{Convergence threshold for log-likelihood (the default is aggressive)}
 

@@ -29,18 +29,11 @@ Rcpp::List weightedEuLCPP(const arma::mat& z, arma::vec mu,
 
   zz.each_row() -= mu.t(); // z <- z - mu
 
-  if (ct.n_elem != n)
-    stop("Length of ct must equal nrow(zz).");
-
-  if (!zz.is_finite())
-    stop("Non-finite observations (NA, NaN, Inf) are not welcome.");
-  if (!ct.is_finite())
-    stop("Non-finite weights (NA, NaN, Inf) are not welcome.");
-
-  if (ct.min() < 0 && verbose)
-    warning("Negative weights are present.");
-  if (arma::accu(ct) <= 0.0)
-    stop("The total sum of weights must be positive.");
+  if (ct.n_elem != n) stop("Length of ct must equal nrow(zz).");
+  if (!zz.is_finite()) stop("Non-finite observations (NA, NaN, Inf) are not welcome.");
+  if (!ct.is_finite()) stop("Non-finite weights (NA, NaN, Inf) are not welcome.");
+  if (ct.min() < 0 && verbose) warning("Negative weights are present.");
+  if (arma::accu(ct) <= 0.0) stop("The total sum of weights must be positive.");
 
   if (!SEL) stop("Only 'ct' representing weights (adding up to one) are supported (SEL = TRUE).");
 
@@ -53,6 +46,8 @@ Rcpp::List weightedEuLCPP(const arma::mat& z, arma::vec mu,
     }
     ct.elem(tiny) = trunc_to * arma::sign(ct.elem(tiny));
   }
+  // Re-normalising for SEL
+  if (SEL) ct /= arma::accu(ct);
 
   // Discard zero-weight rows to save size
   uvec nonz = arma::find(ct != 0.0);
@@ -61,7 +56,6 @@ Rcpp::List weightedEuLCPP(const arma::mat& z, arma::vec mu,
   shift = shift.elem(nonz);  // TODO: use later
   const std::size_t n_final = nonz.n_elem;
 
-  if (SEL) ct /= arma::accu(ct);
 
   const double N = SEL ? static_cast<double>(n_orig) : arma::accu(ct);
   if (N <= 0) stop("Total weights after tolerance checks must be positive.");
