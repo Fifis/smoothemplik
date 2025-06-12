@@ -49,25 +49,41 @@ test_that("very small counts result in bad uniroot output", {
           2.3e-10, 1.3e-10, 3.1e-11, 2.1e-11, 1.9e-12, 1.3e-12, 2.8e-14, 2.0e-15)
   EL0 <- weightedEL0(z, ct = ct, return.weights = TRUE, weight.tolerance = 0)
   EL1 <- weightedEL0(z, ct = ct, return.weights = TRUE)
-  expect_equal(EL0$exitcode, 13)  # A solution too close to the boundary
-  expect_equal(EL1$exitcode, 0)
-  expect_equal(length(EL0$wts), length(EL1$wts))
-  expect_equal(sum(EL1$wts == 0), 26) # If the defaults change, this will break
+  expect_identical(EL0$exitcode, 11L)  # A solution too close to the boundary
+  expect_identical(EL1$exitcode, 0L)
+  expect_identical(length(EL0$wts), length(EL1$wts))
+  expect_identical(sum(EL1$wts == 0), 26L) # If the defaults change, this will break
+})
+
+test_that("weightedEL0 can plot ELR with spanning condition failure", {
+  x <- -4:5
+  w <- 1:10
+  mugrid <- seq(-6, 7, 0.25)
+  ELR1 <- sapply(mugrid, function(m) -2*weightedEL0(z = x, ct = w, mu = m, chull.fail = "none")$logelr)
+  ELR2 <- sapply(mugrid, function(m) -2*weightedEL0(z = x, ct = w, mu = m, chull.fail = "taylor")$logelr)
+  ELR3 <- sapply(mugrid, function(m) -2*weightedEL0(z = x, ct = w, mu = m, chull.fail = "wald")$logelr)
+  expect_identical(ELR1[1], Inf)
+  expect_true(all(is.finite(ELR2)))
+  expect_true(all(is.finite(ELR3)))
+  # plot(mugrid, ELR1, bty = "n", ylim = c(0, 1000))
+  # lines(mugrid, ELR2, col = 2)
+  # lines(mugrid, ELR3, col = 4)
+  # cbind(mugrid, ELR1, ELR2, ELR3)
 })
 
 test_that("exit codes of weightedEL0", {
-  expect_equal(weightedEL0(-4:3)$exitcode, 0)
-  expect_equal(weightedEL0(c(-1e-8, 1:9), chull.fail = "none")$exitcode, 2)
-  expect_equal(weightedEL0(-1:8, ct = c(1e-8, rep(1, 9)), weight.tolerance = 0)$exitcode, 3)
-  expect_equal(weightedEL0(z = -1:8, ct = c(1e-15, rep(1, 9)), weight.tolerance = 0)$exitcode, 4)
-  expect_equal(weightedEL0(1:5, chull.fail = "none")$exitcode, 5)
-  expect_equal(weightedEL0(0:3, chull.fail = "none")$exitcode, 7)
-  expect_equal(weightedEL0(rep(pi, 10), mu = pi, chull.fail = "none")$exitcode, 8)
-  expect_equal(weightedEL0(rep(pi, 10), mu = pi, chull.fail = "taylor")$exitcode, 8)
-  expect_equal(weightedEL0(0:3, chull.fail = "taylor")$exitcode, 9)
-  expect_equal(weightedEL0(c(0.999, 1:9), chull.fail = "taylor")$exitcode, 10)
-  expect_equal(weightedEL0(1:5, chull.fail = "wald")$exitcode, 12)
-  expect_equal(weightedEL0(z = -1:8, ct = c(1e-12, rep(1, 8), 1e-12), weight.tolerance = 0)$exitcode, 13)
+  expect_identical(weightedEL0(-4:3)$exitcode, 0L)
+  expect_identical(weightedEL0(c(-1e-8, 1:9), chull.fail = "none")$exitcode, 2L)
+  expect_identical(weightedEL0(-1:8, ct = c(1e-8, rep(1, 9)), weight.tolerance = 0)$exitcode, 3L)
+  expect_identical(weightedEL0(z = -1:8, ct = c(1e-15, rep(1, 9)), weight.tolerance = 0)$exitcode, 4L)
+  expect_identical(weightedEL0(1:5, chull.fail = "none")$exitcode, 5L)
+  expect_identical(weightedEL0(0:3, chull.fail = "none")$exitcode, 7L)
+  expect_identical(weightedEL0(rep(pi, 10), mu = pi, chull.fail = "none")$exitcode, 8L)
+  expect_identical(weightedEL0(rep(pi, 10), mu = pi, chull.fail = "taylor")$exitcode, 8L)
+  expect_identical(weightedEL0(0:3, chull.fail = "taylor")$exitcode, 9L)
+  expect_identical(weightedEL0(c(0.999, 1:9), chull.fail = "taylor")$exitcode, 10L)
+  expect_identical(weightedEL0(1:5, chull.fail = "wald")$exitcode, 10L)
+  expect_identical(weightedEL0(z = -1:8, ct = c(1e-12, rep(1, 8), 1e-12), weight.tolerance = 0)$exitcode, 11L)
   # Come up with ideas for exit code = 1!
 })
 

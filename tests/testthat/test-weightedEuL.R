@@ -2,8 +2,11 @@ test_that("input validation for weightedEuL", {
   a <- -4:4
   expect_error(weightedEuL(c(a, NA)), "Non-finite observations")
   expect_error(weightedEuL(z = a, ct = 1/a), "Non-finite weights")
+  expect_error(weightedEuL(z = a, vt = 1/a), "Non-finite variance weights")
   expect_warning(weightedEuL(z = 1:10, mu = pi, ct = c(9:1, 1e-12), verbose = TRUE),
                  "Counts closer to 0")
+  expect_warning(weightedEuL(z = 1:10, mu = pi, vt = c(9:1, 1e-12), verbose = TRUE),
+                 "Variance weights closer to 0")
   expect_error(weightedEuL(a, ct = rep(-1, 9)), "total sum of weights")
 })
 
@@ -40,8 +43,9 @@ test_that("very small counts are handled reasonably well", {
           1.6e-06, 4.9e-07, 8.9e-08, 5.8e-08, 4.3e-08, 4.2e-08, 3.0e-08, 1.2e-08,
           5.0e-09, 3.9e-09, 3.1e-09, 2.1e-09, 7.6e-10, 4.3e-10, 3.0e-10, 2.8e-10,
           2.3e-10, 1.3e-10, 3.1e-11, 2.1e-11, 1.9e-12, 1.3e-12, 2.8e-14, 2.0e-15)
-  EL0 <- weightedEuL(z, ct = ct, return.weights = TRUE, weight.tolerance = 0)
-  EL1 <- weightedEuL(z, ct = ct, return.weights = TRUE)
+  vt <- ct
+  EL0 <- weightedEuL(z, ct = ct, vt = vt, return.weights = TRUE, weight.tolerance = 0)
+  EL1 <- weightedEuL(z, ct = ct, vt = vt, return.weights = TRUE)
   expect_equal(length(EL0$wts), length(EL1$wts))
   expect_equal(sum(EL1$wts == 0), 16) # If the defaults change, this will break
 })

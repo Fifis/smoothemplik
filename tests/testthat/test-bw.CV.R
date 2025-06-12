@@ -60,9 +60,9 @@ test_that("LSCV handles multivariate inputs with unique and distinct bws, findin
   x <- matrix(x, ncol = 3)
 
   system.time(expect_true(all(is.finite(suppressWarnings(
-    b1 <- bw.CV(x = x, y = y, kernel = "epanechnikov", degree = 1, PIT = TRUE, method = "BFGS", tol = 1e-3, try.grid = FALSE, same = TRUE))))))
+    b1 <- bw.CV(x = x, y = y, kernel = "epanechnikov", degree = 1, PIT = TRUE, tol = 1e-3, try.grid = FALSE, same = TRUE))))))
   system.time(expect_true(all(is.finite(suppressWarnings(
-    b2 <- bw.CV(x = x, y = y, kernel = "epanechnikov", degree = 1, PIT = TRUE, method = "BFGS", tol = 1e-2, start.bw = rep(b1, 3)))))))
+    b2 <- bw.CV(x = x, y = y, kernel = "epanechnikov", degree = 1, PIT = TRUE, tol = 1e-2, try.grid = FALSE, start.bw = rep(b1, 3)))))))
   expect_gt(LSCV(x = x, y = y, kernel = "epanechnikov", degree = 1, PIT = TRUE, bw = b1),
             LSCV(x = x, y = y, kernel = "epanechnikov", degree = 1, PIT = TRUE, bw = b2))
 })
