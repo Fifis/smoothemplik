@@ -11,7 +11,6 @@
 #' @param mu Hypothesized mean of \code{z} in the moment condition.
 #' @param SEL If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 #' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
-#' @param n.orig An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
 #'   (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
 #' @param chull.fail A character: what to do if the convex hull of \code{z} does not contain \code{mu}
@@ -126,10 +125,9 @@
 #' # aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
 #' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
 #' @export
-weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
-                        SEL = FALSE, n.orig = NULL,
-                        weight.tolerance = NULL, boundary.tolerance = 1e-9,
-                        trunc.to = 0, chull.fail = c("taylor", "wald", "none"),
+weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, SEL = FALSE,
+                        weight.tolerance = NULL, boundary.tolerance = 1e-9, trunc.to = 0,
+                        chull.fail = c("log4", "log2", "taylor", "wald", "adjusted", "balanced", "none"),
                         uniroot.control = list(),
                         return.weights = FALSE, verbose = FALSE
 ) {
@@ -144,7 +142,7 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
   if (any(!is.finite(ct))) stop("Non-finite weights (NA, NaN, Inf) are not welcome.")
   if (min(ct) < 0) stop("Negative weights are present.")
   if (sum(ct) <= 0) stop("The total sum of EL weights must be positive.")
-  if (is.null(n.orig)) n.orig <- n
+  n.orig <- n
   if (is.null(shift)) shift <- rep(0, n)
   if (is.null(weight.tolerance))
     weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
@@ -193,72 +191,91 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
   int <- c(-Inf, Inf)
   estim.prec <- NA
   f.root <- NA
-  exitcode <- 5
-
-  # Weighted mean and variance for convenience
-  wm <- stats::weighted.mean(z, ct)
-  wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)  # Variance of the mean; dividing by sum(ct) is not a mistake
+  exitcode <- 5L
 
   # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z),
-  # or some form of Taylor expansion must be used to avoid this check an simply return a strongly negative
-  # value (e.g. Euclidean LL, quartic LL etc.) without w_i > 0 or a Wald statistic instead of LR
+  # or some form extrapolation must be used to avoid this check an simply return a strongly negative
+  # value (e.g. Euclidean L, Balanced EL etc.) or a Wald statistic instead of LR
+  # NB: here, we declare SC failure even in the stronger sense: 'one must extrapolate'
+  # due the zero being too close to the boundary
   zu <- sort(unique(z))
   # The values cannot be too close to each other because it may break numerical differentiation
   # Keeping only sufficiently distinct ones
-  zu <- zu[c(TRUE, abs(diff(zu)) > 16 * .Machine$double.eps)]
+  # TODO: add relative difference, too
+  abs.diff <- c(1, abs(diff(zu)))
+  zu <- zu[abs.diff > 64*.Machine$double.eps]
   l <- length(zu)
   if (length(zu) >= 2) {
     z12 <- zu[1:2]
-    znn <- zu[l-1:0]
+    znn <- zu[(l-1):l]
   } else {
     z12 <- znn <- rep(zu[1], 2)
   }
-  mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
-  mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
-
-  spanning <- ((z1 < 0 && zn > 0) && chull.fail == "none") || ((mu.llimit <= 0 && mu.rlimit >= 0) && chull.fail == "taylor")
+  ExEL <- chull.fail %in% c("taylor", "wald")
+  if (ExEL) {  # Values for extrepolation
+    mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
+    mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
+    if (chull.fail == "wald") {
+      wm <- stats::weighted.mean(z, ct)
+      wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)
+    }
+  }
+  spanning <- ((!ExEL) & (z1 <= 0 && zn >= 0)) || (ExEL && (mu.llimit <= 0 && mu.rlimit >= 0))
 
   if (n < 2) { # Codes > 5
-    exitcode <- 6
+    exitcode <- 6L
   } else if (z1 == zn) { # The sample is degenerate without variance, no extrapolation possible
-    exitcode <- 8
+    exitcode <- 8L
+  } else if (chull.fail == "none" && (z1 == 0 || zn == 0)) {
+    # mu is on the boundary -- special case (still in the book)
+    logelr <- -Inf
+    lam <- iter <- estim.prec <- f.root <- 0
+    converged <- TRUE
+    int <- c(0, 0)
+    exitcode <- 7L
   } else if (!spanning) {  ######### TODO: test with 2 observations
-    if ((z1 == 0 || zn == 0) && chull.fail == "none") {
-      # mu is on the boundary
-      logelr <- -Inf
-      lam <- iter <- estim.prec <- f.root <- 0
-      converged <- TRUE
-      int <- c(0, 0)
-      exitcode <- 7
-    } else if (chull.fail == "taylor") {
-      if (length(zu) < 2) stop("For Taylor extrapolation, at least two unique observations are required.")
-      iqr <- stats::IQR(z)
-      if (iqr == 0) iqr <- stats::sd(z)
-      # Apply the parabola formula for 3 points
 
-      if (mean(sign(zu)) >= 0) {  # All non-negative values, sample average > 0
-        # If the spanning condition holds but barely, we need to ignore one point
-        # Larger step size for numerically more stable parabola estimates
-        mu.limit <- mu.llimit
-        # If the points are close, use IQR, but do not go outside the convex hull
-        stepsize <- max(diff(z12)*0.01, min(iqr*0.001, diff(z12)*0.25))
-      } else if (mean(sign(zu)) <= 0) {
-        mu.limit <- mu.rlimit
-        stepsize <- max(diff(znn)*0.01, min(iqr*0.001, diff(znn)*0.25))
-      } else if (mean(sign(zu)) == 0) {  # There are two unique points?
+    # Optimisation 1: extrapolate only the right end
+    if (min(zu) >= 0) {  # All observations are to the right -- zero would be in the left branch
+      z <- -z
+      zu <- rev(-zu)
+      tmp <- z12
+      z12 <- rev(-znn)
+      znn <- rev(-tmp)
+      if (ExEL) {
+        tmp <- mu.llimit
+        mu.llimit <- -mu.rlimit
+        mu.rlimit <- -tmp
+      }
+      if (chull.fail == "wald") wm <- -wm
+    }
+
+    if (chull.fail == "taylor") {
+      if (length(zu) < 2) stop("For Taylor extrapolation, at least two unique observations are required.")
+      ma <- stats::median(abs(z))
+      if (ma == 0) ma <- stats::IQR(z)
+      if (ma == 0) ma <- stats::sd(z)
+      if (ma == 0) stop("No variability in remaining 'z', calculations impossible.")
+      if (mean(sign(zu)) == 0) {  # There are two unique points?
         stop("Error checking the signs of the data for correct extrapolation. Please report this bug.")
       }
-      zgrid <- mu.limit + stepsize*(-1:1)
-      w.fp <- c(-0.5, 0, 0.5)  # These numbers are obtained from the pnd package
-      w.fpp <- c(1, -2, 1)  # pnd::fdCoef(deriv.order = 1, stencil = -1:1)
+      # Anchor the parabola at the end that is closest to 0 after the (possible) sign flip
+      mu.limit <- if (abs(mu.llimit) < abs(mu.rlimit)) mu.llimit else mu.rlimit
+      # Apply the parabola formula for 3 points using f, f', f'' from a 4-point stencil with a larger step size
+      stepsize <- max(diff(znn)*0.01, ma*.Machine$double.eps^0.25)
+      zgrid <- mu.limit + stepsize*(-3:0)
+      w.fp <- c(-2, 9, -18, 11) / 6  # These numbers are obtained from the pnd package
+      w.fpp <- c(-1, 4, -5, 2)    # pnd::fdCoef(deriv.order = 2, stencil = -3:0)
 
       llgrid <- vapply(zgrid, function(m) weightedEL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
+      fp <- sum(llgrid * w.fp) / stepsize
+      fpp <- sum(llgrid * w.fpp) / stepsize^2
       # Check with
       # pnd::Grad(function(m) weightedEL0(z = z, mu = m, ct = ct)$logelr, zgrid[1],
       #   elementwise = FALSE, vectorised = FALSE, multivalued = FALSE, h = 1e-5)
-      abc <- getParabola3(x = zgrid, y = llgrid)
+      abc <- getParabola(x = mu.limit, f = llgrid[4], fp = fp, fpp = fpp)
       parab  <- function(x) abc[1]*x^2  + abc[2]*x  + abc[3]
-      logelr <- parab(0)
+      logelr <- parab(0)  # Just c, the intercept
       # For z = 1:9
       # xgrid <- seq((z[1]+z[2])/2, (znn[1]+znn[2])/2, length.out = 51)
       # ygrid <- sapply(xgrid, function(m) weightedEL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
@@ -269,33 +286,28 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
       # lines(xgrid2, ygrid2, col = 2)
       if (z1 == 0 || zn == 0) {
         converged <- TRUE
-        exitcode <- 9
+        exitcode <- 9L
       } else {
-      exitcode <- 10
+      exitcode <- 10L
       }
     } else if (chull.fail == "wald") {  # Wald approximation to ELR at 0 = squared t-stat
       if (length(zu) < 2) stop("For Wald extrapolation, at least two unique observations are required.")
 
-      if (mean(sign(zu)) >= 0) {  # All non-negative values, sample average > 0
-        # Zero is to the left of the data --> left branch
-        mu.limit <- mu.llimit
-        gap <- if (l > 2) abs(diff(z12)) * 0.5 else abs(diff(z12)) * 0.05
-      } else if (mean(sign(zu)) <= 0) {
-        mu.limit <- mu.rlimit
-        gap <- if (l > 2) abs(diff(znn)) * 0.5 else abs(diff(znn)) * 0.05
-      }
+      mu.limit <- if (abs(mu.llimit) < abs(mu.rlimit)) mu.llimit else mu.rlimit
+      gap <- if (l > 2) abs(diff(znn)) * 0.5 else abs(diff(znn)) * 0.05
+
       # TODO: speed up the evaluation; extrapolate only where necessary; check the gap location
       # Extract info from the interpTwo function
       f <- function(mm) vapply(mm, function(m) -2*weightedEL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
-      logelr <- interpTwo(x = 0, f = f, mean = wm, var = wv, at = mu.limit, gap = gap) * -0.5
+      logelr <- -0.5 * interpTwo(x = 0, f = f, mean = wm, var = wv, at = mu.limit, gap = gap)
       # curve(f, 0, 9)
       # abline(v = c(mu.limit, mu.limit - gap), lty = 3)
       # curve((x-wm)^2/wv, 0, 4, col = 2, add = TRUE)
       if (z1 == 0 || zn == 0) {
         converged <- TRUE
-        exitcode <- 11
+        exitcode <- 9L
       } else {
-        exitcode <- 12
+        exitcode <- 10L
       }
     }
     # Else: do nothing, classical ELR failure
@@ -335,28 +347,28 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
       # Empirical fix for nonsensical probabilities
       # This should not happen unless the spanning condition fails and the Taylor expansion is very inaccurate
       if (any(wvec < 0) && logelr > 0) logelr <- -logelr
-      if (any(!is.finite(wvec))) exitcode <- 14
+      if (any(!is.finite(wvec))) exitcode <- 12L
 
       # brentZero returns the number of iterations times -1 in case it exceeds the maximum number allowed
       converged <- lam.list$iter  >= 0
       estim.prec <- lam.list$estim.prec
       f.root <- lam.list$f.root
-      exitcode <- 0
+      exitcode <- 0L
 
-      if (abs(f.root) > sqrt(.Machine$double.eps)) exitcode <- 1
+      if (abs(f.root) > sqrt(.Machine$double.eps)) exitcode <- 1L
       # Relative tolerance check for boundary closeness
       int.len <- max.lam - min.lam
       if (min(abs(lam - max.lam), abs(lam - min.lam)) < boundary.tolerance * int.len)
-        exitcode <- exitcode + 2
-      if (abs(sum(wvec) - 1) > 1e-6) exitcode <- 13
+        exitcode <- exitcode + 2L
+      if (abs(sum(wvec) - 1) > 1e-6) exitcode <- 11L
     } else { # The original bad output stays intact, only the exit code updates
-      exitcode <- 4
+      exitcode <- 4L
     }
 
   }
 
 
-  if (return.weights && any(!is.finite(wts[nonz]))) exitcode <- 9
+  if (return.weights && any(!is.finite(wts[nonz]))) exitcode <- 9L
 
   msg <- c("FOC not met: |d/dlambda(EL)| > sqrt(Mach.eps)!", # 1
            "Lambda is very close to the boundary! (May happen with extremely small weights.)", # 2
@@ -366,14 +378,12 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL,
            "At least two points are needed for meaningful EL computations.", # 6
            "mu lies exactly on the boundary of the convex hull, log ELR(mu) := -Inf.", # 7
            "Observations with substantial counts are identical and equal to mu (degenerate sample).", # 8
-           "mu lies exactly on the convex hull boundary, quadratic branch approximation used to obtain ELR(mu) > 0.", # 9
-           "mu lies outside the convex hull, quadratic branch approximation used to obtain ELR(mu) > 0.", # 10
-           "mu lies exactly on the convex hull boundary, Wald approximation used to obtain ELR(mu) > 0.", # 11
-           "mu lies outside the convex hull, Wald approximation used to obtain ELR(mu) > 0.", # 12
-           "mu is strictly in the convex hull of z, sum(weights) != 1 and/or weights < 0.",  # 13
-           "Lambda search succeeded but some probabilities are not finite (division by zero?)") # 14
-  msg <- if (exitcode > 0) msg[exitcode] else "successful convergence within the first-order-condition tolerance"
-  if (verbose && exitcode > 0) warning(msg)
+           "mu lies exactly on the convex hull boundary, approximation used to obtain ELR(mu) > 0.", # 9
+           "mu lies outside the convex hull, approximation used to obtain ELR(mu) > 0.", # 10
+           "mu is strictly in the convex hull of z, sum(weights) != 1 and/or weights < 0.",  # 11
+           "Lambda search succeeded but some probabilities are not finite (division by zero?)") # 12
+  msg <- if (exitcode > 0L) msg[exitcode] else "successful convergence within the first-order-condition tolerance"
+  if (verbose && exitcode > 0L) warning(msg)
 
 
   return(list(logelr = logelr, lam = lam, wts = wts,
@@ -481,7 +491,7 @@ weightedEL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
                        order = 4L, weight.tolerance = NULL,
                        thresh = 1e-16, itermax = 100L, verbose = FALSE,
                        alpha = 0.3, beta = 0.8, backeps = 0) {
-  if (is.vector(z)) z <- matrix(z, ncol = 1)
+  if (is.null(dim(z))) z <- matrix(z, ncol = 1)
   n <- nrow(z)
   d <- ncol(z)
   if (length(mu) == 0) mu <- rep(0, d)
@@ -576,15 +586,33 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' Multi-variate Euclidean likelihood with analytical solution
 #'
 #' @param z Numeric data vector.
+#' @param vt Numeric vector: non-negative variance weights for estimating the conditional
+#'   variance of \code{z}. Probabilities are returned only for the observations where \code{vt > 0}.
 #' @inheritParams weightedEL0
 #' @param chull.diag Logical: if \code{TRUE}, checks if there is a definite convex hull failure
 #'   in at least one dimension (\code{mu} being smaller than the smallest or larger
 #'   than the largest element). Note that it does not check if \code{mu} is strictly in the
 #'   convex hull because this procedure is much slower and is probably unnecessary.
 #'
+#' The arguments \code{ct} and \code{vt} are responsible for smoothing of the moment function
+#' and conditional variance, respectively. The objective function is
+#' \deqn{\min_{p_{ij}} \frac1n \sum_{i=1}^n \sum_{j=1}^n \mathbb{I}_{ij} \frac{(p_{ij} -
+#'   c_{ij})^2}{2v_{ij}}}{min_(p_ij) 1/n * sum_i sum_j I_ij (p_ij - c_ij)^2 / (2v_{ij})},
+#' where \eqn{\mathbb{I}_{ij}}{I_ij} is 1 if \eqn{v_{ij} \ne 0}{v_ij != 0}.
+#'
+#' This estimator is numerically equivalent to the Sieve Minimum Distance estimator
+#' of \insertCite{ai2003efficient}{smoothemplik} with kernel sieves, but this interface
+#' provides more flexibility through the two sets of weights. If \code{ct} and
+#' \code{vt} are not provided, their default value is set to 1, and the resulting
+#' estimator is the CUE-GMM estimator: a quadratic form in which the unconditional
+#' mean vector is weighted by the inverse of the unconditional variance.
+#'
 #' @return A list with the same structure as that in [weightedEL()].
 #' @seealso [weightedEL()]
 #' @export
+#'
+#' @references
+#' \insertAllCited{}
 #'
 #' @examples
 #' set.seed(1)
@@ -594,8 +622,8 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' a$wts
 #' sum(a$wts)  # Unity
 #' colSums(a$wts * z)  # Zero
-weightedEuL <- function(z, mu = NULL, ct = NULL, shift = NULL,
-                        SEL = TRUE, n.orig = NULL,
+weightedEuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
+                        SEL = TRUE,
                         weight.tolerance = NULL, trunc.to = 0,
                         return.weights = FALSE, verbose = FALSE, chull.diag = FALSE
 ) {
@@ -604,11 +632,12 @@ weightedEuL <- function(z, mu = NULL, ct = NULL, shift = NULL,
   k <- ncol(z)
   if (is.null(mu)) mu <- rep(0, k)
   if (is.null(ct)) ct <- rep(1, n)
+  if (is.null(vt)) vt <- rep(1, n)
   if (is.null(shift)) shift <- rep(0, n)
-  if (is.null(n.orig)) n.orig <- n
+  n.orig <- n
   if (is.null(weight.tolerance))
     weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
-  ret <- weightedEuLCPP(z = z, mu = mu, ct = ct, shift = shift, n_orig = n.orig,
+  ret <- weightedEuLCPP(z = z, mu = mu, ct = ct, vt = vt, shift = shift, n_orig = n.orig,
                         weight_tolerance = weight.tolerance, trunc_to = trunc.to, SEL = SEL,
                         return_weights = return.weights, verbose = verbose, chull_diag = chull.diag)
   if (return.weights && !is.null(nz <- rownames(z))) names(ret$wts) <- nz

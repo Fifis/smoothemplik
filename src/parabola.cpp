@@ -13,11 +13,11 @@ NumericVector getParabola3CPP(const NumericVector& x, const NumericVector& y) {
 
   if (!std::isfinite(x0) || !std::isfinite(x1) || !std::isfinite(x2) ||
       !std::isfinite(y0) || !std::isfinite(y1) || !std::isfinite(y2)) {
-      Rcpp::stop("Input values must be finite numbers (no NA/NaN/Inf).");
+      stop("Input values must be finite numbers (no NA/NaN/Inf).");
   }
 
   if (x0 == x1 || x0 == x2 || x1 == x2)
-    Rcpp::stop("Input x values must be distinct.");
+    stop("Input x values must be distinct.");
 
   double A1 = x0*x0 - x1*x1;
   double B1 = x0 - x1;
@@ -28,7 +28,7 @@ NumericVector getParabola3CPP(const NumericVector& x, const NumericVector& y) {
   // Compute the 2x2 determinant for the system solving a and b
   double det = A1 * B2 - A2 * B1;
   if (std::fabs(det) < me)
-    Rcpp::stop("Cannot determine a unique parabola (determinant is less than the machine epsilon).");
+    warning("Poor quality of fitted parabola (the determinant in the denominator is less than the machine epsilon).");
 
   double a = (C1 * B2 - C2 * B1) / det;
   double b = (A1 * C2 - A2 * C1) / det;

@@ -80,7 +80,7 @@ weightedELCPP <- function(z, ct, mu, lambda_init, return_weights, lower, upper, 
     .Call(`_smoothemplik_weightedELCPP`, z, ct, mu, lambda_init, return_weights, lower, upper, order, weight_tolerance, thresh, itermax, verbose, alpha, beta, backeps)
 }
 
-weightedEuLCPP <- function(z, mu, ct, shift, n_orig, weight_tolerance, trunc_to = 0.0, SEL = TRUE, return_weights = FALSE, verbose = FALSE, chull_diag = FALSE) {
-    .Call(`_smoothemplik_weightedEuLCPP`, z, mu, ct, shift, n_orig, weight_tolerance, trunc_to, SEL, return_weights, verbose, chull_diag)
+weightedEuLCPP <- function(z, mu, ct, vt, shift, n_orig, weight_tolerance, trunc_to = 0.0, SEL = TRUE, return_weights = FALSE, verbose = FALSE, chull_diag = FALSE) {
+    .Call(`_smoothemplik_weightedEuLCPP`, z, mu, ct, vt, shift, n_orig, weight_tolerance, trunc_to, SEL, return_weights, verbose, chull_diag)
 }
 
