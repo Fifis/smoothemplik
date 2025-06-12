@@ -22,15 +22,12 @@ List wEL(const arma::vec& lambda,
   IntegerVector ders = IntegerVector::create(0, 1, 2);
   arma::vec s = 1.0 + Z * lambda;
   NumericVector sR(s.begin(), s.end());
-  NumericMatrix LT = as<NumericMatrix>(logTaylorCPP(sR, lower, upper, ders, taylorOrd));
 
-  const int n = s.size();
-  arma::vec v0(n), v1(n), v2(n);  // minus log and its derivatives
-  for (int i = 0; i < n; ++i) {
-    v0[i] = -LT(i, 0);          // -log
-    v1[i] = -LT(i, 1);          // -1/(1+l'Z)
-    v2[i] = -LT(i, 2);          //  1/(1+l'Z)^2
-  }
+  NumericMatrix LT = as<NumericMatrix>(logTaylorCPP(sR, lower, upper, ders, taylorOrd));
+  const arma::mat LTm( LT.begin(), LT.nrow(), LT.ncol(), /*copy_aux_mem*/ false );
+  arma::vec v0 = -LTm.col(0);  // minus log and its derivatives
+  arma::vec v1 = -LTm.col(1);  // -1/(1+l'Z)
+  arma::vec v2 = -LTm.col(2);  //  1/(1+l'Z)^2
 
   double fn     = dot(ct, v0);                  // objective
   arma::vec g   = Z.t() * (ct % v1);            // gradient
@@ -67,6 +64,9 @@ List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericV
   const int n = z.nrow();
   const int d = z.ncol();
   g_Z  = arma::mat(z.begin(), n, d, /*copy_aux_mem =*/ true);
+
+  if (mu.size() == 1) mu = NumericVector(d, mu[0]);
+  if (mu.size() != d) stop("The length of mu must match the number of columns in z.");
 
   // Centre by the hypothesised mean
   for (int j = 0; j < d; ++j) g_Z.col(j) -= mu[j];

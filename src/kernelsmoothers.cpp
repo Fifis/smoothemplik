@@ -214,7 +214,6 @@ arma::vec kepanechnikov4conv(arma::vec x) {
 }
 
 
-
 // Quartic kernel, unscaled (with roughness = int x^2 f(x) dx = 1/7)
 arma::vec kquartic2(const arma::vec& x) {
   arma::vec ax = arma::abs(x);
@@ -419,22 +418,39 @@ arma::sp_mat sparseKernelWeightsOneCPP(arma::vec x, arma::vec xout, arma::vec bw
   arma::uword nx = x.n_elem;
   if (nb != ng)
     Rcpp::stop("sparseKernelWeightsOneCPP: bw and xout must have the same length.");
-  // arma::vec xs = x / bw; // Scaling by the bandwidth
-  // arma::vec gs = xout / bw;
-  const arma::vec inv_bw = 1.0 / bw;
-  arma::sp_mat kw(ng, nx);
 
-  for (arma::uword i = 0; i < nx; ++i) {
-    arma::vec ko = kernelFunCPP((xout - x[i]) % inv_bw, kernel, order, convolution);
-    arma::uvec nzrind = find(ko); // Find non-zero indices for the rows
-    arma::uvec nzcind = arma::ones<arma::uvec>(nzrind.n_elem) * i;
-    arma::umat nzind = arma::join_cols(nzrind.t(), nzcind.t());
-    arma::vec values = ko(nzrind);
-    for (arma::uword j = 0; j < values.n_elem; ++j)
-      kw(nzrind[j], i) = values[j];
+  std::vector<arma::uword> rows;
+  std::vector<arma::uword> cols;
+  std::vector<double>      vals;
+  rows.reserve(ng); cols.reserve(ng); vals.reserve(ng);   // coarse guess
+
+  const arma::vec inv_bw = 1.0 / bw;
+  double maxX = 1.0;
+  if (kernel == "gaussian") {
+    if ((order == 2) & (!convolution)) maxX =  8.2924;
+    if ((order == 2) & ( convolution)) maxX =  11.7272;
+    if ((order == 4) & (!convolution)) maxX =  8.713;
+    if ((order == 4) & ( convolution)) maxX =  12.68;
   }
 
-  return kw;
+  for (arma::uword i = 0; i < nx; ++i) {
+    arma::vec  u   = (xout - x[i]) % inv_bw;
+    arma::uvec nz  = arma::find(arma::abs(u) < maxX); // cheap range test
+    if (nz.is_empty()) continue;
+
+    arma::vec k = kernelFunCPP(u.elem(nz), kernel, order, convolution);
+    rows.insert(rows.end(), nz.begin(), nz.end());
+    cols.insert(cols.end(), nz.n_elem, i);                  // repeat i
+    vals.insert(vals.end(), k.begin(), k.end());
+  }
+
+  arma::umat loc(2, rows.size());
+  for (size_t j = 0; j < rows.size(); ++j) {
+    loc(0, j) = rows[j];
+    loc(1, j) = cols[j];
+  }
+
+  return arma::sp_mat(loc, arma::vec(vals), ng, nx);
 }
 
 // [[Rcpp::export]]
