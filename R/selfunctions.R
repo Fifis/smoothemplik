@@ -134,7 +134,7 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
   type       <- match.arg(type)
   # Constructing residuals
   rho.series <- rho(theta, data, ...)
-  n <- length(rho.series)
+  n <- NROW(rho.series)  # length or nrow
   if (is.null(chunks)) chunks <- ceiling(n / 2000)
   if (any("none" %in% attach.attributes)) attach.attributes <- "none"
   if (isTRUE(attach.attributes)) attach.attributes <- "all"

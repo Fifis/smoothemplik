@@ -11,6 +11,8 @@ These bug fixes and features are scheduled for the upcoming releases.
 - SYNTAX: `kernelSmooth()`, being a local average, should have `na.rm` and check the inputs
 - SYNTAX: In `kernelDiscreteDensitySmooth()`, remove the `table` attribute and change the test.
 - SYNTAX: Create a summary class for SEL; print numerical gradients of lambdas; print the number of converged inner optimisation problems
+- FEATURE: Speed up interpolation by memoising it
+- FEATURE: Check if only 4 points, as opposed to 6, are required for extrapolation in `weightedEL0`
 - FEATURE: Create a class for smoothing that would yield LOESS smoothing matrices, with ranks or distances
 - FEATURE: For `sparseVectorToList()`, the default `trim(x)` should be such that the sum of sorted weights exceeds 0.99999999: `trim = \(w) min(which(cumsum(sort(w / sum(w), decreasing = TRUE)) > 1 - 1e-8))`
 - FEATURE: Create convolution for kernel orders 4 and 6
@@ -32,6 +34,7 @@ These bug fixes and features are scheduled for the upcoming releases.
 - FEATURE: Check: if the kernel is finite-support and bandwidth is smaller than the largest gap between two observations, then, set the bandwidth in that dimension to 1.1 times that gap. `kernelSmooth()` and `kernelDensity()` should have an argument for increasing small bandwidths in case of zero weights to match the largest gap divided by 2 (times 1.1 to have at least some coverage)
 - FEATURE: Like in the SEL application: de-duplicate the input matrix, replace with weights; allow the user to disable it
 - FEATURE: Merging cells: allow arbitrary variables (including continuous ones) for proximity.
+- MISC: Add references to AEL and BAEL (Chen 2008, Emerson & Owen 2009, ... 2011)
 - MISC: Check analytical expressions for all combinations of kernels, convolutions, and orders in Sage and Mathematica, publish the reproducing codes
 - MISC: Reproduce the CKT (2019) results with the `shift` argument (i.e. test the shift)
 - MISC: Add a vignette for non-parametric methods to GitHub, finish the mixed-smoothing part
