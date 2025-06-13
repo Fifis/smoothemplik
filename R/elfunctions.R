@@ -5,27 +5,27 @@
 #' The names of the elements in the returned list are consistent with the original R code in \insertCite{owen2017weighted}{smoothemplik}.
 #'
 #' @param z Numeric data vector.
+#' @param mu Hypothesized mean of \code{z} in the moment condition.
 #' @param ct Numeric count variable with positive values that indicates the multiplicity of observations.
 #'   Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.
 #' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
-#' @param mu Hypothesized mean of \code{z} in the moment condition.
+#' @param return.weights Logical: if TRUE, individual EL weights are computed and returned.
+#'   Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
 #' @param SEL If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 #' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
 #'   (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
-#' @param chull.fail A character: what to do if the convex hull of \code{z} does not contain \code{mu}
-#'   (spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
-#'   of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
-#'   \code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
-#'   with the Wald statistic (testing if the weighted mean of \code{z} is zero).
 #' @param boundary.tolerance Relative tolerance for determining when the lambda is not an interior
 #'   solution because it is too close to the boundary. Corresponds to a fraction of the
 #'   interval range length.
 #' @param trunc.to Counts under \code{weight.tolerance} will be set to this value.
 #'   In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
+#' @param chull.fail A character: what to do if the convex hull of \code{z} does not contain \code{mu}
+#'   (spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
+#'   of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
+#'   \code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
+#'   with the Wald statistic (testing if the weighted mean of \code{z} is zero).
 #' @param uniroot.control A list passed to the \code{uniroot}.
-#' @param return.weights Logical: if TRUE, individual EL weights are computed and returned.
-#'   Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
 #' @param verbose Logical: if \code{TRUE}, prints warnings.
 #'
 #' @details
@@ -125,11 +125,11 @@
 #' # aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
 #' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
 #' @export
-weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, SEL = FALSE,
+weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, SEL = FALSE,
                         weight.tolerance = NULL, boundary.tolerance = 1e-9, trunc.to = 0,
                         chull.fail = c("log4", "log2", "taylor", "wald", "adjusted", "balanced", "none"),
                         uniroot.control = list(),
-                        return.weights = FALSE, verbose = FALSE
+                        verbose = FALSE
 ) {
   if (NCOL(z) > 1) stop("Only one-dimensional vectors or matrices are supported.")
   if (is.data.frame(z)) z <- as.matrix(z)
@@ -239,13 +239,11 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, SEL = FALSE,
     if (min(zu) >= 0) {  # All observations are to the right -- zero would be in the left branch
       z <- -z
       zu <- rev(-zu)
-      tmp <- z12
-      z12 <- rev(-znn)
-      znn <- rev(-tmp)
+      z12 <- zu[1:2]
+      znn <- zu[(l-1):l]
       if (ExEL) {
-        tmp <- mu.llimit
-        mu.llimit <- -mu.rlimit
-        mu.rlimit <- -tmp
+        mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
+        mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
       }
       if (chull.fail == "wald") wm <- -wm
     }

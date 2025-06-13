@@ -11,7 +11,6 @@ weightedEuL(
   vt = NULL,
   shift = NULL,
   SEL = TRUE,
-  n.orig = NULL,
   weight.tolerance = NULL,
   trunc.to = 0,
   return.weights = FALSE,
@@ -34,8 +33,6 @@ variance of \code{z}. Probabilities are returned only for the observations where
 
 \item{SEL}{If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
-
-\item{n.orig}{An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).}
 
 \item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
 (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}

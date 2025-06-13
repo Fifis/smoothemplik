@@ -9,14 +9,13 @@ weightedEL0(
   mu = NULL,
   ct = NULL,
   shift = NULL,
+  return.weights = FALSE,
   SEL = FALSE,
-  n.orig = NULL,
   weight.tolerance = NULL,
   boundary.tolerance = 1e-09,
   trunc.to = 0,
-  chull.fail = c("taylor", "wald", "none"),
+  chull.fail = c("log4", "log2", "taylor", "wald", "adjusted", "balanced", "none"),
   uniroot.control = list(),
-  return.weights = FALSE,
   verbose = FALSE
 )
 }
@@ -30,10 +29,11 @@ Can be fractional. Very small counts below the threshold \code{weight.tolerance}
 
 \item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
 
+\item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned.
+Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
+
 \item{SEL}{If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
 due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
-
-\item{n.orig}{An optional scalar to denote the original sample size (useful in the rare cases re-normalisation is needed).}
 
 \item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
 (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
@@ -52,9 +52,6 @@ of the logarithm outside \code{[lower, upper]} or, if any of those is not provid
 with the Wald statistic (testing if the weighted mean of \code{z} is zero).}
 
 \item{uniroot.control}{A list passed to the \code{uniroot}.}
-
-\item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned.
-Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
 
 \item{verbose}{Logical: if \code{TRUE}, prints warnings.}
 }

@@ -55,7 +55,7 @@ test_that("very small counts result in bad uniroot output", {
   expect_identical(sum(EL1$wts == 0), 26L) # If the defaults change, this will break
 })
 
-test_that("weightedEL0 can plot ELR with spanning condition failure", {
+test_that("weightedEL0 can handle ELR spanning condition failure", {
   x <- -4:5
   w <- 1:10
   mugrid <- seq(-6, 7, 0.25)
