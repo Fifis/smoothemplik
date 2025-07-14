@@ -23,7 +23,7 @@ weightedEuL(
 
 \item{mu}{Hypothesized mean of \code{z} in the moment condition.}
 
-\item{ct}{Numeric count variable with positive values that indicates the multiplicity of observations.
+\item{ct}{Numeric count variable with non-negative values that indicates the multiplicity of observations.
 Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.}
 
 \item{vt}{Numeric vector: non-negative variance weights for estimating the conditional

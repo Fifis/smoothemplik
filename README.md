@@ -86,7 +86,7 @@ In case `devtools` cannot be installed, try upgrading R to the next major versio
 
 ## Licence
 
-This software is released under the free/open-source [EUPL 1.2 licence](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
+This software is released under the free/open-source [EUPL 1.2 licence](https://interoperable-europe.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
 
 
 ## Remarks

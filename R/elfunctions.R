@@ -6,7 +6,7 @@
 #'
 #' @param z Numeric data vector.
 #' @param mu Hypothesized mean of \code{z} in the moment condition.
-#' @param ct Numeric count variable with positive values that indicates the multiplicity of observations.
+#' @param ct Numeric count variable with non-negative values that indicates the multiplicity of observations.
 #'   Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.
 #' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
 #' @param return.weights Logical: if TRUE, individual EL weights are computed and returned.
@@ -21,11 +21,13 @@
 #' @param trunc.to Counts under \code{weight.tolerance} will be set to this value.
 #'   In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
 #' @param chull.fail A character: what to do if the convex hull of \code{z} does not contain \code{mu}
-#'   (spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
-#'   of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
-#'   \code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
-#'   with the Wald statistic (testing if the weighted mean of \code{z} is zero).
-#' @param uniroot.control A list passed to the \code{uniroot}.
+#'   (spanning condition does not hold). \code{"taylor"} creates a Taylor approximation
+#'   of the log-ELR function near the ends of the sample. \code{"wald"} smoothly transitions
+#'   between the log-ELR function into -0.5 * the Wald statistic for the weighted mean of \code{z}.
+#'   \code{"adjusted"} invokes the method of \insertCite{chen2008adjusted}{smoothemplik}, and
+#'   \code{"balanced"} calls the method of \insertCite{emerson2009calibration}{smoothemplik},
+#'   which is an improvement of the former.
+#' @param uniroot.control A list passed to the \code{brentZero}.
 #' @param verbose Logical: if \code{TRUE}, prints warnings.
 #'
 #' @details
@@ -53,7 +55,7 @@
 #' function to allow mixed conditional and unconditional estimation;
 #' Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
 #'
-#' The actual tolerance of the lambda search in \code{uniroot} is
+#' The actual tolerance of the lambda search in \code{brentZero} is
 #' \eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
 #' where \code{tol} can be set in \code{uniroot.control} and
 #' \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
@@ -69,10 +71,10 @@
 #'   \item{lam}{The Lagrange multiplier.}
 #'   \item{wts}{Observation weights/probabilities (of the same length as \code{z}).}
 #'   \item{converged}{\code{TRUE} if the algorithm converged, \code{FALSE} otherwise (usually means that \code{mu} is not within the range of \code{z}, i.e. the one-dimensional convex hull of \code{z}).}
-#'   \item{iter}{The number of iterations used (from \code{uniroot}).}
+#'   \item{iter}{The number of iterations used (from \code{brentZero}).}
 #'   \item{bracket}{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
-#'   \item{estim.prec}{The approximate estimated precision of lambda (from \code{uniroot}).}
-#'   \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
+#'   \item{estim.prec}{The approximate estimated precision of lambda (from \code{brentZero}).}
+#'   \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{brentZero}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
 #'   \item{exitcode}{An integer indicating the reason of termination.}
 #'   \item{message}{Character string describing the optimisation termination status.}
 #' }
@@ -127,7 +129,7 @@
 #' @export
 weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, SEL = FALSE,
                         weight.tolerance = NULL, boundary.tolerance = 1e-9, trunc.to = 0,
-                        chull.fail = c("log4", "log2", "taylor", "wald", "adjusted", "balanced", "none"),
+                        chull.fail = c("taylor", "wald", "adjusted", "balanced", "none"),
                         uniroot.control = list(),
                         verbose = FALSE
 ) {
@@ -135,6 +137,8 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
   if (is.data.frame(z)) z <- as.matrix(z)
   if (!is.null(dim(z))) z <- drop(z)
   if (any(!is.finite(z))) stop("Non-finite observations (NA, NaN, Inf) are not welcome.")
+
+
   n <- length(z)
 
   if (is.null(mu)) mu <- 0
@@ -172,12 +176,33 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
     ct <- ct[nonz]
     shift <- shift[nonz]
   }
+
+
   if (SEL) ct <- ct / sum(ct) # We might have truncated some weights, so re-normalisation is needed!
   # The denominator for EL with counts is the sum of total counts, and for SEL, it is the number of observations!
   n.denom <- if (SEL) n else sum(ct)
   if (n.denom <= 0) stop(paste0("Total weights after tolerance checks (", n.denom, ") must be positive (check the counts and maybe decrease 'weight.tolerance', which is now ", sprintf("%1.1e", weight.tolerance), ".\n"))
 
+  # Enforcing the moment condition
   z <- z - mu
+
+  # Finally, implement Adjusted and Balanced EL to maintain the sample average
+  # Handling AEL and BAEL at the very end is correct because the formulae are simpler
+  if (chull.fail %in% c("adjusted", "balanced")) {
+    an <- computeBartlett(z) * 0.5  # Unweighted -- because there is no theory on weighted AEL
+    if (an < 0) stop("weightedEL0: Bartlett factor a_n < 0 -- please report this bug on GitHub.")
+    zbar <- trimmed.weighted.mean(z, trim = 0.1, w = ct)
+    if (chull.fail == "adjusted") {
+      z <- c(z, -zbar * an)
+      ct <- if (!SEL) c(ct, 1) else c(ct, 1)
+      shift <- c(shift, 0)
+    } else {
+      z <- c(z, -zbar * an, 2 * mean(z) + zbar * an)
+      ct <- if (!SEL) c(ct, 1, 1) else c(ct, 1, 1)
+      if (SEL) ct <- ct / sum(ct)
+      shift <- c(shift, 0, 0)
+    }
+  }
 
   z1 <- min(z)
   zn <- max(z)
@@ -216,7 +241,7 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
     mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
     mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
     if (chull.fail == "wald") {
-      wm <- stats::weighted.mean(z, ct)
+      wm <- stats::weighted.mean(z, ct)  # Over-writing what had been calculated before
       wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)
     }
   }
@@ -310,8 +335,6 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
     }
     # Else: do nothing, classical ELR failure
   } else {  # The main 'good' loop: EL may proceed because the spanning condition holds
-    # Any requests for self-concordance or other Taylor forms?
-
     negz <- z < 0
     comp <- (ct / n.denom - 1 - shift) / z
     min.lam <- suppressWarnings(max(comp[!negz]))
@@ -351,6 +374,7 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
       converged <- lam.list$iter  >= 0
       estim.prec <- lam.list$estim.prec
       f.root <- lam.list$f.root
+      iter <- lam.list$iter
       exitcode <- 0L
 
       if (abs(f.root) > sqrt(.Machine$double.eps)) exitcode <- 1L

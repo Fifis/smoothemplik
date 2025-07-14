@@ -14,7 +14,7 @@ weightedEL0(
   weight.tolerance = NULL,
   boundary.tolerance = 1e-09,
   trunc.to = 0,
-  chull.fail = c("log4", "log2", "taylor", "wald", "adjusted", "balanced", "none"),
+  chull.fail = c("taylor", "wald", "adjusted", "balanced", "none"),
   uniroot.control = list(),
   verbose = FALSE
 )
@@ -24,7 +24,7 @@ weightedEL0(
 
 \item{mu}{Hypothesized mean of \code{z} in the moment condition.}
 
-\item{ct}{Numeric count variable with positive values that indicates the multiplicity of observations.
+\item{ct}{Numeric count variable with non-negative values that indicates the multiplicity of observations.
 Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.}
 
 \item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
@@ -46,12 +46,14 @@ interval range length.}
 In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
 
 \item{chull.fail}{A character: what to do if the convex hull of \code{z} does not contain \code{mu}
-(spanning condition does not hold). \code{"taylor"} requests a Taylor approximation
-of the logarithm outside \code{[lower, upper]} or, if any of those is not provided,
-\code{[ct/sum(ct), 1]}. \code{"wald"} eliminates the numerical lambda search and replaces the LR statistic
-with the Wald statistic (testing if the weighted mean of \code{z} is zero).}
+(spanning condition does not hold). \code{"taylor"} creates a Taylor approximation
+of the log-ELR function near the ends of the sample. \code{"wald"} smoothly transitions
+between the log-ELR function into -0.5 * the Wald statistic for the weighted mean of \code{z}.
+\code{"adjusted"} invokes the method of \insertCite{chen2008adjusted}{smoothemplik}, and
+\code{"balanced"} calls the method of \insertCite{emerson2009calibration}{smoothemplik},
+which is an improvement of the former.}
 
-\item{uniroot.control}{A list passed to the \code{uniroot}.}
+\item{uniroot.control}{A list passed to the \code{brentZero}.}
 
 \item{verbose}{Logical: if \code{TRUE}, prints warnings.}
 }
@@ -63,10 +65,10 @@ A list with the following elements:
   \item{lam}{The Lagrange multiplier.}
   \item{wts}{Observation weights/probabilities (of the same length as \code{z}).}
   \item{converged}{\code{TRUE} if the algorithm converged, \code{FALSE} otherwise (usually means that \code{mu} is not within the range of \code{z}, i.e. the one-dimensional convex hull of \code{z}).}
-  \item{iter}{The number of iterations used (from \code{uniroot}).}
+  \item{iter}{The number of iterations used (from \code{brentZero}).}
   \item{bracket}{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
-  \item{estim.prec}{The approximate estimated precision of lambda (from \code{uniroot}).}
-  \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{uniroot}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
+  \item{estim.prec}{The approximate estimated precision of lambda (from \code{brentZero}).}
+  \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{brentZero}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
   \item{exitcode}{An integer indicating the reason of termination.}
   \item{message}{Character string describing the optimisation termination status.}
 }
@@ -101,7 +103,7 @@ which defines the search bracket:
 function to allow mixed conditional and unconditional estimation;
 Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
 
-The actual tolerance of the lambda search in \code{uniroot} is
+The actual tolerance of the lambda search in \code{brentZero} is
 \eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
 where \code{tol} can be set in \code{uniroot.control} and
 \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.

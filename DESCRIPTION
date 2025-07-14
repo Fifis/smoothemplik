@@ -5,10 +5,11 @@ Version: 0.0.14
 Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
         role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
-Description: Smoothed Empirical Likelihood for asymtotically efficient
-    estimation of conditional-moment-restriction-based models
-    with focus on linear models under random sampling, variable-probability
-    sampling, and with missing data in endogenous variables.
+Description: Empirical likelihood methods for asymptotically efficient
+    estimation of models based on conditional or unconditional moment
+    restrictions through fast Rcpp implementations of kernel-based
+    non-parametric methods for density/regression estimation and numerical
+    routines for empirical likelihood maximisation.
 License: EUPL
 Encoding: UTF-8
 URL: https://github.com/Fifis/smoothemplik
