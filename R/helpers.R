@@ -227,3 +227,116 @@ dampedNewton <- function(fn, par, thresh  = 1e-30, itermax = 100,
   dampedNewtonCPP(fn = fn, par = par, thresh = thresh, itermax = itermax, verbose = verbose,
                   alpha = alpha, beta = beta, backeps = backeps)
 }
+
+# Bartlett correction factor for the 1-dimensional Adjusted EL
+computeBartlett <- function(x, ct = NULL) {
+  # Expressions from Liu & Chen (2011, Annals of Statistic, p.1347)
+  n <- length(x)
+  if (is.null(ct)) ct <- rep(1, n)
+  alpha1 <- stats::weighted.mean(x, ct)
+  zc <- x - alpha1
+  alpha2hat <- stats::weighted.mean(zc^2, ct)
+  alpha3hat <- stats::weighted.mean(zc^3, ct)
+  alpha4hat <- stats::weighted.mean(zc^4, ct)
+  alpha6hat <- stats::weighted.mean(zc^6, ct)
+  alpha2 <- n/(n-1) * alpha2hat
+  alpha4 <- n/(n-4)*alpha4hat - 6/(n-4)*alpha2^2
+  alpha22 <- alpha2^2 - alpha4/n
+  alpha3 <- n/(n-3)*alpha3hat
+  alpha33 <- alpha3^2 - (alpha6hat - alpha3^2)/n
+  alpha222 <- alpha2^3
+  b <- 0.5*alpha4/alpha22 - alpha33/alpha222/3
+  return(b)
+}
+
+
+#' Weighted trimmed mean
+#'
+#' Compute a weighted trimmed mean, i.e. a mean that assigns non-negative weights
+#' to the observations and (2)  discards an equal share of total weight from
+#' each tail of the distribution before averaging.
+#'
+#' For example, `trim = 0.10` removes 10% of the weight from the left tail and 10%
+#' from the right (20% in total), then takes the weighted mean of what is left.
+#' Setting `trim = 0.5` returns the weighted median.
+#'
+#' @param x Numeric vector of data values.
+#' @param trim Single number in \eqn{[0,\,0.5]}. Fraction of the total weight to cut
+#'   from each tail.
+#' @param w Numeric vector of non-negative weights of the same length as `x`.
+#'   If `NULL` (default), equal weights are used.
+#' @param na.rm Logical: should `NA` values in `x` or `w` be removed?
+#' @param ... Further arguments passed to [`weighted.mean()`] (for compatibility).
+#'
+#' @details
+#' The algorithm follows these steps:
+#' \enumerate{
+#'   \item Sort the data by `x` and accumulate the corresponding weights.
+#'   \item Identify the lower and upper cut-points that mark the central
+#'         share of the total weight.
+#'   \item Drop observations whose cumulative weight lies entirely
+#'         outside the cut-points and proportionally down-weight the two (at most)
+#'         remaining outermost observations.
+#'   \item Return the weighted mean of the retained mass.  If `trim == 0.5`,
+#'         only the 50% quantile remains, so the function returns the weighted median.
+#' }
+#'
+#' @return A single numeric value: the trimmed weighted mean of `x`. Returns `NA_real_`
+#' if no non-`NA` observations remain after optional `na.rm` handling.
+#' @export
+#'
+#' @seealso
+#' [`mean()`] for the unweighted trimmed mean, [`weighted.mean()`] for the untrimmed weighted mean.
+#'
+#' @examples
+#' set.seed(1)
+#' z <- rt(100, df = 3)
+#' w <- pmin(1, 1 / abs(z)^2)  # Far-away observations tails get lower weight
+#'
+#' mean(z, trim = 0.20)  # Ordinary trimmed mean
+#' trimmed.weighted.mean(z, trim = 0.20)  # Same
+#'
+#' weighted.mean(z, w)   # Ordinary weighted mean (no trimming)
+#' trimmed.weighted.mean(z, w = w)  # Same
+#'
+#' trimmed.weighted.mean(z, trim = 0.20, w = w)  # Weighted trimmed mean
+#' trimmed.weighted.mean(z, trim = 0.5,  w = w)  # Weighted median
+trimmed.weighted.mean <- function(x, trim = 0, w = NULL, na.rm = FALSE, ...) {
+  if (trim == 0)  return(stats::weighted.mean(x, w, na.rm = na.rm, ...))
+  if (is.null(w)) return(mean(x, trim = trim, na.rm = na.rm, ...))
+  if (length(w) != length(x)) stop("'w' must have the same length as 'x'")
+  if (any(w < 0, na.rm = TRUE)) stop("'w' must contain non-negative numbers only")
+  if (trim < 0) stop("'trim' must be in [0, .5]")
+  if (trim > 0.5) trim <- 0.5
+
+  if (na.rm) {
+    ok <- !(is.na(x) | is.na(w))
+    x  <- x[ok]
+    w <- w[ok]
+  }
+  if (length(x) < 1) return(NA_real_)
+
+  # Sort all observations by value
+  ord <- order(x)
+  x   <- x[ord]
+  w   <- w[ord]
+
+  totw <- sum(w)
+  cumwfrac <- cumsum(w) / totw  # Cumulative weight share
+  prevfrac <- c(0, utils::head(cumwfrac, -1))  # Share up to before obs
+  # Lower and upper cut points (fractions of weight)
+  L <- trim
+  U <- 1 - trim
+
+  # Initialise kept weights after trimming
+  keepw <- w
+  keepw[cumwfrac <= L | prevfrac >= U] <- 0  # Fully trimmed observations
+  ## Partially trimmed observations (one on each side at most)
+  idxL <- prevfrac < L & cumwfrac > L
+  if (any(idxL)) keepw[idxL] <- w[idxL] * (cumwfrac[idxL] - L) / (w[idxL]/totw)
+  idxU <- prevfrac < U & cumwfrac > U
+  if (any(idxU)) keepw[idxU] <- w[idxU] * (U - prevfrac[idxU]) / (w[idxU]/totw)
+
+  stats::weighted.mean(x, keepw, na.rm = na.rm, ...)
+}
+
