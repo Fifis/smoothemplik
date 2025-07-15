@@ -7,9 +7,12 @@ Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
 Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
 Description: Empirical likelihood methods for asymptotically efficient
     estimation of models based on conditional or unconditional moment
-    restrictions through fast Rcpp implementations of kernel-based
-    non-parametric methods for density/regression estimation and numerical
-    routines for empirical likelihood maximisation.
+    restrictions; see Kitamura, Tripathi & Ahn (2004)
+    <doi:10.1111/j.1468-0262.2004.00550.x> and Owen (2013)
+    <doi:10.1002/cjs.11183>.
+    Kernel-based non-parametric methods for density/regression estimation and
+    numerical routines for empirical likelihood maximisation are implemented in
+    'Rcpp' for speed.
 License: EUPL
 Encoding: UTF-8
 URL: https://github.com/Fifis/smoothemplik

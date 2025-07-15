@@ -522,21 +522,24 @@ kernelDensity <- function(x,
 #'
 #' @examples
 #' set.seed(1)
-#' x <- sort(rt(1000, df = 5)) # Observed values
-#' g <- seq(-7, 7, 0.1) # Grid for evaluation
+#' n <- 300
+#' x <- sort(rt(n, df = 6)) # Observed values
+#' g <- seq(-4, 5, 0.1) # Grid for evaluation
 #' f <- function(x) 1 + x + sin(x) # True E(Y | X) = f(X)
-#' y <- f(x) + rt(1000, df = 4)
+#' y <- f(x) + rt(n, df = 4)
 #' # 3 estimators: locally constant + 2nd-order kernel,
 #' # locally constant + 4th-order kernel, locally linear robust
-#' b2lc <- bw.CV(x, y = y, kernel = "quartic")
-#' b4lc <- bw.CV(x, y = y, kernel = "quartic", order = 4, deduplicate.x = FALSE)
+#' b2lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic", deduplicate.x = FALSE)
+#'                          + 0.8)
+#' b4lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic", order = 4,
+#'               try.grid = FALSE, start.bw = 3, deduplicate.x = FALSE) + 1)
 #' b2ll <- bw.CV(x, y = y, kernel = "quartic", degree = 1, robust.iterations = 1,
-#'               try.grid = TRUE, start.bw = 2.1356, verbose = TRUE, deduplicate.x = FALSE)
+#'               try.grid = FALSE, start.bw = 3, verbose = TRUE, deduplicate.x = FALSE)
 #' m2lc <- kernelSmooth(x, y, g, bw = b2lc, kernel = "quartic", no.dedup = TRUE)
 #' m4lc <- kernelSmooth(x, y, g, bw = b4lc, kernel = "quartic", order = 4, no.dedup = TRUE)
 #' m2ll <- kernelSmooth(x, y, g, bw = b2ll, kernel = "quartic",
 #'                      degree = 1, robust.iterations = 1, no.dedup = TRUE)
-#' plot(x, y, xlim = c(-7, 7), col = "#00000088")
+#' plot(x, y, xlim = c(-6, 7), col = "#00000088", bty = "n")
 #' lines(g, f(g), col = "white", lwd = 5); lines(g, f(g))
 #' lines(g, m2lc, col = 2); lines(g, m4lc, col = 3); lines(g, m2ll, col = 4)
 

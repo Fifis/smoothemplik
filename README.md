@@ -55,7 +55,7 @@ Unlike functions for unconditional-moment-restriction models that typically requ
 This package provides direct functionality for the following articles:
 
 * Cosma, A., Kostyrka, A. V., & Tripathi, G. (2019). Inference in conditional moment restriction models when there is selection due to stratification. In *The Econometrics of Complex Survey Data* (Vol. 39, pp. 137–171). Emerald Publishing Limited. [doi.org/10.1108/S0731-905320190000039010](https://doi.org/10.1108/S0731-905320190000039010).
-* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2024). *Missing endogenous variables in conditional moment restriction models.* (Working paper No. 2024-01). University of Luxembourg, Department of Economics and Management. [hdl.handle.net/10993/60100](hdl.handle.net/10993/60100).
+* Cosma, A., Kostyrka, A. V., & Tripathi, G. (2024). *Missing endogenous variables in conditional moment restriction models.* (Working paper No. 2024-01). University of Luxembourg, Department of Economics and Management. [hdl.handle.net/10993/60100](https://hdl.handle.net/10993/60100).
 
 The theory behind the method is provided in the following sources:
 
@@ -66,7 +66,7 @@ The theory behind the method is provided in the following sources:
 ## Installation
 
 This package currently exists only on GitHub. To install it, first, obtain the compiler.
-* [RTools installer for Windows](https://cloud.r-project.org/bin/windows/Rtools/)
+* [RTools installer for Windows](https://CRAN.R-project.org/bin/windows/Rtools/)
 * [Compilers for Mac](https://mac.r-project.org/tools/)
 * `sudo apt install r-base-dev` on Debian/Ubuntu/Mint or simply use the compiled version on Linux.
 
