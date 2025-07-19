@@ -49,10 +49,10 @@ These bug fixes and features are scheduled for the upcoming releases.
 # smoothemplik 0.0.15 (2025-XX-XX)
 
 - Rewrote most of the internal functions in Rcpp for higher speed
-- Moved `weightedEL` to `weightedEL0` and `cemplik` -- now that it is in C++ -- to `weightedEL`
-- Added weighted Euclidean likelihood
+- Moved `weightedEL` to `EL0` and `cemplik` -- now that it is in C++ -- to `EL`
+- Added Euclidean likelihood
 - `smoothEmplik()` accepts `attach.attributes = TRUE` as a synonym for `"all"`
-- Fixed a bug in the Taylor expansion that could cause a violation of the spanning condition
+- Fixed 2 bugs in the Taylor expansion related to the spanning condition
 
 # smoothemplik 0.0.14 (2025-04-30)
 

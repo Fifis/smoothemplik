@@ -371,14 +371,16 @@ prepareKernel <- function(x,
 #' wsp <- kernelWeights(x, g, bw = 2, kernel = "triangular", sparse = TRUE)
 #' print(c(object.size(w), object.size(wsp)) / 1024) # Kilobytes used
 #' image(g, x, w)
-#' all.equal(w[, 1, drop = FALSE],  # Internal calculation for one column
-#'           smoothemplik:::kernelFunCPP((g - x[1])/2, "triangular", 2, FALSE))
+#' all.equal(w[, 1],  # Internal calculation for one column
+#'             kernelFun((g - x[1])/2, "triangular", 2, FALSE))
 #'
 #' # Bare-bones interface to the C++ functions
-#' x <- seq(-3, 3, 0.01)
-#' kmat <- sapply(c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"),
-#'                function(k) smoothemplik:::kernelFunCPP(x, k, 4, TRUE))
-#' matplot(x, kmat, type = "l", lty = 1)
+#' # Example: 4th-order convolution kernels
+#' x <- seq(-3, 5, length.out = 301)
+#' ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian")
+#' kmat <- sapply(ks, function(k) kernelFun(x, k, 4, TRUE))
+#' matplot(x, kmat, type = "l", lty = 1, bty = "n", lwd = 2)
+#' legend("topright", ks, col = 1:5, lwd = 2)
 kernelWeights <- function(x,
                           xout = NULL,
                           bw = NULL,
@@ -873,7 +875,6 @@ kernelMixedDensity <- function(x, by, xout = NULL, byout = NULL, weights = NULL,
 #' all.equal(km1, km2)
 #'
 #' # Parallel capabilities shine in large data sets
-#' \dontrun{
 #' if (.Platform$OS.type != "windows") {
 #' # A function to carry out the same estimation in multiple cores
 #' pFun <- function(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
@@ -881,8 +882,6 @@ kernelMixedDensity <- function(x, by, xout = NULL, byout = NULL, weights = NULL,
 #'          bw = 1, degree = 0, parallel = TRUE, cores = n)
 #' system.time(pFun(1))  # 0.6--0.7 s
 #' system.time(pFun(2))  # 0.4--0.5 s
-#' system.time(pFun(4))  # 0.2--0.3 s
-#' }
 #' }
 kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NULL, parallel = FALSE, cores = 1, preschedule = TRUE, ...) {
   .kernelMixed(x = x, y = y, by = by, xout = xout, byout = byout, weights = weights, type = "smooth", parallel = parallel, cores = cores, preschedule = preschedule, ...)
@@ -1057,10 +1056,11 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
 #' g <- seq(-3.5, 3.5, 0.05)
 #' yhat <- kernelSmooth(x, y, xout = g, weights = w,
 #'                      bw = bw.opt, deduplicate.xout = FALSE)
-#' par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
+#' oldpar <- par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
 #' plot(bw.grid, CV, bty = "n", xlab = "", ylab = "", main = "Cross-validation")
 #' plot(x.uniq, y.uniq, bty = "n", xlab = "", ylab = "", main = "Optimal fit")
 #' points(g, yhat, pch = 16, col = 2, cex = 0.5)
+#' par(oldpar)
 LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "gaussian",
                  order = 2, PIT = FALSE, chunks = 0, robust.iterations = 0, cores = 1) {
   arg <- prepareKernel(x = x, y = y, weights = weights, bw = bw[1],
@@ -1150,11 +1150,12 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
 #' bw.opt <- bw.CV(x, y, w) # 0.49, very close
 #' g <- seq(-3.5, 3.5, 0.05)
 #' yhat <- kernelSmooth(x, y, g, w, bw.opt, deduplicate.xout = FALSE)
-#' par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
+#' oldpar <- par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
 #' plot(bw.grid, CV, bty = "n", xlab = "", ylab = "", main = "Cross-validation")
 #' points(bw.opt, LSCV(x, y, bw.opt, w), col = 2, pch = 15)
 #' plot(x.uniq, y.uniq, bty = "n", xlab = "", ylab = "", main = "Optimal fit")
 #' points(g, yhat, pch = 16, col = 2, cex = 0.5)
+#' par(oldpar)
 bw.CV <- function(x, y = NULL, weights = NULL,
                   kernel = "gaussian", order = 2, PIT = FALSE,
                   chunks = 0,
@@ -1251,12 +1252,19 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #' @param x A numeric vector of values at which to compute the kernel function.
 #' @param kernel Kernel type: uniform, Epanechnikov, triangular, quartic, or Gaussian.
 #' @param order Kernel order. 2nd-order kernels are always non-negative.
-#'   kth-order kernels have all moments from 1 to (k-1) equal to zero, which is
+#'   *k*-th-order kernels have all moments from 1 to (k-1) equal to zero, which is
 #'   achieved by having some negative values.
 #' \eqn{\int_{-\infty}^{+\infty} x^2 k(x) = \sigma^2_k = 1}.
 #' This is useful because in this case, the constant \code{k_2} in formulæ 3.12 and 3.21
 #' from \insertCite{silverman1986density;textual}{smoothemplik} is equal to 1.
 #' @param convolution Logical: return the convolution kernel? (Useful for density cross-validation.)
+#'
+#' @details
+#' The kernel functions take non-zero values on \eqn{[-1, 1]}{[-1, 1]}, except for
+#' the Gaussian one, which is supposed to have full support, but due to the rapid
+#' decay, is indistinguishable from machine epsilon outside
+#' \eqn{[-8.2924, 8.2924]}{[-8.2924, 8.2924]}.
+#'
 #'
 #' @return A numeric vector of the same length as input.
 #' @importFrom Rdpack reprompt
@@ -1274,7 +1282,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #' plot(NULL, NULL, xlim = range(xout), ylim = c(0, 1.1),
 #'   xlab = "", ylab = "", main = "Unscaled kernels", bty = "n"); put.legend()
 #' for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i]), col = cols[i])
-#' par(mfrow = c(1, 2))
+#' oldpar <- par(mfrow = c(1, 2))
 #' plot(NULL, NULL, xlim = range(xout), ylim = c(-0.1, 0.8), xlab = "", ylab = "",
 #'   main = "4th-order kernels", bty = "n"); put.legend()
 #' for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 4), col = cols[i])
@@ -1285,6 +1293,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
 #'   for (j in 1:2) lines(xout, kernelFun(xout, kernel = ks[i], order = os[j],
 #'   convolution = TRUE), col = cols[i], lty = j)
 #' }; legend("topleft", c("2nd order", "4th order"), lty = 1:2, bty = "n")
+#' par(oldpar)
 #'
 #' # All kernels integrate to correct values; we compute the moments
 #' mom <- Vectorize(function(k, o, m, c) integrate(function(x) x^m * kernelFun(x, k, o,

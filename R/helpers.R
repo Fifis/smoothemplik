@@ -21,7 +21,7 @@ dlog <- function(x, d = 0L) dlogCPP(x, d)
 #' a <- 1.5
 #' x <- seq(a*2, a/2, length.out = 101)
 #' f <- function(x, d = 0)  if (d == 0) log(x) else ((d%%2 == 1)*2-1) * 1/x^d * gamma(d)
-#' par(mfrow = c(2, 3), mar = c(2, 2, 2.5, 0.2))
+#' oldpar <- par(mfrow = c(2, 3), mar = c(2, 2, 2.5, 0.2))
 #' for (d in 0:5) {
 #' y <- f(x, d = d)
 #' plot(x, y, type = "l", lwd = 7, bty = "n", ylim = range(0, y),
@@ -30,6 +30,7 @@ dlog <- function(x, d = 0L) dlogCPP(x, d)
 #'   points(a, f(a, d = d), pch = 16, cex = 1.5, col = "white")
 #' }
 #' legend("topright", as.character(0:8), title = "Order", col = cl, lwd = 1)
+#' par(oldpar)
 tlog <- function(x, a = as.numeric(c(1.0)), k = 4L, d = 0L) tlogCPP(x, a, k, d)
 
 
@@ -163,7 +164,7 @@ getParabola <- function(x, f, fp, fpp) getParabolaCPP(x, f, fp, fpp)
 #' w <- 10:1
 #' w <- w / sum(w)
 #'
-#' f <- Vectorize(function(m) -2*weightedEL0(xx, mu = m, ct = w, chull.fail = "none")$logelr)
+#' f <- Vectorize(function(m) -2*EL0(xx, mu = m, ct = w, chull.fail = "none")$logelr)
 #' museq <- seq(-6, 6, 0.1)
 #' LRseq <- f(museq)
 #' plot(museq, LRseq, bty = "n")

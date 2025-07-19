@@ -11,7 +11,7 @@
 #'   for convex hull failure.
 #' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 #'   or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.
-#' @param EL.args A list of arguments passed to \code{weightedEL()}, \code{weightedEL0()}, or \code{weightedEuL}.
+#' @param EL.args A list of arguments passed to \code{EL()}, \code{EL0()}, or \code{EuL()}.
 #' @param kernel.args A list of arguments passed to \code{kernelWeights()} if
 #'   \code{sel.weights} is a function.
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).
@@ -33,7 +33,7 @@
 #' \code{"lam"} for the Lagrange multipliers lambda in the EL problems,
 #' \code{"nabla"} for d/d(lambda)EL (should be close to zero because this must be true for any \code{theta}),
 #' \code{"converged"} for the convergence of #' individual EL problems,
-#' \code{"exitcode"} for the \code{weightedEL} exit codes (0 for success),
+#' \code{"exitcode"} for the \code{EL} exit codes (0 for success),
 #' \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).
 #' @param ... Passed to \code{rho}.
 #'
@@ -56,7 +56,9 @@
 #' # SEL maximisation
 #' ctl <- list(fnscale = -1, reltol = 1e-6, ndeps = rep(1e-5, 2),
 #'             trace = 1, REPORT = 5)
-#' b.SEL <- optim(coef(mod.OLS), SEL, method = "BFGS", control = ctl)
+#' b.init <- coef(mod.OLS)
+#' b.init <- c(1.790207, 1.007491)  # Only to speed up estimation
+#' b.SEL <- optim(b.init, SEL, method = "BFGS", control = ctl)
 #' print(b.SEL$par) # Closer to the true value (1, 1) than OLS
 #' plot(x, y)
 #' abline(1, 1, lty = 2)
@@ -77,8 +79,8 @@
 #' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
 #'
 #' # The next example is very slow; approx. 1 minute
-#' \dontrun{
-#' # Experiment: a small bandwidth so that the spanning condition should fail
+#' \donttest{
+#' # Experiment: a small bandwidth so that the spanning condition should fail often
 #' # It yields an appalling estimator
 #' w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
 #' w <- w / rowSums(w)
@@ -92,33 +94,39 @@
 #' b0grid <- seq(-1.5, 7, length.out = 51)
 #' b1grid <- seq(-1.5, 4.5, length.out = 51)
 #' bgrid <- as.matrix(expand.grid(b0grid, b1grid))
-#' selgrid <- unlist(parallel::mclapply(1:nrow(bgrid), function(i)
-#'   smoothEmplik(rho, bgrid[i, ], sel.weights = w, chull.fail = "taylor"),
-#'     mc.cores = parallel::detectCores()/2-1))
+#' fi <- function(i) smoothEmplik(rho, bgrid[i, ], sel.weights = w, type = "EL0",
+#'                   EL.args = list(chull.fail = "taylor"))
+#' ncores <- max(floor(parallel::detectCores()/2 - 1), 1)
+#' chk <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")  # Limit to 2 cores for CRAN checks
+#' if (nzchar(chk) && chk == "TRUE") ncores <- min(ncores, 2L)
+#' selgrid <- unlist(parallel::mclapply(1:nrow(bgrid), fi, mc.cores = ncores))
 #' selgrid <- matrix(selgrid, nrow = length(b0grid))
 #' probs <- c(0.25, 0.5, 0.75, 0.8, 0.9, 0.95, 0.99, 1-10^seq(-4, -16, -2))
 #' levs <- qchisq(probs, df = 2)
 #' # levs <- c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000)
 #' labs <- round(levs, 1)
 #' cols <- rainbow(length(levs), end = 0.7, v = 0.7)
-#' par(mar = c(4, 4, 2, 0) + .1)
-#' contour(b0grid, b1grid, -2*(selgrid - max(selgrid, na.rm = TRUE)), levels = levs,
+#' oldpar <- par(mar = c(4, 4, 2, 0) + .1)
+#' selgrid2 <- -2*(selgrid - max(selgrid, na.rm = TRUE))
+#' contour(b0grid, b1grid, selgrid2, levels = levs,
 #'         labels = labs, col = cols, lwd = 1.5, bty = "n",
 #'         main = "'Safe' likelihood contours", asp = 1)
-#' image(b0grid, b1grid, log1p(-2*(selgrid - max(selgrid, na.rm = TRUE))))
+#' image(b0grid, b1grid, log1p(selgrid2))
 #' # The narrow lines are caused by the fact that if two observations are close together
 #' # at the edge, the curvature at that point is extreme
 #'
 #' # The same with Euclidean likelihood
 #' seulgrid <- unlist(parallel::mclapply(1:nrow(bgrid), function(i)
 #'   smoothEmplik(rho, bgrid[i, ], sel.weights = w, type = "EuL"),
-#'     mc.cores = 1))
+#'     mc.cores = ncores))
 #' seulgrid <- matrix(seulgrid, nrow = length(b0grid))
+#' seulgrid2 <- -50*(seulgrid - max(seulgrid, na.rm = TRUE))
 #' par(mar = c(4, 4, 2, 0) + .1)
-#' contour(b0grid, b1grid, -50*(seulgrid - max(seulgrid, na.rm = TRUE)), levels = levs,
+#' contour(b0grid, b1grid, seulgrid2, levels = levs,
 #'         labels = labs, col = cols, lwd = 1.5, bty = "n",
 #'         main = "'Safe' likelihood contours", asp = 1)
-#' image(b0grid, b1grid, log1p(-2*(seulgrid - max(seulgrid, na.rm = TRUE))))
+#' image(b0grid, b1grid, log1p(seulgrid2))
+#' par(oldpar)
 #' }
 smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
                          type = c("EL", "EuL", "EL0"),
@@ -167,13 +175,13 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
 
   calcOne <- function(i) { # Call the appropriate weighted likelihood function based on `type`
     if (type == "EL") {
-      return(weightedEL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+      return(EL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
                         weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
     } else if (type == "EuL") {
-      return(weightedEuL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+      return(EuL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
                          weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
     } else if (type == "EL0") {
-      return(weightedEL0(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+      return(EL0(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
                          chull.fail = EL.args$chull.fail, weight.tolerance = EL.args$weight.tolerance,
                          return.weights = attach.probs))
     } else {

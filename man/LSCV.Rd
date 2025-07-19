@@ -86,8 +86,9 @@ bw.opt <- bw.grid[which.min(CV)]
 g <- seq(-3.5, 3.5, 0.05)
 yhat <- kernelSmooth(x, y, xout = g, weights = w,
                      bw = bw.opt, deduplicate.xout = FALSE)
-par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
+oldpar <- par(mfrow = c(2, 1), mar = c(2, 2, 2, 0)+.1)
 plot(bw.grid, CV, bty = "n", xlab = "", ylab = "", main = "Cross-validation")
 plot(x.uniq, y.uniq, bty = "n", xlab = "", ylab = "", main = "Optimal fit")
 points(g, yhat, pch = 16, col = 2, cex = 0.5)
+par(oldpar)
 }

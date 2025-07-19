@@ -31,7 +31,7 @@ cl <- rainbow(9, end = 0.8, v = 0.8, alpha = 0.8)
 a <- 1.5
 x <- seq(a*2, a/2, length.out = 101)
 f <- function(x, d = 0)  if (d == 0) log(x) else ((d\%\%2 == 1)*2-1) * 1/x^d * gamma(d)
-par(mfrow = c(2, 3), mar = c(2, 2, 2.5, 0.2))
+oldpar <- par(mfrow = c(2, 3), mar = c(2, 2, 2.5, 0.2))
 for (d in 0:5) {
 y <- f(x, d = d)
 plot(x, y, type = "l", lwd = 7, bty = "n", ylim = range(0, y),
@@ -40,4 +40,5 @@ plot(x, y, type = "l", lwd = 7, bty = "n", ylim = range(0, y),
   points(a, f(a, d = d), pch = 16, cex = 1.5, col = "white")
 }
 legend("topright", as.character(0:8), title = "Order", col = cl, lwd = 1)
+par(oldpar)
 }

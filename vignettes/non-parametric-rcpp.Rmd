@@ -214,7 +214,7 @@ all.equal(mR, mCPP, tolerance = 1e-16)
 
 We can visualise the results and see that the discrepancies are tiny:
 ```{r}
-par(mfrow = c(2, 1), mar = c(4, 4, 2, 3))
+oldpar <- par(mfrow = c(2, 1), mar = c(4, 4, 2, 3))
 plot(X, Y, bty = "n", main = "Non-parametric regression (black) and density (blue) estimate", las = 1)
 lines(xg, mCPP, lwd = 2)
 par(new = TRUE)
@@ -413,6 +413,10 @@ print(c(object.size(kw),
 ## Conclusion
 
 These examples showcase the speed improvements and comparable accuracy of the Rcpp implementations over pure R code, making the `smoothemplik` a versatile and efficient tool for non-parametric statistical analysis.
+
+```{r include=FALSE}
+par(oldpar)
+```
 
 ## References
 
