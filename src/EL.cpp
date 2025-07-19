@@ -57,24 +57,24 @@ static SEXP wELlambda(SEXP lambdaSEXP) {
 }
 
 // [[Rcpp::export]]
-List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init,
-                   bool return_weights, NumericVector lower, NumericVector upper,
-                   int order, double weight_tolerance, double thresh, int itermax, bool verbose = false,
-                   double alpha = 0.3, double beta = 0.8, double backeps = 0.0) {
+List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init,
+           bool return_weights, NumericVector lower, NumericVector upper,
+           int order, double weight_tolerance, double thresh, int itermax, bool verbose = false,
+           double alpha = 0.3, double beta = 0.8, double backeps = 0.0) {
   const int n = z.nrow();
   const int d = z.ncol();
   g_Z  = arma::mat(z.begin(), n, d, /*copy_aux_mem =*/ true);
 
   if (mu.size() == 1) mu = NumericVector(d, mu[0]);
-  if (mu.size() != d) stop("The length of mu must match the number of columns in z.");
+  if (mu.size() != d) stop("ELCPP: The length of mu must match the number of columns in z.");
 
   // Centre by the hypothesised mean
   for (int j = 0; j < d; ++j) g_Z.col(j) -= mu[j];
 
   // Observation weights = counts
-  if (min(ct) < 0) stop("Negative weights are not allowed.");
+  if (min(ct) < 0) stop("ELCPP: Negative weights are not allowed.");
   for (double& w : ct) if (w > 0 && w < weight_tolerance) w = 0;
-  if (sum(ct) == 0) stop("Total weight must be positive.");
+  if (sum(ct) == 0) stop("ELCPP: Total weight must be positive.");
   g_ct = arma::vec(ct.begin(), n,  /*copy_aux_mem =*/ true);
 
   // Cut-offs
@@ -82,7 +82,7 @@ List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericV
   if (g_lower.size() == 1) g_lower = NumericVector(n, g_lower[0]);
   g_upper = as<NumericVector>(upper);
   if (g_upper.size() == 1) g_upper = NumericVector(n, g_upper[0]);
-  for (int i = 0; i < n; ++i) if (g_lower[i] > g_upper[i]) stop("weightedELCPP: lower > upper");
+  for (int i = 0; i < n; ++i) if (g_lower[i] > g_upper[i]) stop("ELCPP: lower > upper");
 
   g_order = order;   // Taylor order  (>=4)
 

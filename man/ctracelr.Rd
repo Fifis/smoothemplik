@@ -16,9 +16,9 @@ ctracelr(
 )
 }
 \arguments{
-\item{z}{Passed to \code{weightedEL}.}
+\item{z}{Passed to \code{EL}.}
 
-\item{ct}{Passed to \code{weightedEL}.}
+\item{ct}{Passed to \code{EL}.}
 
 \item{mu0}{Starting point of trajectory}
 
@@ -30,7 +30,7 @@ ctracelr(
 
 \item{verbose.solver}{Logical: report internal iteration data from the optimiser? Very verbose.}
 
-\item{...}{Passed to \code{weightedEL}.
+\item{...}{Passed to \code{EL}.
 
 This function does not accept the starting lambda because it is much faster (3--5 times)
 to reuse the lambda from the previous iteration.}
@@ -47,7 +47,7 @@ earth <- c(
   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 )
-weightedEL(earth, mu = 5.1,  verbose = TRUE)
+EL(earth, mu = 5.1,  verbose = TRUE)
 logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 55, verbose = TRUE)
 hist(earth, breaks = seq(4.75, 6, 1/8))
 plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",

@@ -17,7 +17,7 @@ kernelFun(
 \item{kernel}{Kernel type: uniform, Epanechnikov, triangular, quartic, or Gaussian.}
 
 \item{order}{Kernel order. 2nd-order kernels are always non-negative.
-  kth-order kernels have all moments from 1 to (k-1) equal to zero, which is
+  *k*-th-order kernels have all moments from 1 to (k-1) equal to zero, which is
   achieved by having some negative values.
 \eqn{\int_{-\infty}^{+\infty} x^2 k(x) = \sigma^2_k = 1}.
 This is useful because in this case, the constant \code{k_2} in formulæ 3.12 and 3.21
@@ -33,6 +33,12 @@ Computes 5 most popular kernel functions of orders 2 and 4 with the potential of
 an analytical convolution kernel for density cross-validation. These kernels appear
 in \insertCite{silverman1986density}{smoothemplik}.
 }
+\details{
+The kernel functions take non-zero values on \eqn{[-1, 1]}{[-1, 1]}, except for
+the Gaussian one, which is supposed to have full support, but due to the rapid
+decay, is indistinguishable from machine epsilon outside
+\eqn{[-8.2924, 8.2924]}{[-8.2924, 8.2924]}.
+}
 \examples{
 ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"); names(ks) <- ks
 os <- c(2, 4); names(os) <- paste0("o", os)
@@ -42,7 +48,7 @@ xout <- seq(-4, 4, length.out = 301)
 plot(NULL, NULL, xlim = range(xout), ylim = c(0, 1.1),
   xlab = "", ylab = "", main = "Unscaled kernels", bty = "n"); put.legend()
 for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i]), col = cols[i])
-par(mfrow = c(1, 2))
+oldpar <- par(mfrow = c(1, 2))
 plot(NULL, NULL, xlim = range(xout), ylim = c(-0.1, 0.8), xlab = "", ylab = "",
   main = "4th-order kernels", bty = "n"); put.legend()
 for (i in 1:5) lines(xout, kernelFun(xout, kernel = ks[i], order = 4), col = cols[i])
@@ -53,6 +59,7 @@ for (i in 1:5) {
   for (j in 1:2) lines(xout, kernelFun(xout, kernel = ks[i], order = os[j],
   convolution = TRUE), col = cols[i], lty = j)
 }; legend("topleft", c("2nd order", "4th order"), lty = 1:2, bty = "n")
+par(oldpar)
 
 # All kernels integrate to correct values; we compute the moments
 mom <- Vectorize(function(k, o, m, c) integrate(function(x) x^m * kernelFun(x, k, o,

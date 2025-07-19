@@ -6,12 +6,12 @@ using namespace Rcpp;
 // the R one
 
 // [[Rcpp::export]]
-List weightedEuLCPP(const arma::mat& z, arma::vec mu,
-                          arma::vec ct, arma::vec vt, arma::vec shift,
-                          const double n_orig, const double weight_tolerance,
-    const double trunc_to = 0.0, const bool SEL = true,
-    const bool return_weights = false, const bool verbose = false,
-    const bool chull_diag = false)
+List EuLCPP(const arma::mat& z, arma::vec mu,
+            arma::vec ct, arma::vec vt, arma::vec shift,
+            const double n_orig, const double weight_tolerance,
+            const double trunc_to = 0.0, const bool SEL = true,
+            const bool return_weights = false, const bool verbose = false,
+            const bool chull_diag = false)
 {
   const double me = std::numeric_limits<double>::epsilon();
 
@@ -70,7 +70,7 @@ List weightedEuLCPP(const arma::mat& z, arma::vec mu,
 
   // Original sample size for normalisation
   const double N = SEL ? static_cast<double>(n_orig) : arma::accu(ct);
-  if (N <= 0) stop("Total weights after tolerance checks must be positive.");
+  if (N <= 0) stop("EuLCPP: Total weights after tolerance checks must be positive.");
 
   // Rcout << "zz: " << zz << "\n";
   // Rcout << "ct: " << ct << "\n";

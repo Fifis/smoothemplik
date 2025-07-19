@@ -53,7 +53,7 @@ xx <- -4:5  # Global data for EL evaluation
 w <- 10:1
 w <- w / sum(w)
 
-f <- Vectorize(function(m) -2*weightedEL0(xx, mu = m, ct = w, chull.fail = "none")$logelr)
+f <- Vectorize(function(m) -2*EL0(xx, mu = m, ct = w, chull.fail = "none")$logelr)
 museq <- seq(-6, 6, 0.1)
 LRseq <- f(museq)
 plot(museq, LRseq, bty = "n")

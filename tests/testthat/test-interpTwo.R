@@ -3,7 +3,7 @@ test_that("interpolation works and is monotone", {
   xt <- c(-3, 2.5)  # Transition at these points
   w <- c(9, rep(1, 8))
   w <- w / sum(w)
-  f <- Vectorize(function(m) -2*weightedEL0(xx, mu = m, ct = w, chull.fail = "none", SEL = TRUE)$logelr)
+  f <- Vectorize(function(m) -2*EL0(xx, mu = m, ct = w, chull.fail = "none", SEL = TRUE)$logelr)
   xl <- seq(xt[1]-1, xt[1]+1, 0.1)
   xr <- seq(xt[2]-1, xt[2]+1, 0.1)
   fl <- f(xl)

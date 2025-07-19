@@ -102,7 +102,6 @@ system.time(km2 <- kernelMixedSmooth(x = xr, y = y, by = by, weights = w,
 all.equal(km1, km2)
 
 # Parallel capabilities shine in large data sets
-\dontrun{
 if (.Platform$OS.type != "windows") {
 # A function to carry out the same estimation in multiple cores
 pFun <- function(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
@@ -110,7 +109,5 @@ pFun <- function(n) kernelMixedSmooth(x = rep(x, 2), y = rep(y, 2),
          bw = 1, degree = 0, parallel = TRUE, cores = n)
 system.time(pFun(1))  # 0.6--0.7 s
 system.time(pFun(2))  # 0.4--0.5 s
-system.time(pFun(4))  # 0.2--0.3 s
-}
 }
 }

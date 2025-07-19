@@ -62,7 +62,7 @@
 #'
 #' The sum of log-weights is maximised without Taylor expansion, forcing \code{mu} to be inside
 #' the convex hull of \code{z}. If a violation is happening, consider using the \code{chull.fail} argument
-#' or switching to Euclidean likelihood via [weightedEuL()].
+#' or switching to Euclidean likelihood via [EuL()].
 #'
 #' @return A list with the following elements:
 #'
@@ -82,7 +82,7 @@
 #' @references
 #' \insertAllCited{}
 #'
-#' @seealso [weightedEL()]
+#' @seealso [EL()]
 #'
 #' @examples
 #' # Figure 2.4 from Owen (2001) -- with a slightly different data point
@@ -91,43 +91,43 @@
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 #' )
 #' set.seed(1)
-#' system.time(r1 <- replicate(40, weightedEL(sample(earth, replace = TRUE), mu = 5.517)))
+#' system.time(r1 <- replicate(40, EL(sample(earth, replace = TRUE), mu = 5.517)))
 #' set.seed(1)
-#' system.time(r2 <- replicate(40, weightedEL0(sample(earth, replace = TRUE), mu = 5.517)))
+#' system.time(r2 <- replicate(40, EL0(sample(earth, replace = TRUE), mu = 5.517)))
 #' plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
 #'      bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
-#'      main = "Discrepancy between weightedEL and weightedEL0", ylab = "")
+#'      main = "Discrepancy between EL and EL0", ylab = "")
 #' abline(h = 0, lty = 2)
 #'
 #' # Handling the convex hull violation differently
-#' weightedEL0(1:9, chull.fail = "none")
-#' weightedEL0(1:9, chull.fail = "taylor")
-#' weightedEL0(1:9, chull.fail = "wald")
+#' EL0(1:9, chull.fail = "none")
+#' EL0(1:9, chull.fail = "taylor")
+#' EL0(1:9, chull.fail = "wald")
 #'
 #' # Interpolation to well-defined branches outside the convex hull
 #' mu.seq <- seq(-1, 7, 0.1)
-#' wEL1 <- -2*sapply(mu.seq, function(m) weightedEL0(1:9, mu = m, chull.fail = "none")$logelr)
-#' wEL2 <- -2*sapply(mu.seq, function(m) weightedEL0(1:9, mu = m, chull.fail = "taylor")$logelr)
-#' wEL3 <- -2*sapply(mu.seq, function(m) weightedEL0(1:9, mu = m, chull.fail = "wald")$logelr)
+#' wEL1 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "none")$logelr)
+#' wEL2 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "taylor")$logelr)
+#' wEL3 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "wald")$logelr)
 #' plot(mu.seq, wEL1)
 #' lines(mu.seq, wEL2, col = 2)
 #' lines(mu.seq, wEL3, col = 4)
 #'
-#' # Warning: depending on the compiler, the discrepancy between weightedEL and weightedEL0
+#' # Warning: depending on the compiler, the discrepancy between EL and EL0
 #' # can be one million (1) times larger than the machine epsilon despite both of them
 #' # being written in pure R
 #' # The results from Apple clang-1400.0.29.202 and Fortran GCC 12.2.0 are different from
 #' # those obtained under Ubuntu 22.04.4 + GCC 11.4.0-1ubuntu1~22.04,
 #' # Arch Linux 6.6.21 + GCC 14.1.1, and Windows Server 2022 + GCC 13.2.0
-#' out1 <- weightedEL(earth, mu = 5.517)[1:4]
-#' out2 <- weightedEL0(earth, mu = 5.517, return.weights = TRUE)[1:4]
+#' out1 <- EL(earth, mu = 5.517)[1:4]
+#' out2 <- EL0(earth, mu = 5.517, return.weights = TRUE)[1:4]
 #' print(c(out1$lam, out2$lam), 16)
 #'
-#' # Value of lambda                         weightedEL          weightedEL0
+#' # Value of lambda                                 EL                  EL0
 #' # aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
 #' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
 #' @export
-weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, SEL = FALSE,
+EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, SEL = FALSE,
                         weight.tolerance = NULL, boundary.tolerance = 1e-9, trunc.to = 0,
                         chull.fail = c("taylor", "wald", "adjusted", "balanced", "none"),
                         uniroot.control = list(),
@@ -190,7 +190,7 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
   # Handling AEL and BAEL at the very end is correct because the formulae are simpler
   if (chull.fail %in% c("adjusted", "balanced")) {
     an <- computeBartlett(z) * 0.5  # Unweighted -- because there is no theory on weighted AEL
-    if (an < 0) stop("weightedEL0: Bartlett factor a_n < 0 -- please report this bug on GitHub.")
+    if (an < 0) stop("EL0: Bartlett factor a_n < 0 -- please report this bug on GitHub.")
     zbar <- trimmed.weighted.mean(z, trim = 0.1, w = ct)
     if (chull.fail == "adjusted") {
       z <- c(z, -zbar * an)
@@ -236,15 +236,34 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
   } else {
     z12 <- znn <- rep(zu[1], 2)
   }
+
   ExEL <- chull.fail %in% c("taylor", "wald")
-  if (ExEL) {  # Values for extrepolation
+  if (ExEL) {  # Extrapolation will be done -- the limits are required
     mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
     mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
     if (chull.fail == "wald") {
       wm <- stats::weighted.mean(z, ct)  # Over-writing what had been calculated before
       wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)
     }
+    left.extrap  <- (mu.llimit > 0)
+    right.extrap <- (mu.rlimit < 0)
+    if (left.extrap && right.extrap) stop("Extrapolation must be one-sided.")
+
+    # Optimisation 1: extrapolate only the right end
+    if (left.extrap) {
+      # All observations are to the right -- zero would be in the left branch
+      z <- -z
+      zu <- sort(unique(z))
+      z1 <- min(z)
+      zn <- max(z)
+      z12 <- zu[1:2]
+      znn <- zu[(l-1):l]
+      mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
+      mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
+      if (chull.fail == "wald") wm <- -wm
+    }
   }
+
   spanning <- ((!ExEL) & (z1 <= 0 && zn >= 0)) || (ExEL && (mu.llimit <= 0 && mu.rlimit >= 0))
 
   if (n < 2) { # Codes > 5
@@ -260,19 +279,6 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
     exitcode <- 7L
   } else if (!spanning) {  ######### TODO: test with 2 observations
 
-    # Optimisation 1: extrapolate only the right end
-    if (min(zu) >= 0) {  # All observations are to the right -- zero would be in the left branch
-      z <- -z
-      zu <- rev(-zu)
-      z12 <- zu[1:2]
-      znn <- zu[(l-1):l]
-      if (ExEL) {
-        mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
-        mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
-      }
-      if (chull.fail == "wald") wm <- -wm
-    }
-
     if (chull.fail == "taylor") {
       if (length(zu) < 2) stop("For Taylor extrapolation, at least two unique observations are required.")
       ma <- stats::median(abs(z))
@@ -286,22 +292,26 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
       mu.limit <- if (abs(mu.llimit) < abs(mu.rlimit)) mu.llimit else mu.rlimit
       # Apply the parabola formula for 3 points using f, f', f'' from a 4-point stencil with a larger step size
       stepsize <- max(diff(znn)*0.01, ma*.Machine$double.eps^0.25)
+      # Cap so that mu.limit - 3*stepsize >= z1 (stay inside data)
+      max.step <- (mu.limit - z1)/3
+      if (max.step <= 0) stop("EL0: cannot form left stencil (mu.limit <= z_min).")
+      stepsize <- min(stepsize, 0.5*max.step)
       zgrid <- mu.limit + stepsize*(-3:0)
       w.fp <- c(-2, 9, -18, 11) / 6  # These numbers are obtained from the pnd package
       w.fpp <- c(-1, 4, -5, 2)    # pnd::fdCoef(deriv.order = 2, stencil = -3:0)
 
-      llgrid <- vapply(zgrid, function(m) weightedEL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
+      llgrid <- vapply(zgrid, function(m) EL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
       fp <- sum(llgrid * w.fp) / stepsize
       fpp <- sum(llgrid * w.fpp) / stepsize^2
       # Check with
-      # pnd::Grad(function(m) weightedEL0(z = z, mu = m, ct = ct)$logelr, zgrid[1],
+      # pnd::Grad(function(m) EL0(z = z, mu = m, ct = ct)$logelr, zgrid[1],
       #   elementwise = FALSE, vectorised = FALSE, multivalued = FALSE, h = 1e-5)
       abc <- getParabola(x = mu.limit, f = llgrid[4], fp = fp, fpp = fpp)
       parab  <- function(x) abc[1]*x^2  + abc[2]*x  + abc[3]
       logelr <- parab(0)  # Just c, the intercept
       # For z = 1:9
       # xgrid <- seq((z[1]+z[2])/2, (znn[1]+znn[2])/2, length.out = 51)
-      # ygrid <- sapply(xgrid, function(m) weightedEL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
+      # ygrid <- sapply(xgrid, function(m) EL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
       # plot(xgrid, ygrid, xlim = range(z, 0) + c(-0.25, 0.25), ylim = c(min(ygrid)*1.5, 0), bty = "n")
       # points(zgrid, llgrid, col = 2, pch = 16)
       # xgrid2 <- seq(-0.1, 1.5, length.out = 31)
@@ -321,7 +331,7 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
 
       # TODO: speed up the evaluation; extrapolate only where necessary; check the gap location
       # Extract info from the interpTwo function
-      f <- function(mm) vapply(mm, function(m) -2*weightedEL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
+      f <- function(mm) vapply(mm, function(m) -2*EL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
       logelr <- -0.5 * interpTwo(x = 0, f = f, mean = wm, var = wv, at = mu.limit, gap = gap)
       # curve(f, 0, 9)
       # abline(v = c(mu.limit, mu.limit - gap), lty = 3)
@@ -423,7 +433,8 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
 #'
 #' @source This original code was written for \insertCite{owen2013self}{smoothemplik}
 #' and [published online](https://artowen.su.domains/empirical/) by Art B. Owen
-#' (February 2014) and slightly reworked to contain fewer inner functions and loops.
+#' (March 2015, February 2017). The present version was rewritten in \code{Rcpp} and
+#' slightly reworked to contain fewer inner functions and loops.
 #'
 #' @details
 #' Negative weights are not allowed. They could be useful in some applications, but they can destroy
@@ -436,10 +447,10 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
 #'
 #' Tweak \code{alpha} and \code{beta} with extreme caution. See \insertCite{boyd2004convex}{smoothemplik},
 #' pp. 464--466 for details. It is necessary that \code{0 < alpha < 1/2} and \code{0 < beta < 1}.
-#' \code{alpha = 0.03} seems better than 0.01 on some 2-dimensional test data (sometimes fewer iterations).
+#' \code{alpha = 0.3} seems better than 0.01 on some 2-dimensional test data (sometimes fewer iterations).
 #'
 #' The argument names, except for \code{lambda.init}, are matching the original names in Art B. Owen's implementation.
-#' The highly optimised one-dimensional counterpart, \code{weightedEL0}, is designed to return a faster
+#' The highly optimised one-dimensional counterpart, \code{EL0}, is designed to return a faster
 #' and a more accurate solution in the one-dimensional case.
 #'
 #' @param z A numeric vector or a matrix with one data vector per column.
@@ -478,14 +489,14 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
 #' @references
 #' \insertAllCited{}
 #'
-#' @seealso [logTaylor()], [weightedEL0()]
+#' @seealso [logTaylor()], [EL0()]
 #'
 #' @examples
 #' earth <- c(
 #'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 #' )
-#' weightedEL(earth, mu = 5.517, verbose = TRUE) # 5.517 is the modern accepted value
+#' EL(earth, mu = 5.517, verbose = TRUE) # 5.517 is the modern accepted value
 #'
 #' # Linear regression through empirical likelihood
 #' coef.lm <- coef(lm(mpg ~ hp + am, data = mtcars))
@@ -495,20 +506,20 @@ weightedEL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = 
 #'   resid <- y - drop(x %*% par)   # must be 0
 #'   resid * x
 #' }
-#' minusEL <- function(par) -weightedEL(foc.lm(par, xmat, yvec), itermax = 10)$logelr
+#' minusEL <- function(par) -EL(foc.lm(par, xmat, yvec), itermax = 10)$logelr
 #' coef.el <- optim(c(mean(yvec), 0, 0), minusEL)$par
 #' abs(coef.el - coef.lm) / coef.lm  # Relative difference
 #'
 #' # Likelihood ratio testing without any variance estimation
 #' # Define the profile empirical likelihood for the coefficient on am
 #' minusPEL <- function(par.free, par.am)
-#'   -weightedEL(foc.lm(c(par.free, par.am), xmat, yvec), itermax = 20)$logelr
+#'   -EL(foc.lm(c(par.free, par.am), xmat, yvec), itermax = 20)$logelr
 #' # Constrained maximisation assuming that the coef on par.am is 3.14
 #' coef.el.constr <- optim(coef.el[1:2], minusPEL, par.am = 3.14)$par
-#' print(-2 * weightedEL(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
+#' print(-2 * EL(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
 #' # Exceeds the critical value qchisq(0.95, df = 1)
 #' @export
-weightedEL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
+EL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
                        return.weights = FALSE, lower = NULL, upper = NULL,
                        order = 4L, weight.tolerance = NULL,
                        thresh = 1e-16, itermax = 100L, verbose = FALSE,
@@ -537,23 +548,23 @@ weightedEL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
   }
   if (sum(ct) <= 0) stop("Total weight must be positive.")
 
-  weightedELCPP(z = z, ct = ct, mu = mu, lambda_init = lambda.init,
-                return_weights = return.weights, lower = lower, upper = upper,
-                order = order, weight_tolerance = weight.tolerance, thresh = thresh,
-                itermax = itermax, verbose = verbose,
-                alpha = alpha, beta = beta, backeps = backeps)
+  ELCPP(z = z, ct = ct, mu = mu, lambda_init = lambda.init,
+        return_weights = return.weights, lower = lower, upper = upper,
+        order = order, weight_tolerance = weight.tolerance, thresh = thresh,
+        itermax = itermax, verbose = verbose,
+        alpha = alpha, beta = beta, backeps = backeps)
 }
 
 #' Compute empirical likelihood on a trajectory
 #'
-#' @param z Passed to \code{weightedEL}.
-#' @param ct Passed to \code{weightedEL}.
+#' @param z Passed to \code{EL}.
+#' @param ct Passed to \code{EL}.
 #' @param mu0 Starting point of trajectory
 #' @param mu1 End point of trajectory
 #' @param N Number of segments into which the path is split (i. e. \code{N+1} steps are used).
 #' @param verbose Logical: report iteration data?
 #' @param verbose.solver Logical: report internal iteration data from the optimiser? Very verbose.
-#' @param ... Passed to \code{weightedEL}.
+#' @param ... Passed to \code{EL}.
 #'
 #' This function does not accept the starting lambda because it is much faster (3--5 times)
 #' to reuse the lambda from the previous iteration.
@@ -567,7 +578,7 @@ weightedEL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
 #'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 #' )
-#' weightedEL(earth, mu = 5.1,  verbose = TRUE)
+#' EL(earth, mu = 5.1,  verbose = TRUE)
 #' logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 55, verbose = TRUE)
 #' hist(earth, breaks = seq(4.75, 6, 1/8))
 #' plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
@@ -589,7 +600,7 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
   for (i in 0:N) {
     mui <- (i*mu1 + (N-i)*mu0) / N
     if (i > 0) lam0 <- if (all(is.finite(x$lam))) drop(x$lam) else NULL
-    x <- weightedEL(z = z, ct = ct, mu = mui, lambda.init = lam0, verbose = verbose.solver, ...)
+    x <- EL(z = z, ct = ct, mu = mui, lambda.init = lam0, verbose = verbose.solver, ...)
     m[i+1, ] <- mui
     l[i+1, ] <- x$lam
     elr[i+1] <- x$logelr
@@ -610,7 +621,7 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' @param z Numeric data vector.
 #' @param vt Numeric vector: non-negative variance weights for estimating the conditional
 #'   variance of \code{z}. Probabilities are returned only for the observations where \code{vt > 0}.
-#' @inheritParams weightedEL0
+#' @inheritParams EL0
 #' @param chull.diag Logical: if \code{TRUE}, checks if there is a definite convex hull failure
 #'   in at least one dimension (\code{mu} being smaller than the smallest or larger
 #'   than the largest element). Note that it does not check if \code{mu} is strictly in the
@@ -629,8 +640,8 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' estimator is the CUE-GMM estimator: a quadratic form in which the unconditional
 #' mean vector is weighted by the inverse of the unconditional variance.
 #'
-#' @return A list with the same structure as that in [weightedEL()].
-#' @seealso [weightedEL()]
+#' @return A list with the same structure as that in [EL()].
+#' @seealso [EL()]
 #' @export
 #'
 #' @references
@@ -640,11 +651,11 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' set.seed(1)
 #' z <- cbind(rnorm(10), runif(10))
 #' colMeans(z)
-#' a <- weightedEuL(z, return.weights = TRUE)
+#' a <- EuL(z, return.weights = TRUE)
 #' a$wts
 #' sum(a$wts)  # Unity
 #' colSums(a$wts * z)  # Zero
-weightedEuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
+EuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
                         SEL = TRUE,
                         weight.tolerance = NULL, trunc.to = 0,
                         return.weights = FALSE, verbose = FALSE, chull.diag = FALSE
@@ -659,9 +670,9 @@ weightedEuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
   n.orig <- n
   if (is.null(weight.tolerance))
     weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
-  ret <- weightedEuLCPP(z = z, mu = mu, ct = ct, vt = vt, shift = shift, n_orig = n.orig,
-                        weight_tolerance = weight.tolerance, trunc_to = trunc.to, SEL = SEL,
-                        return_weights = return.weights, verbose = verbose, chull_diag = chull.diag)
+  ret <- EuLCPP(z = z, mu = mu, ct = ct, vt = vt, shift = shift, n_orig = n.orig,
+                weight_tolerance = weight.tolerance, trunc_to = trunc.to, SEL = SEL,
+                return_weights = return.weights, verbose = verbose, chull_diag = chull.diag)
   if (return.weights && !is.null(nz <- rownames(z))) names(ret$wts) <- nz
   return(ret)
 }

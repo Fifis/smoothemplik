@@ -11,6 +11,53 @@ Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
 Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
+// ELCPP
+List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper, int order, double weight_tolerance, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps);
+RcppExport SEXP _smoothemplik_ELCPP(SEXP zSEXP, SEXP ctSEXP, SEXP muSEXP, SEXP lambda_initSEXP, SEXP return_weightsSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP orderSEXP, SEXP weight_toleranceSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type z(zSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type ct(ctSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type lambda_init(lambda_initSEXP);
+    Rcpp::traits::input_parameter< bool >::type return_weights(return_weightsSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type lower(lowerSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type upper(upperSEXP);
+    Rcpp::traits::input_parameter< int >::type order(orderSEXP);
+    Rcpp::traits::input_parameter< double >::type weight_tolerance(weight_toleranceSEXP);
+    Rcpp::traits::input_parameter< double >::type thresh(threshSEXP);
+    Rcpp::traits::input_parameter< int >::type itermax(itermaxSEXP);
+    Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
+    Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
+    Rcpp::traits::input_parameter< double >::type beta(betaSEXP);
+    Rcpp::traits::input_parameter< double >::type backeps(backepsSEXP);
+    rcpp_result_gen = Rcpp::wrap(ELCPP(z, ct, mu, lambda_init, return_weights, lower, upper, order, weight_tolerance, thresh, itermax, verbose, alpha, beta, backeps));
+    return rcpp_result_gen;
+END_RCPP
+}
+// EuLCPP
+List EuLCPP(const arma::mat& z, arma::vec mu, arma::vec ct, arma::vec vt, arma::vec shift, const double n_orig, const double weight_tolerance, const double trunc_to, const bool SEL, const bool return_weights, const bool verbose, const bool chull_diag);
+RcppExport SEXP _smoothemplik_EuLCPP(SEXP zSEXP, SEXP muSEXP, SEXP ctSEXP, SEXP vtSEXP, SEXP shiftSEXP, SEXP n_origSEXP, SEXP weight_toleranceSEXP, SEXP trunc_toSEXP, SEXP SELSEXP, SEXP return_weightsSEXP, SEXP verboseSEXP, SEXP chull_diagSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type ct(ctSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type vt(vtSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type shift(shiftSEXP);
+    Rcpp::traits::input_parameter< const double >::type n_orig(n_origSEXP);
+    Rcpp::traits::input_parameter< const double >::type weight_tolerance(weight_toleranceSEXP);
+    Rcpp::traits::input_parameter< const double >::type trunc_to(trunc_toSEXP);
+    Rcpp::traits::input_parameter< const bool >::type SEL(SELSEXP);
+    Rcpp::traits::input_parameter< const bool >::type return_weights(return_weightsSEXP);
+    Rcpp::traits::input_parameter< const bool >::type verbose(verboseSEXP);
+    Rcpp::traits::input_parameter< const bool >::type chull_diag(chull_diagSEXP);
+    rcpp_result_gen = Rcpp::wrap(EuLCPP(z, mu, ct, vt, shift, n_orig, weight_tolerance, trunc_to, SEL, return_weights, verbose, chull_diag));
+    return rcpp_result_gen;
+END_RCPP
+}
 // brentMinCPP
 Rcpp::List brentMinCPP(Function f, NumericVector interval, double lower, double upper, double tol, int maxiter, int trace);
 RcppExport SEXP _smoothemplik_brentMinCPP(SEXP fSEXP, SEXP intervalSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP tolSEXP, SEXP maxiterSEXP, SEXP traceSEXP) {
@@ -295,57 +342,12 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// weightedELCPP
-List weightedELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper, int order, double weight_tolerance, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps);
-RcppExport SEXP _smoothemplik_weightedELCPP(SEXP zSEXP, SEXP ctSEXP, SEXP muSEXP, SEXP lambda_initSEXP, SEXP return_weightsSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP orderSEXP, SEXP weight_toleranceSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericMatrix >::type z(zSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type ct(ctSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type lambda_init(lambda_initSEXP);
-    Rcpp::traits::input_parameter< bool >::type return_weights(return_weightsSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type lower(lowerSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type upper(upperSEXP);
-    Rcpp::traits::input_parameter< int >::type order(orderSEXP);
-    Rcpp::traits::input_parameter< double >::type weight_tolerance(weight_toleranceSEXP);
-    Rcpp::traits::input_parameter< double >::type thresh(threshSEXP);
-    Rcpp::traits::input_parameter< int >::type itermax(itermaxSEXP);
-    Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
-    Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
-    Rcpp::traits::input_parameter< double >::type beta(betaSEXP);
-    Rcpp::traits::input_parameter< double >::type backeps(backepsSEXP);
-    rcpp_result_gen = Rcpp::wrap(weightedELCPP(z, ct, mu, lambda_init, return_weights, lower, upper, order, weight_tolerance, thresh, itermax, verbose, alpha, beta, backeps));
-    return rcpp_result_gen;
-END_RCPP
-}
-// weightedEuLCPP
-List weightedEuLCPP(const arma::mat& z, arma::vec mu, arma::vec ct, arma::vec vt, arma::vec shift, const double n_orig, const double weight_tolerance, const double trunc_to, const bool SEL, const bool return_weights, const bool verbose, const bool chull_diag);
-RcppExport SEXP _smoothemplik_weightedEuLCPP(SEXP zSEXP, SEXP muSEXP, SEXP ctSEXP, SEXP vtSEXP, SEXP shiftSEXP, SEXP n_origSEXP, SEXP weight_toleranceSEXP, SEXP trunc_toSEXP, SEXP SELSEXP, SEXP return_weightsSEXP, SEXP verboseSEXP, SEXP chull_diagSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const arma::mat& >::type z(zSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type ct(ctSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type vt(vtSEXP);
-    Rcpp::traits::input_parameter< arma::vec >::type shift(shiftSEXP);
-    Rcpp::traits::input_parameter< const double >::type n_orig(n_origSEXP);
-    Rcpp::traits::input_parameter< const double >::type weight_tolerance(weight_toleranceSEXP);
-    Rcpp::traits::input_parameter< const double >::type trunc_to(trunc_toSEXP);
-    Rcpp::traits::input_parameter< const bool >::type SEL(SELSEXP);
-    Rcpp::traits::input_parameter< const bool >::type return_weights(return_weightsSEXP);
-    Rcpp::traits::input_parameter< const bool >::type verbose(verboseSEXP);
-    Rcpp::traits::input_parameter< const bool >::type chull_diag(chull_diagSEXP);
-    rcpp_result_gen = Rcpp::wrap(weightedEuLCPP(z, mu, ct, vt, shift, n_orig, weight_tolerance, trunc_to, SEL, return_weights, verbose, chull_diag));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 RcppExport SEXP run_testthat_tests(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_smoothemplik_ELCPP", (DL_FUNC) &_smoothemplik_ELCPP, 15},
+    {"_smoothemplik_EuLCPP", (DL_FUNC) &_smoothemplik_EuLCPP, 12},
     {"_smoothemplik_brentMinCPP", (DL_FUNC) &_smoothemplik_brentMinCPP, 7},
     {"_smoothemplik_brentZeroCPP", (DL_FUNC) &_smoothemplik_brentZeroCPP, 10},
     {"_smoothemplik_dampedNewtonCPP", (DL_FUNC) &_smoothemplik_dampedNewtonCPP, 8},
@@ -364,8 +366,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_smoothemplik_getParabola3CPP", (DL_FUNC) &_smoothemplik_getParabola3CPP, 2},
     {"_smoothemplik_getParabolaCPP", (DL_FUNC) &_smoothemplik_getParabolaCPP, 4},
     {"_smoothemplik_svdlmCPP", (DL_FUNC) &_smoothemplik_svdlmCPP, 4},
-    {"_smoothemplik_weightedELCPP", (DL_FUNC) &_smoothemplik_weightedELCPP, 15},
-    {"_smoothemplik_weightedEuLCPP", (DL_FUNC) &_smoothemplik_weightedEuLCPP, 12},
     {"run_testthat_tests",         (DL_FUNC) &run_testthat_tests,         1},
     {NULL, NULL, 0}
 };

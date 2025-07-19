@@ -81,12 +81,14 @@ w   <- kernelWeights(x, g, bw = 2, kernel = "triangular")
 wsp <- kernelWeights(x, g, bw = 2, kernel = "triangular", sparse = TRUE)
 print(c(object.size(w), object.size(wsp)) / 1024) # Kilobytes used
 image(g, x, w)
-all.equal(w[, 1, drop = FALSE],  # Internal calculation for one column
-          smoothemplik:::kernelFunCPP((g - x[1])/2, "triangular", 2, FALSE))
+all.equal(w[, 1],  # Internal calculation for one column
+            kernelFun((g - x[1])/2, "triangular", 2, FALSE))
 
 # Bare-bones interface to the C++ functions
-x <- seq(-3, 3, 0.01)
-kmat <- sapply(c("uniform", "triangular", "epanechnikov", "quartic", "gaussian"),
-               function(k) smoothemplik:::kernelFunCPP(x, k, 4, TRUE))
-matplot(x, kmat, type = "l", lty = 1)
+# Example: 4th-order convolution kernels
+x <- seq(-3, 5, length.out = 301)
+ks <- c("uniform", "triangular", "epanechnikov", "quartic", "gaussian")
+kmat <- sapply(ks, function(k) kernelFun(x, k, 4, TRUE))
+matplot(x, kmat, type = "l", lty = 1, bty = "n", lwd = 2)
+legend("topright", ks, col = 1:5, lwd = 2)
 }
