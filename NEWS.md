@@ -3,7 +3,6 @@
 These bug fixes and features are scheduled for the upcoming releases.
 
 - BUG: Fix the DCV code with convolutions (especially the quartic one)
-- BUG: If `x` contains duplicates, `DCV(x, bw = bw.grid, weights = w)` complains that no duplicates were found (see the example)
 - BUG: LOO estimation: instead of dropping unique (X, Y) observations, leave each conditioning points (only X)
 - BUG: Fix the optimiser control argument in `bw.CV()`, add `log()` for non-negativity and better scaling.
 - SYNTAX: `kernelSmooth()`, being a local average, should have `na.rm` and check the inputs

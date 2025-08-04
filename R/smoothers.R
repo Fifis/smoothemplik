@@ -970,8 +970,8 @@ kernelMixedSmooth <- function(x, y, by, xout = NULL, byout = NULL, weights = NUL
 #' @export
 #' @examples
 #' set.seed(1)
-#' x <- rlnorm(100)
-#' bws <- exp(seq(-2, 1.5, 0.1))
+#' x <- rlnorm(100); x <- c(x[1], x)  # x with 1 duplicate
+#' bws <- exp(seq(-3, 0.5, 0.1))
 #' plot(bws, DCV(x, bws), log = "x", bty = "n", main = "Density CV")
 DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order = 2,
                 PIT = FALSE, chunks = 0, no.dedup = FALSE) {
@@ -1000,7 +1000,7 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
     if (!one.dim && length(b) == 1) b <- rep(b, ncol(x))
     # No PIT here because arg$x is already transformed
     # Term 1: int ^f(x)^2 dx
-    KK <- kernelWeights(x = arg$x, bw = b, kernel = arg$kernel, order = arg$order, convolution = TRUE, deduplicate.x = arg$deduplicate.x)
+    KK <- kernelWeights(x = arg$x, bw = b, kernel = arg$kernel, order = arg$order, convolution = TRUE, no.dedup = TRUE)
     KK <- sweep(KK, 2, arg$weights, "*")
     pb <- prod(b)
     term1 <- sum(KK) / (n^2 * pb)
@@ -1011,7 +1011,7 @@ DCV <- function(x, bw, weights = NULL, same = FALSE, kernel = "gaussian", order 
     # fhat_i(X[i]) = n/(n-1) fhat(X[i]) - K(0) / prod(b) / (n-1)
     # n-1 gets replaced with n - w[i] in case of weights
     K0   <- as.numeric(kernelWeights(x = matrix(0, ncol = length(b)), bw = b, kernel = arg$kernel, order = arg$order, no.dedup = TRUE))
-    fhat <- kernelDensity(x = arg$x, weights = arg$weights, bw = b, kernel = arg$kernel, order = arg$order, chunks = chunks, deduplicate.x = arg$deduplicate.x)
+    fhat <- kernelDensity(x = arg$x, weights = arg$weights, bw = b, kernel = arg$kernel, order = arg$order, chunks = chunks, no.dedup = TRUE)
     fhat.LOO <- (n*fhat - K0/pb) / (n - arg$weights)
     term2 <- -2 * mean(fhat.LOO)
     return(term1 + term2)
@@ -1180,7 +1180,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   f.to.min <- function(b) {
     if (verbose) print(b)
     if (isTRUE(any(b <= ndeps))) return(if (method == "L-BFGS-B") sqrt(.Machine$double.xmax) else Inf)
-    ret <- if (is.null(y)) do.call(DCV, c(arg.list, list(b = b))) else do.call(LSCV, c(arg.list, list(b = b)))
+    ret <- if (CV == "DCV") do.call(DCV, c(arg.list, list(b = b))) else do.call(LSCV, c(arg.list, list(b = b)))
     if (method == "L-BFGS-B") ret[!is.finite(ret)] <- sqrt(.Machine$double.xmax)
     return(ret)
   }
