@@ -400,11 +400,12 @@ arma::mat kernelWeightsOneCPP(arma::vec x, arma::vec xout, arma::vec bw, std::st
   // Rcout << "ngrid: " << ng << ", nbw: " << nb << "\n";
   if (nb != ng)
     Rcpp::stop("kernelWeightsOneCPP: bw and xout must have the same length.");
-  // arma::vec xs = x / bw; // Scaling by the bandwidth
-  // arma::vec gs = xout / bw;
+
   const arma::vec inv_bw = 1.0 / bw;
   arma::mat kw(ng, nx);
 
+  // There is no benefit to relying on the kernel symmetry because accessing the matrix columns or rows for copying
+  // is slower than doing highly optimised arithmetic
   for (arma::uword i = 0; i < nx; i++)
     kw.col(i) = kernelFunCPP((xout - x[i]) % inv_bw, kernel, order, convolution);
 

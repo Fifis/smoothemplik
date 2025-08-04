@@ -24,9 +24,10 @@
 #'   (spanning condition does not hold). \code{"taylor"} creates a Taylor approximation
 #'   of the log-ELR function near the ends of the sample. \code{"wald"} smoothly transitions
 #'   between the log-ELR function into -0.5 * the Wald statistic for the weighted mean of \code{z}.
-#'   \code{"adjusted"} invokes the method of \insertCite{chen2008adjusted}{smoothemplik}, and
-#'   \code{"balanced"} calls the method of \insertCite{emerson2009calibration}{smoothemplik},
-#'   which is an improvement of the former.
+#'   \code{"adjusted"} invokes the method of \insertCite{chen2008adjusted}{smoothemplik},
+#'   where an extra observation is added to ensure that the convex hull contains the mean, and
+#'   \code{"balanced"} calls the method of \insertCite{emerson2009calibration}{smoothemplik}
+#'   and \insertCite{liu2010adjusted}{smoothemplik} with two extra points.
 #' @param uniroot.control A list passed to the \code{brentZero}.
 #' @param verbose Logical: if \code{TRUE}, prints warnings.
 #'
