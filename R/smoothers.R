@@ -405,6 +405,19 @@ kernelWeights <- function(x,
 }
 
 
+checkDupStat <- function(ds, thresh = 0.1) {
+  # Here, isTRUE is needed because without de-duplication, the values of ds are NA
+  if (isTRUE(sum(ds[1:2]) == 0) & sum(ds[3:4]) > 0.1) {  # Only substantial slow-downs are reported
+    message("No duplicates found in input 'x' and 'xout'. Consider setting 'no.dedup = TRUE' to eliminate the overhead (> 100 ms).")
+  } else if (isTRUE(ds[1] == 0) & ds[3] > 0.1) {
+    message("No duplicates found in input 'x'. Consider setting 'deduplicate.x = FALSE' to eliminate the overhead (> 100 ms).")
+  } else if (isTRUE(ds[2] == 0) & ds[4] > 0.1) {
+    message("No duplicates found in input 'xout'. Consider setting 'deduplicate.xout = FALSE' to eliminate the overhead (> 100 ms).")
+  }
+  return(NULL)
+}
+
+
 #' Kernel density estimation
 #'
 #' @inheritParams kernelWeights
@@ -480,10 +493,7 @@ kernelDensity <- function(x,
     if (return.grid) result <- result[arg$xout.matches, ] else result <- result[arg$xout.matches]
   }
   ds <- c(arg$duplicate.stats, seconds.density = as.numeric(difftime(Sys.time(), tic0, units = "secs")))
-  # Here, isTRUE is needed because without de-duplication, the values of ds are NA
-  if (isTRUE(sum(ds[1:2]) == 0)) message("No duplicates found in input 'x' and 'xout'. Consider setting no.dedup = TRUE to eliminate the overhead.") else
-    if (isTRUE(ds[1] == 0)) message("No duplicates found in input 'x'. Consider setting deduplicate.x = FALSE to eliminate the overhead.") else
-      if (isTRUE(ds[2] == 0)) message("No duplicates found in input 'xout', consider setting deduplicate.xout = FALSE to eliminate the overhead.")
+  checkDupStat(ds)
   attr(result, "duplicate.stats") <- ds
   return(result)
 }
@@ -531,12 +541,12 @@ kernelDensity <- function(x,
 #' y <- f(x) + rt(n, df = 4)
 #' # 3 estimators: locally constant + 2nd-order kernel,
 #' # locally constant + 4th-order kernel, locally linear robust
-#' b2lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic", deduplicate.x = FALSE)
+#' b2lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic")
 #'                          + 0.8)
 #' b4lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic", order = 4,
-#'               try.grid = FALSE, start.bw = 3, deduplicate.x = FALSE) + 1)
+#'               try.grid = FALSE, start.bw = 3) + 1)
 #' b2ll <- bw.CV(x, y = y, kernel = "quartic", degree = 1, robust.iterations = 1,
-#'               try.grid = FALSE, start.bw = 3, verbose = TRUE, deduplicate.x = FALSE)
+#'               try.grid = FALSE, start.bw = 3, verbose = TRUE)
 #' m2lc <- kernelSmooth(x, y, g, bw = b2lc, kernel = "quartic", no.dedup = TRUE)
 #' m4lc <- kernelSmooth(x, y, g, bw = b4lc, kernel = "quartic", order = 4, no.dedup = TRUE)
 #' m2ll <- kernelSmooth(x, y, g, bw = b2ll, kernel = "quartic",
@@ -697,10 +707,7 @@ kernelSmooth <- function(x, y, xout = NULL, weights = NULL,
 
   # De-duplication summary
   ds <- c(arg$duplicate.stats, seconds.smoother = as.numeric(difftime(Sys.time(), tic0, units = "secs")))
-  # Here, isTRUE is needed because without de-duplication, the values of ds are NA
-  if (isTRUE(sum(ds[1:2]) == 0)) message("No duplicates found in input 'x' and 'xout'. Consider setting no.dedup = TRUE to eliminate the overhead.") else
-    if (isTRUE(ds[1] == 0)) message("No duplicates found in input 'x'. Consider setting deduplicate.x = FALSE to eliminate the overhead.") else
-      if (isTRUE(ds[2] == 0)) message("No duplicates found in input 'xout', consider setting deduplicate.xout = FALSE to eliminate the overhead.")
+  checkDupStat(ds)
 
   if (return.grid) result <- cbind(xout, mu = result)
   if (arg$deduplicate.xout) { # If de-duplication was done
@@ -1127,7 +1134,6 @@ LSCV <- function(x, y, bw, weights = NULL, same = FALSE, degree = 0, kernel = "g
 #' @param verbose Logical: print out the optimiser return code for diagnostics?
 #' @param attach.attributes Logical: if TRUE, returns the output of `optim()` for diagnostics.
 #' @param control List: extra arguments to pass to the control-argument list of `optim`.
-#' @param ... Other parameters passed to the optimiser (e.g. `lower` for `"L-BFGS-B"`).
 #'
 #' @return Numeric vector or scalar of the optimal bandwidth.
 #' @export
@@ -1163,9 +1169,7 @@ bw.CV <- function(x, y = NULL, weights = NULL,
                   start.bw = NULL, same = FALSE,
                   tol = 1e-4, try.grid = TRUE, ndeps = 1e-5,
                   verbose = FALSE, attach.attributes = FALSE,
-                  control = list(),
-                  ...) {
-  dot.args <- list(...)
+                  control = list()) {
   CV <- if (!is.null(y)) "LSCV" else "DCV"
   arg <- prepareKernel(x = x, y = y, weights = weights, bw = 1,
                         # The value '1' skips the bw length check
@@ -1175,13 +1179,10 @@ bw.CV <- function(x, y = NULL, weights = NULL,
                    chunks = chunks, same = same) # Processed data to pass further
   if (CV == "LSCV") arg.list <- c(arg.list, list(y = arg$y), degree = degree, robust.iterations = robust.iterations)
 
-  ctrl <- dot.args[["control"]]
-  method <- if (is.null(dot.args[["method"]])) "BFGS" else dot.args[["method"]]
   f.to.min <- function(b) {
     if (verbose) print(b)
-    if (isTRUE(any(b <= ndeps))) return(if (method == "L-BFGS-B") sqrt(.Machine$double.xmax) else Inf)
+    if (isTRUE(any(b <= ndeps))) return(Inf)
     ret <- if (CV == "DCV") do.call(DCV, c(arg.list, list(b = b))) else do.call(LSCV, c(arg.list, list(b = b)))
-    if (method == "L-BFGS-B") ret[!is.finite(ret)] <- sqrt(.Machine$double.xmax)
     return(ret)
   }
 
@@ -1189,12 +1190,10 @@ bw.CV <- function(x, y = NULL, weights = NULL,
   xgaps <- apply(arg$x, 2, function(a) max(diff(sort(a))))
   if (verbose) cat("Rule-of-thumb bw: (", paste0(start.bw, collapse = ", "), "); max. gap between obs.: (",
                    paste0(xgaps, collapse = ", "), "). Taking the maximum as the starting point.\n", sep = "")
-  start.bw <- pmax(start.bw, xgaps * (1 + 1e-8))
+  start.bw <- pmax(start.bw, xgaps * (1 + 1e-3))
   if (same && ncol(arg$x) > 1) start.bw <- stats::quantile(start.bw, 0.75) # To the over-smoothing side
 
-  optim.control <- switch(method, BFGS = list(reltol = tol, REPORT = 1, trace = if (verbose) 2 else 0, ndeps = rep(ndeps, length(start.bw))),
-                          `L-BFGS-B` = list(factr = tol / .Machine$double.eps, REPORT = 1, trace = if (verbose) 5 else 0, ndeps = rep(ndeps, length(start.bw))))
-  if (!is.null(ctrl)) optim.control[names(ctrl)] <- ctrl
+  optim.control <- list(reltol = tol, REPORT = 1, trace = if (verbose) 2 else 0, ndeps = rep(ndeps, length(start.bw)))
   start.bw <- unname(start.bw) # For proper handling of named arguments inside do.call
   f0 <- suppressWarnings(f.to.min(start.bw))
   # A quick grid search to avoid multi-modality
@@ -1218,17 +1217,17 @@ bw.CV <- function(x, y = NULL, weights = NULL,
       if (is.finite(f0)) break
     }
   }
-  opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min,
-                           lower = if (method %in% c("L-BFGS-B", "Brent")) xgaps * (1 + 1e-8) else -Inf,
-                           method = method, control = optim.control)
-                           , error = function(e) return(e))
+  opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = "BFGS", control = optim.control),
+                         error = function(e) return(e))
   if (inherits(opt.result, "error")) {
     if (grepl("non-finite finite-difference", opt.result$message)) {
       warning("CV gradient could not be computed (initial bw at the boundary? the optimiser tries strange values?). Retrying optimisation with the Nelder-Mead method.")
     } else {
       warning("Generic optimiser error. Retrying optimisation with the Nelder-Mead method.")
     }
-    opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = "Nelder-Mead", control = optim.control), error = function(e) return(e))
+    opt.result <- tryCatch(stats::optim(par = start.bw, fn = f.to.min, method = "Nelder-Mead",
+                                        control = list(reltol = tol, REPORT = 1, trace = if (verbose) 2 else 0), warn.1d.NelderMead = FALSE),
+                           error = function(e) return(e))
   }
   if (inherits(opt.result, "error")) {
     warning(paste0("'optim' failed to optimise the bandwidth. Returning a very rough rule-of-thumb value. Reason: ",

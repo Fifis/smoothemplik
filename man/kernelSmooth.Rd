@@ -121,12 +121,12 @@ f <- function(x) 1 + x + sin(x) # True E(Y | X) = f(X)
 y <- f(x) + rt(n, df = 4)
 # 3 estimators: locally constant + 2nd-order kernel,
 # locally constant + 4th-order kernel, locally linear robust
-b2lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic", deduplicate.x = FALSE)
+b2lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic")
                          + 0.8)
 b4lc <- suppressWarnings(bw.CV(x, y = y, kernel = "quartic", order = 4,
-              try.grid = FALSE, start.bw = 3, deduplicate.x = FALSE) + 1)
+              try.grid = FALSE, start.bw = 3) + 1)
 b2ll <- bw.CV(x, y = y, kernel = "quartic", degree = 1, robust.iterations = 1,
-              try.grid = FALSE, start.bw = 3, verbose = TRUE, deduplicate.x = FALSE)
+              try.grid = FALSE, start.bw = 3, verbose = TRUE)
 m2lc <- kernelSmooth(x, y, g, bw = b2lc, kernel = "quartic", no.dedup = TRUE)
 m4lc <- kernelSmooth(x, y, g, bw = b4lc, kernel = "quartic", order = 4, no.dedup = TRUE)
 m2ll <- kernelSmooth(x, y, g, bw = b2ll, kernel = "quartic",

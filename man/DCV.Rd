@@ -60,7 +60,7 @@ Density cross-validation
 }
 \examples{
 set.seed(1)
-x <- rlnorm(100)
-bws <- exp(seq(-2, 1.5, 0.1))
+x <- rlnorm(100); x <- c(x[1], x)  # x with 1 duplicate
+bws <- exp(seq(-3, 0.5, 0.1))
 plot(bws, DCV(x, bws), log = "x", bty = "n", main = "Density CV")
 }

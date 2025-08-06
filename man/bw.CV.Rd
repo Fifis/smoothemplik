@@ -21,8 +21,7 @@ bw.CV(
   ndeps = 1e-05,
   verbose = FALSE,
   attach.attributes = FALSE,
-  control = list(),
-  ...
+  control = list()
 )
 }
 \arguments{
@@ -71,8 +70,6 @@ cannot be less than this value.}
 \item{attach.attributes}{Logical: if TRUE, returns the output of `optim()` for diagnostics.}
 
 \item{control}{List: extra arguments to pass to the control-argument list of `optim`.}
-
-\item{...}{Other parameters passed to the optimiser (e.g. `lower` for `"L-BFGS-B"`).}
 }
 \value{
 Numeric vector or scalar of the optimal bandwidth.
