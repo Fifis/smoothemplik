@@ -69,7 +69,8 @@ struct KernelSmoothWorker : public RcppParallel::Worker {
   void operator()(std::size_t begin, std::size_t end) {
     for (std::size_t j = begin; j < end; j++) {
       arma::mat xsubgrid = xout.rows(starts[j], ends[j]);
-      arma::mat kw = kernelWeightsCPP(x, xsubgrid, bw, kernel, order, convolution);
+      arma::mat bwsub = bw.rows(starts[j], ends[j]);
+      arma::mat kw = kernelWeightsCPP(x, xsubgrid, bwsub, kernel, order, convolution);
       kw.each_row() %= weights.t();
       if (LOO) { // LOO: being careful because this matrix is not square
         for (arma::uword k=starts[j]; k <= ends[j]; k++) { // Note the <= !

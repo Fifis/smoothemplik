@@ -47,3 +47,18 @@ test_that("prediction on arbitrary grids works", {
   expect_gt(var(yhat0), var(yhat1))
 })
 
+test_that("chunking for smoothing works", {
+  set.seed(1)
+  x <- rnorm(1000)
+  y <- 1 + rt(1000, df = 2)
+  xgrid <- seq(-1.5, 1.5, 0.05)
+  yhat0 <- kernelSmooth(x, y, xgrid, bw = 0.5, no.dedup = TRUE, chunks = 1)
+  yhat1 <- kernelSmooth(x, y, xgrid, bw = 0.5, no.dedup = TRUE, chunks = 2)
+  expect_identical(as.numeric(yhat0), as.numeric(yhat1))
+
+  # Now a slightly more difficult case -- LOO
+  yhat2 <- kernelSmooth(x, y, bw = 0.5, no.dedup = TRUE, LOO = TRUE, chunks = 1)
+  yhat3 <- kernelSmooth(x, y, bw = 0.5, no.dedup = TRUE, LOO = TRUE, chunks = 2)
+  expect_identical(as.numeric(yhat2), as.numeric(yhat3))
+})
+
