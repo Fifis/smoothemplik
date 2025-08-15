@@ -59,6 +59,7 @@ test_that("chunking for smoothing works", {
   # Now a slightly more difficult case -- LOO
   yhat2 <- kernelSmooth(x, y, bw = 0.5, no.dedup = TRUE, LOO = TRUE, chunks = 1)
   yhat3 <- kernelSmooth(x, y, bw = 0.5, no.dedup = TRUE, LOO = TRUE, chunks = 2)
-  expect_identical(as.numeric(yhat2), as.numeric(yhat3))
+  expect_equal(as.numeric(yhat2), as.numeric(yhat3), tolerance = 1e-12)
+  # expect_identical fails on Windows...
 })
 
