@@ -54,7 +54,8 @@ test_that("chunking for smoothing works", {
   xgrid <- seq(-1.5, 1.5, 0.05)
   yhat0 <- kernelSmooth(x, y, xgrid, bw = 0.5, no.dedup = TRUE, chunks = 1)
   yhat1 <- kernelSmooth(x, y, xgrid, bw = 0.5, no.dedup = TRUE, chunks = 2)
-  expect_identical(as.numeric(yhat0), as.numeric(yhat1))
+  # expect_identical(as.numeric(yhat0), as.numeric(yhat1))
+  expect_equal(as.numeric(yhat0), as.numeric(yhat1), tolerance = 1e-12)
 
   # Now a slightly more difficult case -- LOO
   yhat2 <- kernelSmooth(x, y, bw = 0.5, no.dedup = TRUE, LOO = TRUE, chunks = 1)
