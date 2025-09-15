@@ -191,7 +191,10 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
   # Handling AEL and BAEL at the very end is correct because the formulae are simpler
   if (chull.fail %in% c("adjusted", "balanced")) {
     an <- computeBartlett(z) * 0.5  # Unweighted -- because there is no theory on weighted AEL
-    if (an < 0) stop("EL0: Bartlett factor a_n < 0 -- please report this bug on GitHub.")
+    if (an < 0) {
+      stop("EL0: Bartlett factor a_n < 0 -- please report this bug on GitHub. Problematic z: ",
+           paste0(z, collapse = ","))
+    }
     zbar <- trimmed.weighted.mean(z, trim = 0.1, w = ct)
     if (chull.fail == "adjusted") {
       z <- c(z, -zbar * an)
@@ -286,8 +289,12 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
       if (ma == 0) ma <- stats::IQR(z)
       if (ma == 0) ma <- stats::sd(z)
       if (ma == 0) stop("No variability in remaining 'z', calculations impossible.")
-      if (mean(sign(zu)) == 0) {  # There are two unique points?
-        stop("Error checking the signs of the data for correct extrapolation. Please report this bug.")
+      if (mean(sign(zu)) == 0) {  # The unique points are symmetric in count and in sign
+      #   stop("Error checking the signs of the data for correct extrapolation. Please report this bug. Problematic z: ",
+      #        paste0(z, collapse = ","), ", unique values: ", paste0(zu, collapse = ","), ".")
+      # There is no need to trim it. Imagine this configuration: [-0.2, 0.02] --
+      # then mu.limit = -0.002
+      # TODO: test with 2 points and remove this check
       }
       # Anchor the parabola at the end that is closest to 0 after the (possible) sign flip
       mu.limit <- if (abs(mu.llimit) < abs(mu.rlimit)) mu.llimit else mu.rlimit
