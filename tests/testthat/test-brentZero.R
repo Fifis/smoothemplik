@@ -13,17 +13,17 @@ test_that("brentZero works well for good inputs", {
   # xroot <- brentZero(f, c(9, 10), extendInt = "yes", trace = 2)
   # TODO: "downX" does not work here!
 
-  expect_equal(unname(unlist(brentZero(function(x) x-1, c(0, 1)))), c(1, 0, 0, 0, 0))
+  expect_equal(unname(unlist(brentZero(function(x) x-1, c(0, 1)))), c(1, 0, 0, 0, 0, 0))
 })
 
-test_that("brentMin correctly handles bad inputs", {
+test_that("brentMin and brentZero correctly handle bad inputs", {
   expect_error(brentZero(), "is missing, with no")
   expect_error(brentZero(sin), "must be strictly less")
   # TODO: check if the interval is missing
   # TODO: there should be an error in expect_error(brentMin(sin, c(0, -1)), "must be strictly less")
   expect_error(brentMin(sin, 1), "must be a vector of length 2")
   f <- function (x) x - 1
-  expect_error(brentZero(f, c(-20, -19), extendInt = "upX", maxiter = 2), "No sign change found")
+  expect_warning(brentZero(f, c(-20, -19), extendInt = "upX", maxiter = 2), "extension step limit")
   f <- function (x) log(x) - 5
   expect_warning(brentZero(f, c(1, 1000), maxiter = 3), "limit reached, no convergence")
 })

@@ -56,6 +56,7 @@ A list with the following elements:
   \item{iter}{Total iteration count used.}
   \item{init.it}{Number of initial \code{extendInt} iterations if there were any; NA otherwise.}
   \item{estim.prec}{Estimate of the final bracket size.}
+  \item{exitcode}{0 for success, 1 for maximum initial iteration limit, 2 for maximum main iteration limit.}
 }
 }
 \description{

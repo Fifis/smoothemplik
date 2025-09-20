@@ -222,7 +222,7 @@ static inline double Delta(double u) {
 }
 
 // ----------------------------------------------------------------------
-// This function tries to "extend" [lower,upper] until f(lower)*f(upper) <= 0
+// This function extends [lower,upper] until f(lower)*f(upper) <= 0
 // or until we hit the maximum allowed extension steps.
 // - If mode=YES, we expand in both directions as needed (like uniroot "yes").
 // - If mode=DOWN, we only expand downward (like "downX") and then possibly upward if needed.
@@ -232,6 +232,9 @@ static inline double Delta(double u) {
 // This extension step count is returned in 'initSteps', and the final
 // bracket is returned in [lo,hi], with f(lo), f(hi) returned in fLo, fHi.
 //
+// Instead of throwing when we exceed maxSteps or fail to find a sign change, we set softFail=true
+// and return the current "best" endpoint (smaller |f|) in candX/candFX.
+
 void doExtendInterval(
   std::function<double(double)> fn, // the function
                       double &lo, double &hi,           // in/out bracket endpoints
@@ -239,9 +242,14 @@ void doExtendInterval(
                       int &initSteps,                   // out: how many expansions we did
                       int maxSteps,                     // maximum allowed expansions
                       ExtendIntMode mode,               // which mode
-                      int trace                         // printing level
+                      int trace,                        // printing level
+                      bool &softFail,                   // out: did we hit a soft failure?
+                      double &candX, double &candFX     // out: best candidate so far
 ) {
   initSteps = 0;
+  softFail  = false;
+  candX     = NA_REAL;
+  candFX    = NA_REAL;
 
   // truncate the endpoints to avoid overflows as R does:
   double fLoTrunc = truncateBig(fLo);
@@ -275,6 +283,13 @@ void doExtendInterval(
     Rcpp::Rcout << "Extending interval from [" << lo << "," << hi << "] ...\n";
   }
 
+  auto setSoftFailWithBest = [&](){
+    // choose endpoint with smaller |f|
+    if (std::fabs(fLo) <= std::fabs(fHi)) { candX = lo; candFX = fLo; }
+    else { candX = hi; candFX = fHi; }
+    softFail = true;
+  };
+
   if (mode == EXT_YES) {
     // Expand both ends if fLo*fHi > 0
     // This matches uniroot's 'while(f.lower*f.upper>0)'
@@ -286,7 +301,9 @@ void doExtendInterval(
     while ((fLo * fHi > 0.0) && (std::isfinite(lo) || std::isfinite(hi))) {
       initSteps++;
       if (initSteps > maxSteps) {
-        Rcpp::stop("No sign change found during extension in 'yes' mode after %d steps.", initSteps-1);
+        Rcpp::warning("Extension step limit hit after %d steps (soft stop).\n", initSteps-1);
+        setSoftFailWithBest();
+        return;
       }
       // Try to move lower downward
       if (std::isfinite(lo)) {
@@ -338,13 +355,14 @@ void doExtendInterval(
     while ((Sig * fLo > 0.0)) {
       initSteps++;
       if (initSteps > maxSteps) {
-        Rcpp::stop("No sign change found (lower side) after %d steps in 'downX'/'upX' mode.", initSteps-1);
+        Rcpp::warning("Lower extension step limit hit after %d steps (soft stop).\n", initSteps-1);
+        // We were extending the lower endpoint
+        candX  = lo;
+        candFX = fLo;
+        softFail = true;
+        return;
       }
-      lo  = lo - Sig*dd; // if Sig=-1 => lo + dd, but the code is (lo - Sig*dd)
-      // Actually for downX we want lo - (+) => lo - dd
-      // that means if Sig=-1 => (lo - (-1*dd))=lo+dd => we want to go downward.
-      // Actually "downX" => we want to shift lo downward => lo - (positive).
-      // lo -= std::fabs(dd) to always shift downward if mode=downX
+      // Move lower endpoint
       if (mode == EXT_DOWN) {
         lo -= std::fabs(dd);  // ensure we go downward
       } else {
@@ -367,7 +385,12 @@ void doExtendInterval(
     while ((Sig * fHi < 0.0)) {
       initSteps++;
       if (initSteps > maxSteps) {
-        Rcpp::stop("No sign change found (upper side) after %d steps in 'downX'/'upX' mode.", initSteps-1);
+        Rcpp::warning("Upper extension step limit hit after %d steps (soft stop).\n", initSteps-1);
+        // We were extending the upper endpoint
+        candX  = hi;
+        candFX = fHi;
+        softFail = true;
+        return;
       }
       if (mode == EXT_UP) {
         hi += std::fabs(dd); // push hi upward
@@ -390,9 +413,11 @@ void doExtendInterval(
     << initSteps << " steps\n";
   }
 
-  // after extension, check sign again
+  // If still no sign change, soft stop with best endpoint
   if (getsign(fLo) * getsign(fHi) > 0.0) {
-    Rcpp::stop("did not succeed extending interval endpoints to get a sign change");
+    Rcpp::warning("No sign change found during extension in 'yes' mode after %d steps.", initSteps-1);
+    setSoftFailWithBest();
+    return;
   }
 }
 
@@ -404,9 +429,10 @@ void doExtendInterval(
 //      $root        the final solution
 //      $f.root      the function value at that solution
 //      $iter        the number of iterations used
-//      $init.it     the number of initial iterations to fund the function sign change
+//      $init.it     the number of initial iterations to find the sign change
 //      $estim.prec  the approximate final bracket width
 //                   (NA if the solution is at an endpoint)
+//      $exitcode    0 ok, 1 extension max steps, 2 main-loop maxiter
 
 // [[Rcpp::export]]
 List brentZeroCPP(
@@ -456,17 +482,42 @@ List brentZeroCPP(
 
   // Preliminary extension pass if necessary
   int initSteps = 0;
+  bool softFail = false;
+  double candX = NA_REAL, candFX = NA_REAL;
+
   doExtendInterval(
     [&](double xx){
       double val = as<double>(f(xx));
       return (R_finite(val) ? val : NA_REAL);
     },
     lower, upper, fa, fb,
-    initSteps, maxiter, mode, trace
+    initSteps, maxiter, mode, trace, softFail, candX, candFX
   );
+
+  if (softFail) {  // Soft stop: return the current best endpoint
+    return List::create(
+      _["root"]       = candX,
+      _["f.root"]     = candFX,
+      _["iter"]       = initSteps,  // only extension iters
+      _["init.it"]    = (initSteps > 0 ? initSteps : R_NaInt),
+      _["estim.prec"] = NA_REAL,
+      _["exitcode"]   = 1
+    );
+  }
+
   // Now [lower, upper] should have opposite signs
   if (getsign(fa) * getsign(fb) > 0) {
-    stop("f() at the extended endpoints do not have opposite signs");
+    // Shouldn't happen due to soft handling; safeguard any way
+    double root = (std::fabs(fa) <= std::fabs(fb)) ? lower : upper;
+    double froot = (std::fabs(fa) <= std::fabs(fb)) ? fa : fb;
+    return List::create(
+      _["root"]       = root,
+      _["f.root"]     = froot,
+      _["iter"]       = initSteps,
+      _["init.it"]    = (initSteps > 0 ? initSteps : R_NaInt),
+      _["estim.prec"] = NA_REAL,
+      _["exitcode"]   = 1
+    );
   }
 
   // Standard Brent iteration. 'iter' is tracked in local code.
@@ -479,15 +530,17 @@ List brentZeroCPP(
   if (fsa == 0.0) {
     int finalIter = 0 + initSteps;
     return List::create(
-      _["root"] = sa, _["f.root"] = fsa,
-      _["iter"] = finalIter, _["init.it"] = initSteps, _["estim.prec"] = 0.0
+      _["root"]       = sa, _["f.root"] = fsa,
+      _["iter"]       = finalIter, _["init.it"] = initSteps,
+      _["estim.prec"] = 0.0, _["exitcode"]   = 0
     );
   }
   if (fsb == 0.0) {
     int finalIter = 0 + initSteps;
     return List::create(
-      _["root"] = sb, _["f.root"] = fsb,
-      _["iter"] = finalIter, _["init.it"] = initSteps, _["estim.prec"] = 0.0
+      _["root"]       = sb, _["f.root"] = fsb,
+      _["iter"]       = finalIter, _["init.it"] = initSteps,
+      _["estim.prec"] = 0.0, _["exitcode"]   = 0
     );
   }
 
@@ -514,8 +567,10 @@ List brentZeroCPP(
     }
     // If fc is smaller in magnitude than fb, swap roles
     if (std::fabs(fc) < std::fabs(fsb)) {
-      sa = sb;  sb = c;   c = sa;
-      fsa= fsb; fsb= fc;  fc= fsa;
+      double tmpb = sb;  sb = c;   c = tmpb;
+      double tmpf = fsb; fsb= fc;  fc = tmpf;
+      double tmpsa= sa;  sa = sb;  sb = tmpsa; // preserve previous "a"
+      double tmpfa= fsa; fsa= fsb; fsb= tmpfa; // and its f
     }
     double tol1 = 2.0*DBL_EPSILON*std::fabs(sb) + tol;
     double m    = 0.5*(c - sb);
@@ -574,10 +629,10 @@ List brentZeroCPP(
   }
 
   // If we exit due to iteration limit
-  bool convFail = false;
+  int  exitcode = 0;
   if (iterCount >= maxiter) {
-    convFail = true;
-    Rcpp::warning("brentZero: max iteration limit reached, no convergence?");
+    exitcode = 2; // main-loop maxiter
+    Rcpp::warning("brentZero: max iteration limit reached, no convergence.");
     // last best guess:
     root  = sb;
     froot = fsb;
@@ -591,16 +646,14 @@ List brentZeroCPP(
   }
 
   int finalIter = iterCount;
-  if (convFail) {
-    finalIter = -iterCount; // like uniroot does: negative if not converged
-  }
 
   // The total iteration is "main brent iteration + initSteps"
-  int totalIter = (finalIter < 0) ? finalIter : (finalIter + initSteps);
+  int totalIter = finalIter + initSteps;
 
   // Return
   return List::create(
     _["root"] = root, _["f.root"] = froot,
-    _["iter"] = totalIter, _["init.it"] = (initSteps > 0 ? initSteps : R_NaInt), _["estim.prec"] = estimPrec
+    _["iter"] = totalIter, _["init.it"] = (initSteps > 0 ? initSteps : R_NaInt),
+    _["estim.prec"] = estimPrec, _["exitcode"] = exitcode
   );
 }
