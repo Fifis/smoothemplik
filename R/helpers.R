@@ -93,11 +93,18 @@ svdlm <- function(x, y, rel.tol = 1e-9, abs.tol = 1e-100) {
 #' ae <- abs(sapply(2:6, function(o) log(x) - logTaylor(x, lower=1, upper=1, order=o)))
 #' matplot(x[x!=1], ae[x!=1,], type = "l", log = "y", lwd = 2,
 #'   main = "Abs. trunc. err. of Taylor expansion at 1", ylab = "")
+#'
+#' # Vanilla logarithm
+#' identical(logTaylor(2, order = NA), log(2))
 logTaylor <- function(x, lower = NULL, upper = NULL, der = 0, order = 4) {
   n <- length(x)
-  if (is.null(lower)) lower <- rep(1/n, n)
-  if (is.null(upper)) upper <- rep(Inf, n)
-  logTaylorCPP(x, lower, upper, der, order)
+  if (is.null(order) || !is.finite(order) || identical(order, 0) || identical(order, 0L)) {
+    dlog(x, d = der)
+  } else {
+    if (is.null(lower)) lower <- rep(1/n, n)
+    if (is.null(upper)) upper <- rep(Inf, n)
+    logTaylorCPP(x, lower, upper, der, order)
+  }
 }
 
 
@@ -118,74 +125,6 @@ getParabola3 <- function(x, y) getParabola3CPP(x, y)
 # If x = -1, (f, f', f'') = (-6, -1, 4)
 # smoothemplik:::getParabola(-1, -6, -1, 4)
 getParabola <- function(x, f, fp, fpp) getParabolaCPP(x, f, fp, fpp)
-
-
-#' Monotone interpolation between a function and a reference parabola
-#'
-#' Create *piece-wise monotone* splines that smoothly join an arbitrary function `f` to the
-#' quadratic reference curve \eqn{(x-\mathrm{mean})^{2}/\mathrm{var}} at
-#' a user–chosen abscissa \code{at}. The join occurs over a finite interval
-#' of length \code{gap}, guaranteeing a C1-continuous transition (function and first
-#' derivative are continuous) without violating monotonicity.
-#'
-#' @param x A numeric vector of evaluation points.
-#' @param f Function: the original curve to be spliced into the parabola.
-#'   It must be vectorised (i.e.\ accept a numeric vector and return a numeric
-#'   vector of the same length).
-#' @param mean Numeric scalar defining the shift of the reference parabola.
-#' @param var Numeric scalar defining the vertical scaling of the reference parabola.
-#' @param at Numeric scalar: beginning of the transition zone, i.e.\ the
-#'   boundary where `f` stops being evaluated and merging into the parabola begins.
-#' @param gap Positive numeric scalar.  Width of the transition window; the spline
-#'   is constructed on `[at, at+gap]` (or `[at-gap, at]` when `at < mean`) when the
-#'   reference parabola is higher. If the reference parabola is lower, it is the
-#'   distance from the point `z` at which `f(z) = parabola(z)` to allow some growth and
-#'   ensure monotonicity.
-#'
-#' @details
-#' This function calls `interpToHigher()` when the reference parabola is *above* `f(at)`;
-#' the spline climbs from `f` up to the parabola, and `interpToLower()` when the parabola is *below*
-#' `f(at)`, and the transition interval has to be extended to ensure that the spline does not descend.
-#'
-#' Internally, the helpers build a **monotone Hermite cubic spline** via
-#' Fritsch--Carlson tangents.  Anchor points on each side of the
-#' transition window are chosen so that the spline’s one edge matches `f`
-#' while the other edge matches the reference parabola, ensuring strict
-#' monotonicity between the two curves.
-#'
-#' @returns A numeric vector of length \code{length(x)} containing the smoothly
-#'   interpolated values.
-#'
-#' @seealso [splinefun()]
-#' @export
-#'
-#' @examples
-#' xx <- -4:5  # Global data for EL evaluation
-#' w <- 10:1
-#' w <- w / sum(w)
-#'
-#' f <- Vectorize(function(m) -2*EL0(xx, mu = m, ct = w, chull.fail = "none")$logelr)
-#' museq <- seq(-6, 6, 0.1)
-#' LRseq <- f(museq)
-#' plot(museq, LRseq, bty = "n")
-#' rug(xx, lwd = 4)
-#'
-#' wm <- weighted.mean(xx, w)
-#' wv <- weighted.mean((xx-wm)^2, w) / sum(w)
-#' lines(museq, (museq - wm)^2 / wv, col = 2, lty = 2)
-#'
-#' xr <- seq(4, 6, 0.1)
-#' xl <- seq(-6, -3, 0.1)
-#' lines(xl, interpTwo(xl, f, mean = wm, var = wv, at = -3.5, gap = 0.5), lwd = 2, col = 4)
-#' lines(xr, interpTwo(xr, f, mean = wm, var = wv, at = 4.5, gap = 0.5), lwd = 2, col = 3)
-#' abline(v = c(-3.5, -4, 4.5, 5), lty = 3)
-interpTwo <- function(x, f, mean, var, at, gap) {
-  fa <- function(x) (x-mean)^2/var
-  if (f(at) <= fa(at))
-    interpToHigherCPP(x, f, mean, var, at, gap)
-  else
-    interpToLowerCPP(x, f, mean, var, at, gap)
-}
 
 
 #' Damped Newton optimiser

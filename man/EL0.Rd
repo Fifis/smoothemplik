@@ -10,12 +10,12 @@ EL0(
   ct = NULL,
   shift = NULL,
   return.weights = FALSE,
-  SEL = FALSE,
+  renormalise = FALSE,
   weight.tolerance = NULL,
   boundary.tolerance = 1e-09,
   trunc.to = 0,
-  chull.fail = c("taylor", "wald", "adjusted", "balanced", "none"),
-  uniroot.control = list(),
+  deriv = FALSE,
+  log.control = list(order = NULL, lower = NULL, upper = NULL),
   verbose = FALSE
 )
 }
@@ -32,8 +32,9 @@ Can be fractional. Very small counts below the threshold \code{weight.tolerance}
 \item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned.
 Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
 
-\item{SEL}{If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
-due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).}
+\item{renormalise}{If \code{FALSE}, then uses the total sum of counts as the number of observations, like in vanilla empirical likelihood,
+due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise re-normalises the counts to 1
+according to Cosma et al. (2019, p. 170, the topmost formula).}
 
 \item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
 (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
@@ -45,16 +46,9 @@ interval range length.}
 \item{trunc.to}{Counts under \code{weight.tolerance} will be set to this value.
 In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
 
-\item{chull.fail}{A character: what to do if the convex hull of \code{z} does not contain \code{mu}
-(spanning condition does not hold). \code{"taylor"} creates a Taylor approximation
-of the log-ELR function near the ends of the sample. \code{"wald"} smoothly transitions
-between the log-ELR function into -0.5 * the Wald statistic for the weighted mean of \code{z}.
-\code{"adjusted"} invokes the method of \insertCite{chen2008adjusted}{smoothemplik},
-where an extra observation is added to ensure that the convex hull contains the mean, and
-\code{"balanced"} calls the method of \insertCite{emerson2009calibration}{smoothemplik}
-and \insertCite{liu2010adjusted}{smoothemplik} with two extra points.}
+\item{deriv}{Logical: if \code{TRUE}, computes and returns the first two derivatives of log-ELR w.r.t. \code{mu}.}
 
-\item{uniroot.control}{A list passed to the \code{brentZero}.}
+\item{log.control}{List of arguments passed to [logTaylor()].}
 
 \item{verbose}{Logical: if \code{TRUE}, prints warnings.}
 }
@@ -70,6 +64,7 @@ A list with the following elements:
   \item{bracket}{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
   \item{estim.prec}{The approximate estimated precision of lambda (from \code{brentZero}).}
   \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{brentZero}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
+  \item{deriv}{If requested, the first two derivatives of log-ELR w.r.t. \code{mu}}
   \item{exitcode}{An integer indicating the reason of termination.}
   \item{message}{Character string describing the optimisation termination status.}
 }
@@ -106,12 +101,12 @@ Owen's textbook formula corresponds to \eqn{s = 0}{s = 0}.)
 
 The actual tolerance of the lambda search in \code{brentZero} is
 \eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
-where \code{tol} can be set in \code{uniroot.control} and
+where \code{tol} is \code{.Machine$double.eps} and
 \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
 
 The sum of log-weights is maximised without Taylor expansion, forcing \code{mu} to be inside
-the convex hull of \code{z}. If a violation is happening, consider using the \code{chull.fail} argument
-or switching to Euclidean likelihood via [EuL()].
+the convex hull of \code{z}. If a violation is happening, consider using
+\code{log.control(order = 4)} or switching to Euclidean likelihood via [EuL()].
 }
 \examples{
 # Figure 2.4 from Owen (2001) -- with a slightly different data point
@@ -119,28 +114,20 @@ earth <- c(
   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 )
+# Root searching (EL0) is faster than minimisation w.r.t. lambda (EL1)
 set.seed(1)
-system.time(r1 <- replicate(40, EL(sample(earth, replace = TRUE), mu = 5.517)))
+system.time(r0 <- replicate(40, EL0(sample(earth, replace = TRUE), mu = 5.517)))
 set.seed(1)
-system.time(r2 <- replicate(40, EL0(sample(earth, replace = TRUE), mu = 5.517)))
-plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
+system.time(r1 <- replicate(40, EL1(sample(earth, replace = TRUE), mu = 5.517)))
+plot(apply(r0, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r0, 2, "[[", "logelr"),
      bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
-     main = "Discrepancy between EL and EL0", ylab = "")
+     main = "Discrepancy between EL1 and EL0", ylab = "")
 abline(h = 0, lty = 2)
 
 # Handling the convex hull violation differently
-EL0(1:9, chull.fail = "none")
-EL0(1:9, chull.fail = "taylor")
-EL0(1:9, chull.fail = "wald")
-
-# Interpolation to well-defined branches outside the convex hull
-mu.seq <- seq(-1, 7, 0.1)
-wEL1 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "none")$logelr)
-wEL2 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "taylor")$logelr)
-wEL3 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "wald")$logelr)
-plot(mu.seq, wEL1)
-lines(mu.seq, wEL2, col = 2)
-lines(mu.seq, wEL3, col = 4)
+EL0(1:9)
+EL0(1:9, log.control = list(order = 2))  # Warning + huge lambda
+EL0(1:9, log.control = list(order = 4))  # Warning + huge lambda
 
 # Warning: depending on the compiler, the discrepancy between EL and EL0
 # can be one million (1) times larger than the machine epsilon despite both of them
@@ -148,17 +135,17 @@ lines(mu.seq, wEL3, col = 4)
 # The results from Apple clang-1400.0.29.202 and Fortran GCC 12.2.0 are different from
 # those obtained under Ubuntu 22.04.4 + GCC 11.4.0-1ubuntu1~22.04,
 # Arch Linux 6.6.21 + GCC 14.1.1, and Windows Server 2022 + GCC 13.2.0
-out1 <- EL(earth, mu = 5.517)[1:4]
-out2 <- EL0(earth, mu = 5.517, return.weights = TRUE)[1:4]
-print(c(out1$lam, out2$lam), 16)
+out0 <- EL0(earth, mu = 5.517, return.weights = TRUE)[1:4]
+out1 <- EL1(earth, mu = 5.517, return.weights = TRUE)[1:4]
+print(c(out0$lam, out1$lam), 16)
 
-# Value of lambda                                 EL                  EL0
-# aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
-# Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
+# Value of lambda                                EL0                 EL1
+# aarch64-apple-darwin20          -1.5631313957?????  -1.5631313955?????
+# Windows, Ubuntu, Arch           -1.563131395492627  -1.563131395492627
 }
 \references{
 \insertAllCited{}
 }
 \seealso{
-[EL()]
+[EL1()] for multi-variate EL based on minimisation w.r.t. lambda.
 }

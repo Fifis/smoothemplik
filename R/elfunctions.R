@@ -11,8 +11,9 @@
 #' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
 #' @param return.weights Logical: if TRUE, individual EL weights are computed and returned.
 #'   Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
-#' @param SEL If \code{FALSE}, then the boundaries for the lambda search are based on the total sum of counts, like in vanilla empirical likelihood,
-#' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise according to Cosma et al. (2019, p. 170, the topmost formula).
+#' @param renormalise If \code{FALSE}, then uses the total sum of counts as the number of observations, like in vanilla empirical likelihood,
+#' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise re-normalises the counts to 1
+#' according to Cosma et al. (2019, p. 170, the topmost formula).
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
 #'   (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
 #' @param boundary.tolerance Relative tolerance for determining when the lambda is not an interior
@@ -20,15 +21,8 @@
 #'   interval range length.
 #' @param trunc.to Counts under \code{weight.tolerance} will be set to this value.
 #'   In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
-#' @param chull.fail A character: what to do if the convex hull of \code{z} does not contain \code{mu}
-#'   (spanning condition does not hold). \code{"taylor"} creates a Taylor approximation
-#'   of the log-ELR function near the ends of the sample. \code{"wald"} smoothly transitions
-#'   between the log-ELR function into -0.5 * the Wald statistic for the weighted mean of \code{z}.
-#'   \code{"adjusted"} invokes the method of \insertCite{chen2008adjusted}{smoothemplik},
-#'   where an extra observation is added to ensure that the convex hull contains the mean, and
-#'   \code{"balanced"} calls the method of \insertCite{emerson2009calibration}{smoothemplik}
-#'   and \insertCite{liu2010adjusted}{smoothemplik} with two extra points.
-#' @param uniroot.control A list passed to the \code{brentZero}.
+#' @param deriv Logical: if \code{TRUE}, computes and returns the first two derivatives of log-ELR w.r.t. \code{mu}.
+#' @param log.control List of arguments passed to [logTaylor()].
 #' @param verbose Logical: if \code{TRUE}, prints warnings.
 #'
 #' @details
@@ -58,12 +52,12 @@
 #'
 #' The actual tolerance of the lambda search in \code{brentZero} is
 #' \eqn{2 |\lambda_{\max}| \epsilon_m + \mathrm{tol}/2}{2 * MachEps * l_max + tol/2},
-#' where \code{tol} can be set in \code{uniroot.control} and
+#' where \code{tol} is \code{.Machine$double.eps} and
 #' \eqn{\epsilon_m}{MachEps} is \code{.Machine$double.eps}.
 #'
 #' The sum of log-weights is maximised without Taylor expansion, forcing \code{mu} to be inside
-#' the convex hull of \code{z}. If a violation is happening, consider using the \code{chull.fail} argument
-#' or switching to Euclidean likelihood via [EuL()].
+#' the convex hull of \code{z}. If a violation is happening, consider using
+#' \code{log.control(order = 4)} or switching to Euclidean likelihood via [EuL()].
 #'
 #' @return A list with the following elements:
 #'
@@ -76,6 +70,7 @@
 #'   \item{bracket}{The admissible interval for lambda (that is, yielding weights between 0 and 1).}
 #'   \item{estim.prec}{The approximate estimated precision of lambda (from \code{brentZero}).}
 #'   \item{f.root}{The value of the derivative of the objective function w.r.t. lambda at the root (from \code{brentZero}). Values \code{> sqrt(.Machine$double.eps)} indicate convergence problems.}
+#'   \item{deriv}{If requested, the first two derivatives of log-ELR w.r.t. \code{mu}}
 #'   \item{exitcode}{An integer indicating the reason of termination.}
 #'   \item{message}{Character string describing the optimisation termination status.}
 #' }
@@ -83,7 +78,7 @@
 #' @references
 #' \insertAllCited{}
 #'
-#' @seealso [EL()]
+#' @seealso [EL1()] for multi-variate EL based on minimisation w.r.t. lambda.
 #'
 #' @examples
 #' # Figure 2.4 from Owen (2001) -- with a slightly different data point
@@ -91,28 +86,20 @@
 #'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 #' )
+#' # Root searching (EL0) is faster than minimisation w.r.t. lambda (EL1)
 #' set.seed(1)
-#' system.time(r1 <- replicate(40, EL(sample(earth, replace = TRUE), mu = 5.517)))
+#' system.time(r0 <- replicate(40, EL0(sample(earth, replace = TRUE), mu = 5.517)))
 #' set.seed(1)
-#' system.time(r2 <- replicate(40, EL0(sample(earth, replace = TRUE), mu = 5.517)))
-#' plot(apply(r1, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r2, 2, "[[", "logelr"),
+#' system.time(r1 <- replicate(40, EL1(sample(earth, replace = TRUE), mu = 5.517)))
+#' plot(apply(r0, 2, "[[", "logelr"), apply(r1, 2, "[[", "logelr") - apply(r0, 2, "[[", "logelr"),
 #'      bty = "n", xlab = "log(ELR) computed via dampened Newthon method",
-#'      main = "Discrepancy between EL and EL0", ylab = "")
+#'      main = "Discrepancy between EL1 and EL0", ylab = "")
 #' abline(h = 0, lty = 2)
 #'
 #' # Handling the convex hull violation differently
-#' EL0(1:9, chull.fail = "none")
-#' EL0(1:9, chull.fail = "taylor")
-#' EL0(1:9, chull.fail = "wald")
-#'
-#' # Interpolation to well-defined branches outside the convex hull
-#' mu.seq <- seq(-1, 7, 0.1)
-#' wEL1 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "none")$logelr)
-#' wEL2 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "taylor")$logelr)
-#' wEL3 <- -2*sapply(mu.seq, function(m) EL0(1:9, mu = m, chull.fail = "wald")$logelr)
-#' plot(mu.seq, wEL1)
-#' lines(mu.seq, wEL2, col = 2)
-#' lines(mu.seq, wEL3, col = 4)
+#' EL0(1:9)
+#' EL0(1:9, log.control = list(order = 2))  # Warning + huge lambda
+#' EL0(1:9, log.control = list(order = 4))  # Warning + huge lambda
 #'
 #' # Warning: depending on the compiler, the discrepancy between EL and EL0
 #' # can be one million (1) times larger than the machine epsilon despite both of them
@@ -120,25 +107,22 @@
 #' # The results from Apple clang-1400.0.29.202 and Fortran GCC 12.2.0 are different from
 #' # those obtained under Ubuntu 22.04.4 + GCC 11.4.0-1ubuntu1~22.04,
 #' # Arch Linux 6.6.21 + GCC 14.1.1, and Windows Server 2022 + GCC 13.2.0
-#' out1 <- EL(earth, mu = 5.517)[1:4]
-#' out2 <- EL0(earth, mu = 5.517, return.weights = TRUE)[1:4]
-#' print(c(out1$lam, out2$lam), 16)
+#' out0 <- EL0(earth, mu = 5.517, return.weights = TRUE)[1:4]
+#' out1 <- EL1(earth, mu = 5.517, return.weights = TRUE)[1:4]
+#' print(c(out0$lam, out1$lam), 16)
 #'
-#' # Value of lambda                                 EL                  EL0
-#' # aarch64-apple-darwin20         -1.5631313955??????   -1.5631313957?????
-#' # Windows, Ubuntu, Arch           -1.563131395492627   -1.563131395492627
+#' # Value of lambda                                EL0                 EL1
+#' # aarch64-apple-darwin20          -1.5631313957?????  -1.5631313955?????
+#' # Windows, Ubuntu, Arch           -1.563131395492627  -1.563131395492627
 #' @export
-EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, SEL = FALSE,
-                        weight.tolerance = NULL, boundary.tolerance = 1e-9, trunc.to = 0,
-                        chull.fail = c("taylor", "wald", "adjusted", "balanced", "none"),
-                        uniroot.control = list(),
-                        verbose = FALSE
+EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, renormalise = FALSE,
+                weight.tolerance = NULL, boundary.tolerance = 1e-9, trunc.to = 0, deriv = FALSE,
+                log.control = list(order = NULL, lower = NULL, upper = NULL), verbose = FALSE
 ) {
   if (NCOL(z) > 1) stop("Only one-dimensional vectors or matrices are supported.")
   if (is.data.frame(z)) z <- as.matrix(z)
   if (!is.null(dim(z))) z <- drop(z)
   if (any(!is.finite(z))) stop("Non-finite observations (NA, NaN, Inf) are not welcome.")
-
 
   n <- length(z)
 
@@ -147,11 +131,8 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
   if (any(!is.finite(ct))) stop("Non-finite weights (NA, NaN, Inf) are not welcome.")
   if (min(ct) < 0) stop("Negative weights are present.")
   if (sum(ct) <= 0) stop("The total sum of EL weights must be positive.")
-  n.orig <- n
   if (is.null(shift)) shift <- rep(0, n)
-  if (is.null(weight.tolerance))
-    weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
-  chull.fail <- match.arg(chull.fail)
+  if (is.null(weight.tolerance)) weight.tolerance <- max(ct, 1) * sqrt(.Machine$double.eps)
 
   # If originally the weights were too small, too many points would be truncated
   # Warn if any non-zero weights are smaller than weight.tolerance
@@ -163,7 +144,7 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
   }
 
   if (return.weights) {
-    wts <- numeric(n.orig)
+    wts <- numeric(n)
     names(wts) <- names(z)
   } else {
     wts <- NULL
@@ -178,35 +159,15 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
     shift <- shift[nonz]
   }
 
+  # Re-normalising (optionally) only after weight truncation
+  if (renormalise) ct <- ct / sum(ct)
 
-  if (SEL) ct <- ct / sum(ct) # We might have truncated some weights, so re-normalisation is needed!
-  # The denominator for EL with counts is the sum of total counts, and for SEL, it is the number of observations!
-  n.denom <- if (SEL) n else sum(ct)
-  if (n.denom <= 0) stop(paste0("Total weights after tolerance checks (", n.denom, ") must be positive (check the counts and maybe decrease 'weight.tolerance', which is now ", sprintf("%1.1e", weight.tolerance), ".\n"))
+  # The denominator for EL with counts is the sum of total counts, and with re-normalisation, it is the number of observations
+  n.denom <- if (renormalise) n else sum(ct)
+  if (n.denom <= 0) stop("Total weights after tolerance checks (", n.denom, ") must be positive (check the counts and maybe decrease 'weight.tolerance', which is now ", sprintf("%1.1e", weight.tolerance), ".")
 
   # Enforcing the moment condition
   z <- z - mu
-
-  # Finally, implement Adjusted and Balanced EL to maintain the sample average
-  # Handling AEL and BAEL at the very end is correct because the formulae are simpler
-  if (chull.fail %in% c("adjusted", "balanced")) {
-    an <- computeBartlett(z) * 0.5  # Unweighted -- because there is no theory on weighted AEL
-    if (an < 0) {
-      stop("EL0: Bartlett factor a_n < 0 -- please report this bug on GitHub. Problematic z: ",
-           paste0(z, collapse = ","))
-    }
-    zbar <- trimmed.weighted.mean(z, trim = 0.1, w = ct)
-    if (chull.fail == "adjusted") {
-      z <- c(z, -zbar * an)
-      ct <- if (!SEL) c(ct, 1) else c(ct, 1)
-      shift <- c(shift, 0)
-    } else {
-      z <- c(z, -zbar * an, 2 * mean(z) + zbar * an)
-      ct <- if (!SEL) c(ct, 1, 1) else c(ct, 1, 1)
-      if (SEL) ct <- ct / sum(ct)
-      shift <- c(shift, 0, 0)
-    }
-  }
 
   z1 <- min(z)
   zn <- max(z)
@@ -222,137 +183,32 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
   f.root <- NA
   exitcode <- 5L
 
-  # Checking the spanning condition; 0 must be in the convex hull of z, that is, min(z) < 0 < max(z),
-  # or some form extrapolation must be used to avoid this check an simply return a strongly negative
-  # value (e.g. Euclidean L, Balanced EL etc.) or a Wald statistic instead of LR
-  # NB: here, we declare SC failure even in the stronger sense: 'one must extrapolate'
-  # due the zero being too close to the boundary
-  zu <- sort(unique(z))
-  # The values cannot be too close to each other because it may break numerical differentiation
-  # Keeping only sufficiently distinct ones
-  # TODO: add relative difference, too
-  abs.diff <- c(1, abs(diff(zu)))
-  zu <- zu[abs.diff > 64*.Machine$double.eps]
-  l <- length(zu)
-  if (length(zu) >= 2) {
-    z12 <- zu[1:2]
-    znn <- zu[(l-1):l]
-  } else {
-    z12 <- znn <- rep(zu[1], 2)
+  spanning <- z1 <= 0 && zn >= 0
+
+  # If logarithm Taylor expansion is requested, prepare good defaults
+  if (is.null(log.control$order) || !is.finite(log.control$order) || log.control$order == 0) log.control$order <- NA
+  if (is.finite(log.control$order)) {
+    if (floor(log.control$order/2) != log.control$order/2) stop("EL0: the extrapolation order must be an positive even number, typically 2 or 4.")
+    if (is.null(log.control$lower)) log.control$lower <- if (!renormalise) 1/n else stats::median(ct)/n
+    if (is.null(log.control$upper)) log.control$upper <- Inf
   }
-
-  ExEL <- chull.fail %in% c("taylor", "wald")
-  if (ExEL) {  # Extrapolation will be done -- the limits are required
-    mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
-    mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
-    if (chull.fail == "wald") {
-      wm <- stats::weighted.mean(z, ct)  # Over-writing what had been calculated before
-      wv <- stats::weighted.mean((z-wm)^2, ct) / sum(ct)
-    }
-    left.extrap  <- (mu.llimit > 0)
-    right.extrap <- (mu.rlimit < 0)
-    if (left.extrap && right.extrap) stop("Extrapolation must be one-sided.")
-
-    # Optimisation 1: extrapolate only the right end
-    if (left.extrap) {
-      # All observations are to the right -- zero would be in the left branch
-      z <- -z
-      zu <- sort(unique(z))
-      z1 <- min(z)
-      zn <- max(z)
-      z12 <- zu[1:2]
-      znn <- zu[(l-1):l]
-      mu.llimit <- if (l > 2) mean(z12) else sum(z12*c(0.9, 0.1))
-      mu.rlimit <- if (l > 2) mean(znn) else sum(znn*c(0.1, 0.9))
-      if (chull.fail == "wald") wm <- -wm
-    }
-  }
-
-  spanning <- ((!ExEL) & (z1 <= 0 && zn >= 0)) || (ExEL && (mu.llimit <= 0 && mu.rlimit >= 0))
 
   if (n < 2) { # Codes > 5
     exitcode <- 6L
   } else if (z1 == zn) { # The sample is degenerate without variance, no extrapolation possible
     exitcode <- 8L
-  } else if (chull.fail == "none" && (z1 == 0 || zn == 0)) {
+  } else if (z1 == 0 || zn == 0) {
     # mu is on the boundary -- special case (still in the book)
     logelr <- -Inf
     lam <- iter <- estim.prec <- f.root <- 0
     converged <- TRUE
     int <- c(0, 0)
     exitcode <- 7L
-  } else if (!spanning) {  ######### TODO: test with 2 observations
-
-    if (chull.fail == "taylor") {
-      if (length(zu) < 2) stop("For Taylor extrapolation, at least two unique observations are required.")
-      ma <- stats::median(abs(z))
-      if (ma == 0) ma <- stats::IQR(z)
-      if (ma == 0) ma <- stats::sd(z)
-      if (ma == 0) stop("No variability in remaining 'z', calculations impossible.")
-      if (mean(sign(zu)) == 0) {  # The unique points are symmetric in count and in sign
-      #   stop("Error checking the signs of the data for correct extrapolation. Please report this bug. Problematic z: ",
-      #        paste0(z, collapse = ","), ", unique values: ", paste0(zu, collapse = ","), ".")
-      # There is no need to trim it. Imagine this configuration: [-0.2, 0.02] --
-      # then mu.limit = -0.002
-      # TODO: test with 2 points and remove this check
-      }
-      # Anchor the parabola at the end that is closest to 0 after the (possible) sign flip
-      mu.limit <- if (abs(mu.llimit) < abs(mu.rlimit)) mu.llimit else mu.rlimit
-      # Apply the parabola formula for 3 points using f, f', f'' from a 4-point stencil with a larger step size
-      stepsize <- max(diff(znn)*0.01, ma*.Machine$double.eps^0.25)
-      # Cap so that mu.limit - 3*stepsize >= z1 (stay inside data)
-      max.step <- (mu.limit - z1)/3
-      if (max.step <= 0) stop("EL0: cannot form left stencil (mu.limit <= z_min).")
-      stepsize <- min(stepsize, 0.5*max.step)
-      zgrid <- mu.limit + stepsize*(-3:0)
-      w.fp <- c(-2, 9, -18, 11) / 6  # These numbers are obtained from the pnd package
-      w.fpp <- c(-1, 4, -5, 2)    # pnd::fdCoef(deriv.order = 2, stencil = -3:0)
-
-      llgrid <- vapply(zgrid, function(m) EL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
-      fp <- sum(llgrid * w.fp) / stepsize
-      fpp <- sum(llgrid * w.fpp) / stepsize^2
-      # Check with
-      # pnd::Grad(function(m) EL0(z = z, mu = m, ct = ct)$logelr, zgrid[1],
-      #   elementwise = FALSE, vectorised = FALSE, multivalued = FALSE, h = 1e-5)
-      abc <- getParabola(x = mu.limit, f = llgrid[4], fp = fp, fpp = fpp)
-      parab  <- function(x) abc[1]*x^2  + abc[2]*x  + abc[3]
-      logelr <- parab(0)  # Just c, the intercept
-      # For z = 1:9
-      # xgrid <- seq((z[1]+z[2])/2, (znn[1]+znn[2])/2, length.out = 51)
-      # ygrid <- sapply(xgrid, function(m) EL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL)$logelr)
-      # plot(xgrid, ygrid, xlim = range(z, 0) + c(-0.25, 0.25), ylim = c(min(ygrid)*1.5, 0), bty = "n")
-      # points(zgrid, llgrid, col = 2, pch = 16)
-      # xgrid2 <- seq(-0.1, 1.5, length.out = 31)
-      # ygrid2 <- parab(xgrid2)
-      # lines(xgrid2, ygrid2, col = 2)
-      if (z1 == 0 || zn == 0) {
-        converged <- TRUE
-        exitcode <- 9L
-      } else {
-      exitcode <- 10L
-      }
-    } else if (chull.fail == "wald") {  # Wald approximation to ELR at 0 = squared t-stat
-      if (length(zu) < 2) stop("For Wald extrapolation, at least two unique observations are required.")
-
-      mu.limit <- if (abs(mu.llimit) < abs(mu.rlimit)) mu.llimit else mu.rlimit
-      gap <- if (l > 2) abs(diff(znn)) * 0.5 else abs(diff(znn)) * 0.05
-
-      # TODO: speed up the evaluation; extrapolate only where necessary; check the gap location
-      # Extract info from the interpTwo function
-      f <- function(mm) vapply(mm, function(m) -2*EL0(z = z, mu = m, ct = ct, shift = shift, SEL = SEL, chull.fail = "none")$logelr, numeric(1))
-      logelr <- -0.5 * interpTwo(x = 0, f = f, mean = wm, var = wv, at = mu.limit, gap = gap)
-      # curve(f, 0, 9)
-      # abline(v = c(mu.limit, mu.limit - gap), lty = 3)
-      # curve((x-wm)^2/wv, 0, 4, col = 2, add = TRUE)
-      if (z1 == 0 || zn == 0) {
-        converged <- TRUE
-        exitcode <- 9L
-      } else {
-        exitcode <- 10L
-      }
-    }
-    # Else: do nothing, classical ELR failure
+  } else if ((!spanning) && is.na(log.control$order)) {
+    # No Taylor extrapolation, no feasible solution
+    # Do nothing, this is the default case
   } else {  # The main 'good' loop: EL may proceed because the spanning condition holds
+    # Search bracket for lambda
     negz <- z < 0
     comp <- (ct / n.denom - 1 - shift) / z
     min.lam <- suppressWarnings(max(comp[!negz]))
@@ -361,35 +217,51 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
     if (!is.finite(max.lam)) max.lam <- -min.lam
     int <- c(min.lam, max.lam)
     int <- int + abs(int) * c(2, -2) * .Machine$double.eps # To avoid bad rounding
-    con <- list(tol = .Machine$double.eps, maxiter = 100, trace = 0) # Wishing the strictest convergence
-    con[names(uniroot.control)] <- uniroot.control
+    ur.ctrl <- list(tol = 1e-16, maxiter = 100, trace = 0)
 
-    # dllik <- function(lambda) sum(ct * z * logTaylor(1 + z * lambda + shift, lower = lower, upper = upper, der = 1, order = taylor.order))
-    dllik <- function(lambda) sum(ct * z * dlog(1 + z * lambda + shift, d = 1))
+    # Empirical log-likelihood and its analytical derivative
+    llik  <- function(lambda) -sum(ct *     logTaylor(1 + z*lambda + shift, der = 0, order = log.control$order, lower = log.control$lower, upper = log.control$upper))
+    dllik <- function(lambda)  sum(ct * z * logTaylor(1 + z*lambda + shift, der = 1, order = log.control$order, lower = log.control$lower, upper = log.control$upper))
+    # Simpler: # dllik <- function(lambda) sum(ct * z * dlog(1 + z * lambda + shift, d = 1))
+
+    # xseq <- seq(-0.1, 1, length.out = 301)
+    # plot(xseq, logTaylor(xseq, order = 6, lower = 0.2)); abline(v = 0, lty = 3)
+
     # xs <- seq(int[1], int[2], length.out = 51)
-    # ys <- sapply(xs, logELr)
-    # ys1 <- sapply(xs, dllik)
+    # ys <- sapply(xs,  llik)
+    # dys <- sapply(xs, dllik)
     # plot(xs, ys)
-    # plot(xs, ys1)
+    # plot(xs, dys)
 
-    lam.list <- tryCatch(brentZero(dllik, interval = int, tol = con$tol, extendInt = "no",
-                                   maxiter = con$maxiter, trace = con$trace),
-                         error = function(e) return(NULL))
+    # Wishing the strictest convergence in the uniroot-like control
+    if (spanning) {
+      # Search with strict boundaries
+      lam.list <- tryCatch(brentZero(dllik, interval = int, tol = .Machine$double.eps, extendInt = "no", maxiter = 100, trace = 0),
+                           error = function(e) return(NULL))
+    } else {
+      # Search with flexible boundaries
+      lam.list <- tryCatch(brentZero(dllik, interval = int, tol = .Machine$double.eps, extendInt = "yes", maxiter = 100, trace = 0),
+                           error = function(e) return(e))
+      exitcode <- 10L
+      # The sum of weights is likely to be less than 1
+      # If a lambda was not found in enough iterations, keep the wrong solution; the error code should be informative
+    }
+
     # There can be only one kind of warning: maximum iterations reached
     if (!is.null(lam.list)) { # Some result with or without a warning as the second element of the list
+      # Preparation for Owen's Taylor strategy
       lam <- lam.list$root
-      zlam1 <- 1 + z * lam + shift
-      wvec <- ct * dlog(zlam1, d = 1)
-      if (!SEL) wvec <- wvec / n.denom
+      wvec <- ct * logTaylor(1 + z*lam + shift, der = 1, order = log.control$order, lower = log.control$lower, upper = log.control$upper)
+      if (!renormalise) wvec <- wvec / n.denom
       if (return.weights) wts[nonz] <- wvec
-      logelr <- -sum(ct * dlog(zlam1, d = 0))
+      logelr <- llik(lam)
       # Empirical fix for nonsensical probabilities
       # This should not happen unless the spanning condition fails and the Taylor expansion is very inaccurate
       if (any(wvec < 0) && logelr > 0) logelr <- -logelr
       if (any(!is.finite(wvec))) exitcode <- 12L
 
       # brentZero returns the number of iterations times -1 in case it exceeds the maximum number allowed
-      converged <- lam.list$iter  >= 0
+      converged <- lam.list$iter  >= 0 && lam.list$exitcode == 0
       estim.prec <- lam.list$estim.prec
       f.root <- lam.list$f.root
       iter <- lam.list$iter
@@ -400,13 +272,11 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
       int.len <- max.lam - min.lam
       if (min(abs(lam - max.lam), abs(lam - min.lam)) < boundary.tolerance * int.len)
         exitcode <- exitcode + 2L
-      if (abs(sum(wvec) - 1) > 1e-6) exitcode <- 11L
+      if (abs(sum(wvec) - 1) > 1e-6 && exitcode != 10) exitcode <- 11L
     } else { # The original bad output stays intact, only the exit code updates
       exitcode <- 4L
     }
-
   }
-
 
   if (return.weights && any(!is.finite(wts[nonz]))) exitcode <- 9L
 
@@ -425,10 +295,22 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
   msg <- if (exitcode > 0L) msg[exitcode] else "successful convergence within the first-order-condition tolerance"
   if (verbose && exitcode > 0L) warning(msg)
 
+  # Computing analytical derivatives
+  if (deriv) {
+    u <- 1 + z*lam + shift
+    S0 <- sum(ct/u)
+    S1 <- sum(ct/u^2)
+    T1 <- sum(ct*z/u^2)
+    T2 <- sum(ct*z^2/u^2)
+    fp <- S0*lam
+    fpp <- lam^2*S1 - (S0 - lam*T1)^2/T2
+    deriv <- c(fp, fpp)
+  } else {
+    deriv <- NULL
+  }
 
-  return(list(logelr = logelr, lam = lam, wts = wts,
-              converged = converged, iter = iter,
-              bracket = int, estim.prec = estim.prec, f.root = f.root,
+  return(list(logelr = logelr, lam = lam, wts = wts, converged = converged, iter = iter,
+              bracket = int, estim.prec = estim.prec, f.root = f.root, deriv = deriv,
               exitcode = exitcode, message = msg))
 }
 
@@ -464,14 +346,16 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
 #' @param z A numeric vector or a matrix with one data vector per column.
 #' @param ct A numeric vector of non-negative counts.
 #' @param mu Hypothesised mean, default (0 ... 0) in R^ncol(z)
+#' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
 #' @param lambda.init Starting lambda, default (0 ... 0)
-#' @param SEL If \code{FALSE}, the default weight tolerance is \code{MachEps^(1/3)}, otherwise
+#' @param renormalise If \code{FALSE}, the default weight tolerance is \code{MachEps^(1/3)}, otherwise
 #'   it is \code{MachEps^(1/2)} of the maximum count.
 #' @param return.weights Logical: if \code{TRUE}, returns the empirical probabilities. Default is memory-saving (\code{FALSE}).
 #' @param lower Lower cut-off for [logTaylor()], default \code{1/nrow(z)}
 #' @param upper Upper cutoff for [logTaylor()], default \code{Inf}
 #' @param order Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
+#' @param deriv Logical: if \code{TRUE}, computes and returns the first two derivatives of log-ELR w.r.t. \code{mu}.
 #' @param thresh Convergence threshold for log-likelihood (the default is aggressive)
 #' @param itermax Upper bound on number of Newton steps (seems ample)
 #' @param alpha Backtracking line search parameter: acceptance of a decrease in function value by ALPHA*f of the prediction
@@ -504,7 +388,7 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
 #'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 #' )
-#' EL(earth, mu = 5.517, verbose = TRUE) # 5.517 is the modern accepted value
+#' EL1(earth, mu = 5.517, verbose = TRUE) # 5.517 is the modern accepted value
 #'
 #' # Linear regression through empirical likelihood
 #' coef.lm <- coef(lm(mpg ~ hp + am, data = mtcars))
@@ -514,28 +398,29 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, S
 #'   resid <- y - drop(x %*% par)   # must be 0
 #'   resid * x
 #' }
-#' minusEL <- function(par) -EL(foc.lm(par, xmat, yvec), itermax = 10)$logelr
+#' minusEL <- function(par) -EL1(foc.lm(par, xmat, yvec), itermax = 10)$logelr
 #' coef.el <- optim(c(mean(yvec), 0, 0), minusEL)$par
 #' abs(coef.el - coef.lm) / coef.lm  # Relative difference
 #'
 #' # Likelihood ratio testing without any variance estimation
 #' # Define the profile empirical likelihood for the coefficient on am
 #' minusPEL <- function(par.free, par.am)
-#'   -EL(foc.lm(c(par.free, par.am), xmat, yvec), itermax = 20)$logelr
+#'   -EL1(foc.lm(c(par.free, par.am), xmat, yvec), itermax = 20)$logelr
 #' # Constrained maximisation assuming that the coef on par.am is 3.14
 #' coef.el.constr <- optim(coef.el[1:2], minusPEL, par.am = 3.14)$par
-#' print(-2 * EL(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
+#' print(-2 * EL1(foc.lm(c(coef.el.constr, 3.14), xmat, yvec))$logelr)
 #' # Exceeds the critical value qchisq(0.95, df = 1)
 #' @export
-EL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
+EL1 <- function(z, mu = NULL, ct = NULL, shift = NULL, lambda.init = NULL, renormalise = FALSE,
                        return.weights = FALSE, lower = NULL, upper = NULL,
-                       order = 4L, weight.tolerance = NULL,
+                       order = NA, weight.tolerance = NULL, deriv = FALSE,
                        thresh = 1e-16, itermax = 100L, verbose = FALSE,
                        alpha = 0.3, beta = 0.8, backeps = 0) {
   if (is.null(dim(z))) z <- matrix(z, ncol = 1)
   n <- nrow(z)
   d <- ncol(z)
   if (length(mu) == 0) mu <- rep(0, d)
+  if (is.null(shift)) shift <- 0
   if (length(mu) != d) stop("The length of mu must be the same as the dimension of z.")
   if (length(lambda.init) == 0) lambda.init <- rep(0, d)
   if (length(lambda.init) != d) stop("The length of mu must be the same as the dimension of z.")
@@ -543,36 +428,36 @@ EL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
   if (is.null(lower)) lower <- rep(1/n, n)
   if (is.null(upper)) upper <- rep(Inf, n)
 
-  if (is.null(weight.tolerance))
-    weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
+  if (is.null(weight.tolerance)) weight.tolerance <- max(ct, 1) * sqrt(.Machine$double.eps)
 
   if (is.null(ct)) ct <- rep(1, n)
   if (min(ct) < 0) stop("Negative weights are not allowed.")
-  if (SEL) ct <- ct / sum(ct)
+  if (renormalise) ct <- ct / sum(ct)
   if (any(0 < ct & ct < weight.tolerance)) {
     if (verbose) warning(paste("Positive counts below", weight.tolerance, "have been replaced by zero."))
     ct[ct < weight.tolerance] <- 0
-    if (SEL) ct <- ct / sum(ct)  # Re-normalising again
+    if (renormalise) ct <- ct / sum(ct)  # Re-normalising again
   }
   if (sum(ct) <= 0) stop("Total weight must be positive.")
 
-  ELCPP(z = z, ct = ct, mu = mu, lambda_init = lambda.init,
+  ELCPP(z = z, ct = ct, mu = mu, shift = shift, lambda_init = lambda.init,
         return_weights = return.weights, lower = lower, upper = upper,
-        order = order, weight_tolerance = weight.tolerance, thresh = thresh,
-        itermax = itermax, verbose = verbose,
+        order = order, weight_tolerance = weight.tolerance, deriv = deriv,
+        thresh = thresh, itermax = itermax, verbose = verbose,
         alpha = alpha, beta = beta, backeps = backeps)
 }
 
 #' Compute empirical likelihood on a trajectory
 #'
-#' @param z Passed to \code{EL}.
-#' @param ct Passed to \code{EL}.
+#' @param z Passed to [EL1()].
+#' @param ct Passed to [EL1()].
 #' @param mu0 Starting point of trajectory
 #' @param mu1 End point of trajectory
 #' @param N Number of segments into which the path is split (i. e. \code{N+1} steps are used).
-#' @param verbose Logical: report iteration data?
-#' @param verbose.solver Logical: report internal iteration data from the optimiser? Very verbose.
-#' @param ... Passed to \code{EL}.
+#' @param order Passed to [EL1()]. It is highly advised to avoid using \code{NA}
+#'   (no extrapolation) because the lambda search may fail with unmodified logarithm.
+#' @param verbose Logical: report iteration progress?
+#' @param ... Passed to [EL1()].
 #'
 #' This function does not accept the starting lambda because it is much faster (3--5 times)
 #' to reuse the lambda from the previous iteration.
@@ -586,19 +471,17 @@ EL <- function(z, mu = NULL, ct = NULL, lambda.init = NULL, SEL = FALSE,
 #'   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
 #'   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 #' )
-#' EL(earth, mu = 5.1,  verbose = TRUE)
+#' EL1(earth, mu = 5.1,  verbose = TRUE)
 #' logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 55, verbose = TRUE)
 #' hist(earth, breaks = seq(4.75, 6, 1/8))
 #' plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
 #'      xlab = "Earth density", ylab = "ELR")
-#' # TODO: why is there non-convergence in row 0?
 #'
 #' # Two-dimensional trajectory
 #' set.seed(1)
 #' xy <- matrix(rexp(200), ncol = 2)
 #' logELR2 <- ctracelr(xy, mu0 = c(0.5, 0.5), mu1 = c(1.5, 1.5), N = 100)
-ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
-                     verbose.solver = FALSE, ...) {
+ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, order = 4, verbose = FALSE, ...) {
   if (is.vector(z)) z <- matrix(z, ncol = 1)
   d <- ncol(z)
 
@@ -608,7 +491,7 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
   for (i in 0:N) {
     mui <- (i*mu1 + (N-i)*mu0) / N
     if (i > 0) lam0 <- if (all(is.finite(x$lam))) drop(x$lam) else NULL
-    x <- EL(z = z, ct = ct, mu = mui, lambda.init = lam0, verbose = verbose.solver, ...)
+    x <- EL1(z = z, ct = ct, mu = mui, lambda.init = lam0, order = order, ...)
     m[i+1, ] <- mui
     l[i+1, ] <- x$lam
     elr[i+1] <- x$logelr
@@ -630,11 +513,8 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' @param vt Numeric vector: non-negative variance weights for estimating the conditional
 #'   variance of \code{z}. Probabilities are returned only for the observations where \code{vt > 0}.
 #' @inheritParams EL0
-#' @param chull.diag Logical: if \code{TRUE}, checks if there is a definite convex hull failure
-#'   in at least one dimension (\code{mu} being smaller than the smallest or larger
-#'   than the largest element). Note that it does not check if \code{mu} is strictly in the
-#'   convex hull because this procedure is much slower and is probably unnecessary.
 #'
+#' @details
 #' The arguments \code{ct} and \code{vt} are responsible for smoothing of the moment function
 #' and conditional variance, respectively. The objective function is
 #' \deqn{\min_{p_{ij}} \frac1n \sum_{i=1}^n \sum_{j=1}^n \mathbb{I}_{ij} \frac{(p_{ij} -
@@ -648,8 +528,8 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' estimator is the CUE-GMM estimator: a quadratic form in which the unconditional
 #' mean vector is weighted by the inverse of the unconditional variance.
 #'
-#' @return A list with the same structure as that in [EL()].
-#' @seealso [EL()]
+#' @return A list with the same structure as that in [EL1()].
+#' @seealso [EL1()]
 #' @export
 #'
 #' @references
@@ -664,9 +544,8 @@ ctracelr <- function(z, ct = NULL, mu0, mu1, N = 5, verbose = FALSE,
 #' sum(a$wts)  # Unity
 #' colSums(a$wts * z)  # Zero
 EuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
-                        SEL = TRUE,
-                        weight.tolerance = NULL, trunc.to = 0,
-                        return.weights = FALSE, verbose = FALSE, chull.diag = FALSE
+                weight.tolerance = NULL, trunc.to = 0, renormalise = TRUE,
+                return.weights = FALSE, verbose = FALSE
 ) {
   if (is.null(dim(z)) || is.data.frame(z)) z <- as.matrix(z, rownames.force = TRUE)
   n <- nrow(z)
@@ -676,11 +555,10 @@ EuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
   if (is.null(vt)) vt <- rep(1, n)
   if (is.null(shift)) shift <- rep(0, n)
   n.orig <- n
-  if (is.null(weight.tolerance))
-    weight.tolerance <- if (!SEL) .Machine$double.eps^(1/3) else max(ct) * sqrt(.Machine$double.eps)
+  if (is.null(weight.tolerance)) weight.tolerance <- max(ct, 1) * sqrt(.Machine$double.eps)
   ret <- EuLCPP(z = z, mu = mu, ct = ct, vt = vt, shift = shift, n_orig = n.orig,
-                weight_tolerance = weight.tolerance, trunc_to = trunc.to, SEL = SEL,
-                return_weights = return.weights, verbose = verbose, chull_diag = chull.diag)
+                weight_tolerance = weight.tolerance, trunc_to = trunc.to, renormalise = renormalise,
+                return_weights = return.weights, verbose = verbose)
   if (return.weights && !is.null(nz <- rownames(z))) names(ret$wts) <- nz
   return(ret)
 }

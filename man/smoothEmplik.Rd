@@ -9,7 +9,7 @@ smoothEmplik(
   theta,
   data,
   sel.weights = NULL,
-  type = c("EL", "EuL", "EL0"),
+  type = c("EL0", "EL1", "EuL"),
   kernel.args = list(bw = NULL, kernel = "epanechnikov", order = 2, PIT = TRUE, sparse =
     TRUE),
   EL.args = list(chull.fail = "taylor", weight.tolerance = NULL),
@@ -117,7 +117,8 @@ cbind(SEL = b.SEL$par, SEuL = b.SEuL$par)
 # Now we start from (0, 0), for which the Taylor expansion is necessary
 # because all residuals at this starting value are positive and the
 # unmodified EL ratio for the test of equality to 0 is -Inf
-smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w, EL.args = list(chull.fail = "none"))
+if (FALSE) {
+smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
 smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
 
 # The next example is very slow; approx. 1 minute
@@ -131,6 +132,9 @@ b.SELt <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "taylor"),
                 method = "BFGS", control = ctl)
 b.SELw <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "wald"),
                 method = "BFGS", control = ctl)
+}
+w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
+w <- w / rowSums(w)
 # In this sense, Euclidean likelihood is robust to convex hull violations
 b.SELu <- optim(c(0, 0), SEuL, method = "BFGS", control = ctl)
 b0grid <- seq(-1.5, 7, length.out = 51)

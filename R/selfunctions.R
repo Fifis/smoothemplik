@@ -75,7 +75,8 @@
 #' # Now we start from (0, 0), for which the Taylor expansion is necessary
 #' # because all residuals at this starting value are positive and the
 #' # unmodified EL ratio for the test of equality to 0 is -Inf
-#' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w, EL.args = list(chull.fail = "none"))
+#' if (FALSE) {
+#' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
 #' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
 #'
 #' # The next example is very slow; approx. 1 minute
@@ -89,6 +90,9 @@
 #'                 method = "BFGS", control = ctl)
 #' b.SELw <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "wald"),
 #'                 method = "BFGS", control = ctl)
+#' }
+#' w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
+#' w <- w / rowSums(w)
 #' # In this sense, Euclidean likelihood is robust to convex hull violations
 #' b.SELu <- optim(c(0, 0), SEuL, method = "BFGS", control = ctl)
 #' b0grid <- seq(-1.5, 7, length.out = 51)
@@ -129,7 +133,7 @@
 #' par(oldpar)
 #' }
 smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
-                         type = c("EL", "EuL", "EL0"),
+                         type = c("EL0", "EL1", "EuL"),
                          kernel.args = list(bw = NULL, kernel = "epanechnikov", order = 2, PIT = TRUE, sparse = TRUE),
                          EL.args = list(chull.fail = "taylor", weight.tolerance = NULL),
                          minus = FALSE,
@@ -173,21 +177,18 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
   empliklist <- vector("list", n)
   if (verbose) pb <- utils::txtProgressBar(min = 0, max = length(chunk.list), style = 3)
 
-  calcOne <- function(i) { # Call the appropriate weighted likelihood function based on `type`
-    if (type == "EL") {
-      return(EL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+  # Call the appropriate weighted likelihood function based on `type`
+  if (type == "EL1") {
+    calcOne <- function(i) return(EL1(z = rho.series, ct = w[i, ], mu = 0, renormalise = TRUE,
                         weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
-    } else if (type == "EuL") {
-      return(EuL(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
+  } else if (type == "EuL") {
+    calcOne <- function(i) return(EuL(z = rho.series, ct = w[i, ], mu = 0, renormalise = TRUE,
                          weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
-    } else if (type == "EL0") {
-      return(EL0(z = rho.series, ct = w[i, ], mu = 0, SEL = TRUE,
-                         chull.fail = EL.args$chull.fail, weight.tolerance = EL.args$weight.tolerance,
-                         return.weights = attach.probs))
-    } else {
-      stop("The 'type' argument must be 'EL' or 'EuL'.")
-    }
-  }
+  } else if (type == "EL0") {
+    calcOne <- function(i) return(EL0(z = rho.series, ct = w[i, ], mu = 0, renormalise = TRUE,
+                         weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
+  }  # match.arg makes sure that only the allowed options are processed
+
 
   if ((is.matrix(sel.weights) || inherits(sel.weights, "dgeMatrix")) && sparse) {
     sel.weights <- Matrix::Matrix(sel.weights, sparse = TRUE)
