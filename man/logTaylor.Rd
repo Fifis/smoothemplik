@@ -41,4 +41,7 @@ x <- seq(0.1, 2, 0.05)
 ae <- abs(sapply(2:6, function(o) log(x) - logTaylor(x, lower=1, upper=1, order=o)))
 matplot(x[x!=1], ae[x!=1,], type = "l", log = "y", lwd = 2,
   main = "Abs. trunc. err. of Taylor expansion at 1", ylab = "")
+
+# Vanilla logarithm
+identical(logTaylor(2, order = NA), log(2))
 }

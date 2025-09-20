@@ -2,7 +2,6 @@
 using namespace Rcpp;
 using namespace arma;
 
-
 // Forward declarations in other functions
 SEXP logTaylorCPP(const NumericVector& x, NumericVector lower, NumericVector upper,
                   IntegerVector der, int order);
@@ -16,11 +15,12 @@ List dampedNewtonCPP(Function fn, NumericVector par, double thresh, int itermax,
 List wEL(const arma::vec& lambda,
          const arma::mat& Z,         // n*d centred data
          const arma::vec& ct,        // n weights
+         const double shift,
          const NumericVector& lower,  // n
          const NumericVector& upper,  // n
-         int taylorOrd) {
+         const int taylorOrd) {
   IntegerVector ders = IntegerVector::create(0, 1, 2);
-  arma::vec s = 1.0 + Z * lambda;
+  arma::vec s = 1.0 + Z * lambda + shift;
   NumericVector sR(s.begin(), s.end());
 
   NumericMatrix LT = as<NumericMatrix>(logTaylorCPP(sR, lower, upper, ders, taylorOrd));
@@ -45,6 +45,7 @@ List wEL(const arma::vec& lambda,
 // a function of one argument (parameter vector)
 static arma::mat      g_Z;
 static arma::vec      g_ct;
+static double         g_shift;
 static NumericVector  g_lower;
 static NumericVector  g_upper;
 static int            g_order;
@@ -53,13 +54,14 @@ static int            g_order;
 static SEXP wELlambda(SEXP lambdaSEXP) {
   NumericVector lamR(lambdaSEXP);
   arma::vec lambda(lamR.begin(), lamR.size(), false);
-  return wEL(lambda, g_Z, g_ct, g_lower, g_upper, g_order);
+  return wEL(lambda, g_Z, g_ct, g_shift, g_lower, g_upper, g_order);
 }
 
 // [[Rcpp::export]]
-List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector lambda_init,
-           bool return_weights, NumericVector lower, NumericVector upper,
-           int order, double weight_tolerance, double thresh, int itermax, bool verbose = false,
+List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
+           NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper,
+           int order, double weight_tolerance, bool deriv = false,
+           double thresh = 1e-16, int itermax = 100, bool verbose = false,
            double alpha = 0.3, double beta = 0.8, double backeps = 0.0) {
   const int n = z.nrow();
   const int d = z.ncol();
@@ -77,6 +79,8 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector la
   if (sum(ct) == 0) stop("ELCPP: Total weight must be positive.");
   g_ct = arma::vec(ct.begin(), n,  /*copy_aux_mem =*/ true);
 
+  g_shift = shift;
+
   // Cut-offs
   g_lower = as<NumericVector>(lower);
   if (g_lower.size() == 1) g_lower = NumericVector(n, g_lower[0]);
@@ -86,6 +90,8 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector la
 
   g_order = order;   // Taylor order  (>=4)
 
+  // Rcpp::Rcout << "Set the main variables" << std::endl;
+
   // Decide the starting lambda
   arma::vec lam = arma::vec(lambda_init.begin(), d);
 
@@ -94,7 +100,7 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector la
     IntegerVector der0 = IntegerVector::create(0);
     // Testing 0: 1+lambda'Z = 1
     NumericVector one_l0(n, 1.0);
-    arma::vec one_lambdaZ = 1.0 + g_Z * lam;
+    arma::vec one_lambdaZ = 1.0 + g_Z * lam + shift;
     NumericVector one_lz(one_lambdaZ.begin(), one_lambdaZ.end());
     NumericVector lt0 = as<NumericVector>( logTaylorCPP(one_l0, g_lower, g_upper, der0, g_order));
     NumericVector lt1 = as<NumericVector>( logTaylorCPP(one_lz, g_lower, g_upper, der0, g_order));
@@ -103,11 +109,15 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector la
     if (f0 < f1) lam.zeros();  // minus log-likelihood is lower -- start from 0 instead
   }
 
+  // Rcpp::Rcout << "Chose lambda" << std::endl;
+
   // Damped Newton optimisation -- key line
   Rcpp::InternalFunction objFunInternal(&wELlambda);
   Rcpp::Function objFun( (SEXP)objFunInternal );
   List opt = dampedNewtonCPP(objFun, NumericVector(lam.begin(), lam.end()), thresh,
                              itermax, verbose, alpha, beta, backeps);
+
+  // Rcpp::Rcout << "Found lambda" << std::endl;
 
   double logelr = opt["value"];
   NumericVector par = opt["par"];
@@ -117,12 +127,34 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, NumericVector la
   SEXP wts = R_NilValue;
   if (return_weights) {
     arma::vec lamA(par.begin(), d, false);
-    arma::vec wtsA = (g_ct / sum(g_ct)) / (1.0 + g_Z * lamA);
+    arma::vec wtsA = (g_ct / sum(g_ct)) / (1.0 + g_Z * lamA + shift);
     wts = NumericVector(wtsA.begin(), wtsA.end());
+  }
+
+  // Derivatives if asked for (univariate only; log-ELR scale)
+  SEXP derivs = R_NilValue;
+  if (deriv && d == 1) {
+    const arma::vec g = g_Z.col(0);
+    const double lam  = par[0];
+    arma::vec u = 1.0 + lam * g + g_shift;
+    arma::vec invu  = 1.0 / u;  // Pre*compute 1/u and 1/u^2
+    arma::vec invu2 = invu % invu;
+    // Same as EL0 in R
+    const double S0 = arma::dot(g_ct, invu);
+    const double S1 = arma::dot(g_ct, invu2);
+    const double T1 = arma::dot(g_ct, g % invu2);
+    const double T2 = arma::dot(g_ct, (g % g) % invu2);
+
+    const double fp  = S0 * lam;
+    const double w   = S0 - lam * T1;
+    const double fpp = lam * lam * S1 - (w * w) / T2;
+
+    derivs = NumericVector::create(fp, fpp);
   }
 
   return List::create(
     _["logelr"] = logelr, _["lam"] = par, _["wts"] = wts,
+    _["deriv"] = derivs,
     _["exitcode"] = opt["convergence"], _["iter"] = it,
     _["ndec"] = opt["ndec"], _["gradnorm"]  = opt["gradnorm"]
   );

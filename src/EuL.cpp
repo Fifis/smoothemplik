@@ -9,9 +9,8 @@ using namespace Rcpp;
 List EuLCPP(const arma::mat& z, arma::vec mu,
             arma::vec ct, arma::vec vt, arma::vec shift,
             const double n_orig, const double weight_tolerance,
-            const double trunc_to = 0.0, const bool SEL = true,
-            const bool return_weights = false, const bool verbose = false,
-            const bool chull_diag = false)
+            const double trunc_to = 0.0, const bool renormalise = true,
+            const bool return_weights = false, const bool verbose = false)
 {
   const double me = std::numeric_limits<double>::epsilon();
 
@@ -31,7 +30,7 @@ List EuLCPP(const arma::mat& z, arma::vec mu,
   if (vt.min() < 0) stop("Negative variance weights are not welcome.");
   if (arma::accu(ct) <= 0.0) stop("The total sum of weights must be positive.");
   if (arma::accu(vt) == 0.0) stop("All variances are zero -- nothing to optimise.");
-  if (!SEL) stop("Only 'ct' representing weights (adding up to one) are supported (SEL = TRUE).");
+  if (!renormalise) stop("Only 'ct' representing weights (adding up to one) are supported (renormalise = TRUE).");
 
   zz.each_row() -= mu.t(); // z <- z - mu
 
@@ -63,13 +62,13 @@ List EuLCPP(const arma::mat& z, arma::vec mu,
   const std::size_t n_final = nonz.n_elem;
 
   // Re-normalising for SEL
-  if (SEL) {
+  if (renormalise) {
     ct /= arma::accu(ct);
   }
   vt /= arma::accu(vt);
 
   // Original sample size for normalisation
-  const double N = SEL ? static_cast<double>(n_orig) : arma::accu(ct);
+  const double N = renormalise ? static_cast<double>(n_orig) : arma::accu(ct);
   if (N <= 0) stop("EuLCPP: Total weights after tolerance checks must be positive.");
 
   // Rcout << "zz: " << zz << "\n";
@@ -87,11 +86,11 @@ List EuLCPP(const arma::mat& z, arma::vec mu,
   NumericVector bracket = NumericVector::create(R_NegInf, R_PosInf);
   double estim_prec = NA_REAL;
   double f_root = NA_REAL;
-  int exitcode = 3;           // Default: failed to invert a matrix
+  int exitcode = 2;           // Default: failed to invert a matrix
 
   // Heart of the function: compute lambdas and ELR
   if (n_final < k) {               // Not enough points to solve the system
-    exitcode = 2;
+    exitcode = 1;
   } else {
     arma::vec m = zz.t() * ct;  // Count-weighted average of z
     arma::mat zc = zz.each_row() - m.t();  // Z minus its conditional expectation for mean
@@ -117,7 +116,7 @@ List EuLCPP(const arma::mat& z, arma::vec mu,
       arma::vec  zlam = zcv * lam;  // lambda' (z_j - mv_i)
       arma::vec  wvec = ct + vt % zlam;
       lam /= N;  // Because the true lambda is -1/n inv(Omega) m
-      if (!SEL) wvec /= N;
+      if (!renormalise) wvec /= N;
       if (return_weights) wts.elem(nonz) = wvec;
       logelr     = -0.5 * arma::accu(arma::square(wvec - ct));
       converged  = true;
@@ -130,17 +129,16 @@ List EuLCPP(const arma::mat& z, arma::vec mu,
       // Convex-hull diagnostic
       // Zero cannot be in the convex hull of a column if its min and max
       // have the same non-zero sign (their product is strictly positive)
-      if (chull_diag) {
-        arma::rowvec colMax = arma::max(zz, /*dim=*/0);
-        arma::rowvec colMin = arma::min(zz, /*dim=*/0);
-        if (arma::any((colMin % colMax) > 0.0)) exitcode = 1;
-      }
+      // if (chull_diag) {
+      //   arma::rowvec colMax = arma::max(zz, /*dim=*/0);
+      //   arma::rowvec colMin = arma::min(zz, /*dim=*/0);
+      //   if (arma::any((colMin % colMax) > 0.0)) exitcode = 1;
+      // }
     }
   }
 
   std::vector<std::string> msgs = {
     "successful convergence, mu is within the convex hull of z",
-    "successful convergence, mu is certainly outside the convex hull of z",
     "at least ncol(z) points non-zero weights are needed for identification",
     "could not invert the matrix (probably columns of 'z' are collinear)"
   };

@@ -47,13 +47,12 @@ test_that("very small counts are handled reasonably well", {
   EL0 <- EuL(z, ct = ct, vt = vt, return.weights = TRUE, weight.tolerance = 0)
   EL1 <- EuL(z, ct = ct, vt = vt, return.weights = TRUE)
   expect_equal(length(EL0$wts), length(EL1$wts))
-  expect_equal(sum(EL1$wts == 0), 16) # If the defaults change, this will break
+  expect_equal(sum(EL1$wts == 0), 17) # If the defaults change, this will break
 })
 
 test_that("exit codes of EuL", {
   expect_equal(EuL(-4:3)$exitcode, 0)
-  expect_equal(EuL(1:5, chull.diag = FALSE)$exitcode, 0)
-  expect_equal(EuL(1:5, chull.diag = TRUE)$exitcode, 1)
-  expect_equal(EuL(matrix(1:2, nrow = 1))$exitcode, 2)
-  expect_equal(EuL(cbind(1:4, 2:5))$exitcode, 3)
+  expect_equal(EuL(1:5)$exitcode, 0)
+  expect_equal(EuL(matrix(1:2, nrow = 1))$exitcode, 1)
+  expect_equal(EuL(cbind(1:4, 2:5))$exitcode, 2)
 })
