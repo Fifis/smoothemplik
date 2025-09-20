@@ -4,21 +4,12 @@
 \alias{ctracelr}
 \title{Compute empirical likelihood on a trajectory}
 \usage{
-ctracelr(
-  z,
-  ct = NULL,
-  mu0,
-  mu1,
-  N = 5,
-  verbose = FALSE,
-  verbose.solver = FALSE,
-  ...
-)
+ctracelr(z, ct = NULL, mu0, mu1, N = 5, order = 4, verbose = FALSE, ...)
 }
 \arguments{
-\item{z}{Passed to \code{EL}.}
+\item{z}{Passed to [EL1()].}
 
-\item{ct}{Passed to \code{EL}.}
+\item{ct}{Passed to [EL1()].}
 
 \item{mu0}{Starting point of trajectory}
 
@@ -26,11 +17,12 @@ ctracelr(
 
 \item{N}{Number of segments into which the path is split (i. e. \code{N+1} steps are used).}
 
-\item{verbose}{Logical: report iteration data?}
+\item{order}{Passed to [EL1()]. It is highly advised to avoid using \code{NA}
+(no extrapolation) because the lambda search may fail with unmodified logarithm.}
 
-\item{verbose.solver}{Logical: report internal iteration data from the optimiser? Very verbose.}
+\item{verbose}{Logical: report iteration progress?}
 
-\item{...}{Passed to \code{EL}.
+\item{...}{Passed to [EL1()].
 
 This function does not accept the starting lambda because it is much faster (3--5 times)
 to reuse the lambda from the previous iteration.}
@@ -47,12 +39,11 @@ earth <- c(
   5.5, 5.61, 4.88, 5.07, 5.26, 5.55, 5.36, 5.29, 5.58, 5.65, 5.57, 5.53, 5.62, 5.29,
   5.44, 5.34, 5.79, 5.1, 5.27, 5.39, 5.42, 5.47, 5.63, 5.34, 5.46, 5.3, 5.75, 5.68, 5.85
 )
-EL(earth, mu = 5.1,  verbose = TRUE)
+EL1(earth, mu = 5.1,  verbose = TRUE)
 logELR <- ctracelr(earth, mu0 = 5.1, mu1 = 5.65, N = 55, verbose = TRUE)
 hist(earth, breaks = seq(4.75, 6, 1/8))
 plot(logELR[, 1], exp(logELR[, 2]), bty = "n", type = "l",
      xlab = "Earth density", ylab = "ELR")
-# TODO: why is there non-convergence in row 0?
 
 # Two-dimensional trajectory
 set.seed(1)

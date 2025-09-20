@@ -51,25 +51,44 @@ List dampedNewtonCPP(Function fn, NumericVector par,
     // Back-tracking line search
     double t = 1.0;
     double fnew; arma::vec gnew; arma::mat hnew;
+
+    // Guards against infinite backtracking
+    const double t_min = 1e-12;
+    const int    max_backtracks = 200;
+    int          n_back = 0;
+
     while (true) {
       arma::vec x_trial = x + t * step;
       std::tie(fnew, gnew, hnew) = eval_fn(x_trial);
 
-      if (std::isfinite(fnew) && gnew.is_finite() && hnew.is_finite()) {
+      bool finite_trial = std::isfinite(fnew) && gnew.is_finite() && hnew.is_finite();
+      if (finite_trial) {
         double armijo = f + alpha * t * dot(g, step) + backeps;
         if (fnew <= armijo || t < 1e-4) {  // Accept
-          // If all is good or all is bad, update the point
+          // Accept trial update (either Armijo satisfied, good -- or tiny step, bad)
           x = x_trial;  f = fnew;  g = gnew;  h = hnew;
           // Could not find a satisfactory step -- fall back to the current point and leave the line search
-          if (t < 1e-4 && verbose) Rcout << "Line search unsuccessful,  accepting a tiny step.\n";
+          if (t < 1e-4 && verbose) Rcout << "Line search unsuccessful, accepting a tiny step.\n";
           break;
         }
       }
 
-      t *= beta;  // Shrink
+      t *= beta;  // Shrink the step
+      ++n_back;
+
+      // Global bail-out even when the trial is non-finite (may happen if logTaylor does not use Taylor)
+      if (t < t_min || n_back >= max_backtracks) {
+        if (verbose) Rcout << "Line search failed (non-finite or no Armijo). Proceeding without update.\n";
+        // Plan B: take a tiny gradient step instead of Newton
+        arma::vec gd_step = -g;
+        x += t_min * gd_step / std::max(1.0, norm(gd_step, 2));
+        std::tie(f, g, h) = eval_fn(x);
+        break;
+      }
+
     }
 
-    if (verbose) Rcout << "Iter " << iter << "  f=" << f << "  |grad|=" <<gradnorm <<
+    if (verbose) Rcout << "Iter " << iter << "  f=" << f << "  |grad|=" << gradnorm <<
       "  decr=" << ndec << "  shrink=" << t << "\n";
 
     converged = (ndec * ndec <= thresh);
