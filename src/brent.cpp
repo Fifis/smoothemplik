@@ -488,7 +488,9 @@ List brentZeroCPP(
   doExtendInterval(
     [&](double xx){
       double val = as<double>(f(xx));
-      return (R_finite(val) ? val : NA_REAL);
+      // (Turning non-finite into NA/0 breaks bracketing.)
+      // return (R_finite(val) ? val : NA_REAL);
+      return val;
     },
     lower, upper, fa, fb,
     initSteps, maxiter, mode, trace, softFail, candX, candFX
@@ -549,7 +551,7 @@ List brentZeroCPP(
   double fc = fsa;
   double e  = sb - sa;
   double d  = e;
-  int iterCount = 0;
+  int    iterCount = 0;
   double root   = sb;
   double froot  = fsb;
 
@@ -567,10 +569,10 @@ List brentZeroCPP(
     }
     // If fc is smaller in magnitude than fb, swap roles
     if (std::fabs(fc) < std::fabs(fsb)) {
-      double tmpb = sb;  sb = c;   c = tmpb;
-      double tmpf = fsb; fsb= fc;  fc = tmpf;
-      double tmpsa= sa;  sa = sb;  sb = tmpsa; // preserve previous "a"
-      double tmpfa= fsa; fsa= fsb; fsb= tmpfa; // and its f
+      std::swap(sb, c);
+      std::swap(fsb, fc);
+      std::swap(sa, sb);
+      std::swap(fsa, fsb);
     }
     double tol1 = 2.0*DBL_EPSILON*std::fabs(sb) + tol;
     double m    = 0.5*(c - sb);
@@ -586,11 +588,11 @@ List brentZeroCPP(
       double s = fsb / fsa;
       double p, q, r;
       if (sa == c) {
-        // linear interpolation
+        // linear interpolation -- secant
         p = 2.0*m*s;
         q = 1.0 - s;
       } else {
-        // inverse quadratic
+        // inverse quadratic interpolation
         q = fsa/fc;
         r = fsb/fc;
         p = s*(2.0*m*q*(q-r) - (sb - sa)*(r - 1.0));
@@ -607,8 +609,8 @@ List brentZeroCPP(
         d = e;
       }
     }
-    sa = sb;
-    fsa= fsb;
+    sa  = sb;
+    fsa = fsb;
 
     if (std::fabs(d) > tol1) {
       sb += d;
@@ -618,8 +620,32 @@ List brentZeroCPP(
       sb -= tol1;
     }
     fsb = as<double>(f(sb));
-    if (!R_finite(fsb)) fsb=0.0; // or handle NA as 0, etc.
+    // if (!R_finite(fsb)) fsb=0.0; // or handle NA as 0, etc.
+    // Reject non-finite trial points; bisect inside the bracket
+    if (!R_finite(fsb)) {
+      // Fall back to bisection toward the interior of [sb,c]
+      // (sb and c carry opposite signs by construction)
+      do {
+        sb = 0.5 * (sb + c);
+        fsb = as<double>(f(sb));
+        tol1 = 2.0*DBL_EPSILON*std::fabs(sb) + tol;
+      } while (!R_finite(fsb) && std::fabs(c - sb) > tol1);
 
+      // If even repeated bisection cannot find a finite value, bail with best finite endpoint.
+      if (!R_finite(fsb)) {
+        double rootCand = (std::isfinite(fsa) && (std::fabs(fsa) <= std::fabs(fc))) ? sa : c;
+        double fCand    = (rootCand == sa) ? fsa : fc;
+        return List::create(
+          _["root"] = rootCand, _["f.root"] = fCand,
+          _["iter"] = iterCount + initSteps,
+          _["init.it"] = (initSteps ? initSteps : R_NaInt),
+          _["estim.prec"] = std::fabs(c - sb),
+          _["exitcode"] = 2
+        );
+      }
+    }
+
+    // Maintain the bracket: (sb, c) must have opposite signs
     if ((fsb > 0.0 && fc > 0.0) || (fsb <= 0.0 && fc <= 0.0)) {
       c  = sa;
       fc = fsa;
