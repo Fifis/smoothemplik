@@ -2,9 +2,18 @@
 % Please edit documentation in R/extrapolation.R
 \name{ExEL1}
 \alias{ExEL1}
+\alias{ExEL2}
 \title{Extrapolated EL of the first kind (Taylor expansion)}
 \usage{
 ExEL1(
+  z,
+  mu,
+  type = c("EL0", "EL1"),
+  exel.control = list(xlim = "auto", fmax = NA, p = 0.999, df = 1),
+  ...
+)
+
+ExEL2(
   z,
   mu,
   type = c("EL0", "EL1"),
@@ -56,4 +65,29 @@ xseq <- seq(0.8, 1.4, length.out = 101)
 plot(xseq, -2*ExEL1(z, xseq, ct = 1:6, exel.control = ctrl0), bty = "n")
 lines(xseq, -2*ExEL1(z, xseq, ct = 1:6, type = "EL0"), col = 3)
 lines(xseq, -2*ExEL1(z, xseq, ct = 1:6, type = "EL1"), col = 2, lty = 2, lwd = 2)
+
+# Compating ExEL2 vs ExEL1
+xseq <- seq(-7, 10.5, 0.1)
+xl <- range(xseq)
+# No extrapolation
+a0 <- ExEL1(-4:4, mu = xseq, ct = 1:9, exel.control = list(xlim = xl))
+a1 <- ExEL1(-4:4, mu = xseq, ct = 1:9)
+a2 <- ExEL2(-4:4, mu = xseq, ct = 1:9)
+v1 <- attr(a1, "xlim")
+v2 <- c(attr(a2, "bridge.left")[c("x1", "x2")], attr(a2, "bridge.right")[c("x1", "x2")])
+
+plot(xseq, a0, ylim = c(-300, 0), xlim = xl, main = "ExEL splices",
+  bty = "n", xlab = "mu", ylab = "logELR(mu)")
+lines(xseq, a1, col = 2, lwd = 2)
+lines(xseq, a2, col = 4, lwd = 2)
+abline(v = v2, lty = 3)
+lines(xseq, attr(a2, "parabola.coef") * (xseq - attr(a2, "parabola.centre"))^2, lty = 2)
+legend("topright", c("Taylor", "Wald", "ax^2"), col = c(2, 4, 1), lwd = c(2, 2, 1), lty = c(1, 1, 2))
+
+plot(xseq[-1], diff(a1)/diff(xseq[1:2]), col = 2, type = "l", lwd = 2,
+  main = "Derivatives of ExEL splice", bty = "n", ylim = c(-100, 100),
+  xlab = "mu", ylab = "d/dmu logELR(mu)")
+lines(xseq[-1], diff(a2)/diff(xseq[1:2]), col = 4, lwd = 2)
+abline(v = c(v1, v2), lty = 3, col = "#00000055")
+legend("topright", c("Taylor", "Wald"), col = c(2, 4), lwd = 2)
 }
