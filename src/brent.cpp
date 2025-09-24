@@ -638,8 +638,7 @@ List brentZeroCPP(
     if (std::fabs(fc) < std::fabs(fsb)) {
       std::swap(sb, c);
       std::swap(fsb, fc);
-      std::swap(sa, sb);
-      std::swap(fsa, fsb);
+      // Do NOT swap sa and fsa here.
     }
     double tol1 = 2.0*DBL_EPSILON*std::fabs(sb) + tol;
     double m    = 0.5*(c - sb);
@@ -712,8 +711,8 @@ List brentZeroCPP(
       }
     }
 
-    // Maintain the bracket: (sb, c) must have opposite signs
-    if ((fsb > 0.0 && fc > 0.0) || (fsb <= 0.0 && fc <= 0.0)) {
+    // Maintain the bracket: ensure sign(fsb) != sign(fc)
+    if (getsign(fsb) == getsign(fc)) {
       c  = sa;
       fc = fsa;
       e  = sb - sa;
