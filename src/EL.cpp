@@ -65,7 +65,33 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
            double alpha = 0.3, double beta = 0.8, double backeps = 0.0) {
   const int n = z.nrow();
   const int d = z.ncol();
-  g_Z  = arma::mat(z.begin(), n, d, /*copy_aux_mem =*/ true);
+
+  // Computing the weighted mean centring -- used only for radial reduction
+  arma::vec v(d);
+  if (deriv) {
+    double ct_sum = 0.0;
+    for (int i = 0; i < n; ++i) ct_sum += ct[i];  // Positivity had been checked before
+    NumericVector wm(d, 0.0);  // Weighted mean by row
+    for (int i = 0; i < n; ++i) {
+      const double w = ct[i];
+      if (w > 0) {
+        for (int j = 0; j < d; ++j) wm[j] += w * z(i, j);
+      }
+    }
+    for (int j = 0; j < d; ++j) wm[j] /= ct_sum;
+    // Direction of the ray: v = (mu - wm) / ||mu - wm||
+    double nn = 0.0;
+    for (int j = 0; j < d; ++j) {
+      double diff = mu[j] - wm[j];
+      v[j] = diff;
+      nn += diff * diff;
+      }
+    if (nn > 0.0) v /= std::sqrt(nn); else v.zeros();   // If mu is wm, v=0
+    // Rcpp::Rcout << "Weighted mean wm=" << wm << std::endl;
+    // Rcpp::Rcout << "Vector v=" << v << std::endl;
+  }
+
+  g_Z  = arma::mat(z.begin(), n, d, /*copy_aux_mem =*/ true);  // Converting to Armadillo objects
 
   if (mu.size() == 1) mu = NumericVector(d, mu[0]);
   if (mu.size() != d) stop("ELCPP: The length of mu must match the number of columns in z.");
@@ -95,7 +121,7 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
   // Decide the starting lambda
   arma::vec lam = arma::vec(lambda_init.begin(), d);
 
-  if (arma::any(lam != 0.0)) {  // user supplied non-zero lambda
+  if (arma::any(lam != 0.0)) {  // Does user-supplied non-zero lambda yield a lower objective?
     arma::vec zerolam(d, fill::zeros);
     IntegerVector der0 = IntegerVector::create(0);
     // Testing 0: 1+lambda'Z = 1
@@ -111,7 +137,7 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
 
   // Rcpp::Rcout << "Chose lambda" << std::endl;
 
-  // Damped Newton optimisation -- key line
+  // Damped Newton in lambda -- THE HEART OF EL
   Rcpp::InternalFunction objFunInternal(&wELlambda);
   Rcpp::Function objFun( (SEXP)objFunInternal );
   List opt = dampedNewtonCPP(objFun, NumericVector(lam.begin(), lam.end()), thresh,
@@ -120,36 +146,49 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
   // Rcpp::Rcout << "Found lambda" << std::endl;
 
   double logelr = opt["value"];
-  NumericVector par = opt["par"];
+  NumericVector par = opt["par"];  // This stays a NumericVector
   int it  = opt["counts"];
+  arma::vec lambda(par.begin(), d, /*copy_aux_mem=*/ false);  // Here is an ARMA copy
 
   // Probabilities if asked for
   SEXP wts = R_NilValue;
   if (return_weights) {
-    arma::vec lamA(par.begin(), d, false);
-    arma::vec wtsA = (g_ct / sum(g_ct)) / (1.0 + g_Z * lamA + shift);
+    arma::vec wtsA = (g_ct / sum(g_ct)) / (1.0 + g_Z * lambda + g_shift);
     wts = NumericVector(wtsA.begin(), wtsA.end());
   }
 
-  // Derivatives if asked for (univariate only; log-ELR scale)
+  // Derivatives in the direction of mu if asked for (log-ELR scale)
   SEXP derivs = R_NilValue;
-  if (deriv && d == 1) {
-    const arma::vec g = g_Z.col(0);
-    const double lam  = par[0];
-    arma::vec u = 1.0 + lam * g + g_shift;
-    arma::vec invu  = 1.0 / u;  // Pre*compute 1/u and 1/u^2
-    arma::vec invu2 = invu % invu;
-    // Same as EL0 in R
-    const double S0 = arma::dot(g_ct, invu);
-    const double S1 = arma::dot(g_ct, invu2);
-    const double T1 = arma::dot(g_ct, g % invu2);
-    const double T2 = arma::dot(g_ct, (g % g) % invu2);
+  if (deriv) {
+    if (arma::norm(v, 2) == 0.0) {  // mu == wm: zero direction
+      derivs = NumericVector::create(0.0, 0.0);
+    } else {
+      arma::vec u      = 1.0 + g_Z * lambda + g_shift; // n x 1
+      arma::vec invu   = 1.0 / u;
+      arma::vec invu2  = invu % invu;
+      arma::vec winvu2 = g_ct % invu2;  // weights / u^2
 
-    const double fp  = S0 * lam;
-    const double w   = S0 - lam * T1;
-    const double fpp = lam * lam * S1 - (w * w) / T2;
+      const double S0 = arma::dot(g_ct, invu);
+      const double S1 = arma::dot(g_ct, invu2);
+      arma::vec  T1  = g_Z.t() * winvu2;                      // d x 1
+      arma::mat  T2   = g_Z.t() * (g_Z.each_col() % winvu2);  // d x d
 
-    derivs = NumericVector::create(fp, fpp);
+      arma::mat T2inv;  // Stable inverse
+      bool ok = false;
+      try { T2inv = arma::inv_sympd(T2); ok = true; } catch(...) { ok = false; }
+      if (!ok) T2inv = arma::pinv(T2);
+
+      const double lamv = arma::dot(lambda, v);
+      arma::vec wv = S0 * v - lamv * T1;
+
+      // log-ELR directional derivatives:
+      // f'_v  =  S0 * (lambda' v)
+      // f''_v = (wv' T2^{-1} wv) - (lambda' v)^2 S1
+      double first  = S0 * lamv;
+      double second = -(arma::as_scalar( wv.t() * T2inv * wv )) + (lamv * lamv) * S1;
+
+      derivs = NumericVector::create(first, second);
+    }
   }
 
   return List::create(

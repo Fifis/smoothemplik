@@ -8,16 +8,16 @@
 ExEL1(
   z,
   mu,
-  type = c("EL0", "EL1"),
-  exel.control = list(xlim = "auto", fmax = NA, p = 0.999, df = 1),
+  type = c("auto", "EL0", "EL1"),
+  exel.control = list(xlim = "auto", fmax = NA, p = 0.999, df = NA),
   ...
 )
 
 ExEL2(
   z,
   mu,
-  type = c("EL0", "EL1"),
-  exel.control = list(xlim = "auto", fmax = NA, p = 0.999, df = 1),
+  type = c("auto", "EL0", "EL1"),
+  exel.control = list(xlim = "auto", fmax = NA, p = 0.999, df = NA),
   ...
 )
 }
@@ -84,10 +84,18 @@ abline(v = v2, lty = 3)
 lines(xseq, attr(a2, "parabola.coef") * (xseq - attr(a2, "parabola.centre"))^2, lty = 2)
 legend("topright", c("Taylor", "Wald", "ax^2"), col = c(2, 4, 1), lwd = c(2, 2, 1), lty = c(1, 1, 2))
 
-plot(xseq[-1], diff(a1)/diff(xseq[1:2]), col = 2, type = "l", lwd = 2,
+dx <- diff(xseq[1:2])
+plot(xseq[-1], diff(a1)/dx, col = 2, type = "l", lwd = 2,
   main = "Derivatives of ExEL splice", bty = "n", ylim = c(-100, 100),
   xlab = "mu", ylab = "d/dmu logELR(mu)")
-lines(xseq[-1], diff(a2)/diff(xseq[1:2]), col = 4, lwd = 2)
+lines(xseq[-1], diff(a2)/dx, col = 4, lwd = 2)
 abline(v = c(v1, v2), lty = 3, col = "#00000055")
 legend("topright", c("Taylor", "Wald"), col = c(2, 4), lwd = 2)
+
+# Multivariate extension
+set.seed(1)
+X <- cbind(rchisq(30, 3), rchisq(30, 3))
+ct <- runif(30)
+-2*ExEL1(X, mu = c(-1, -1),  ct = ct)  # Outside the hull
+-2*ExEL2(X, mu = c(-1, -1),  ct = ct)
 }
