@@ -195,7 +195,9 @@ enum ExtendIntMode {
   EXT_NO = 0,
   EXT_YES,
   EXT_DOWN,
-  EXT_UP
+  EXT_UP,
+  EXT_RIGHT,
+  EXT_LEFT
 };
 
 static ExtendIntMode parseExtendInt(const std::string &str) {
@@ -203,8 +205,12 @@ static ExtendIntMode parseExtendInt(const std::string &str) {
   if (str == "yes")   return EXT_YES;
   if (str == "downX") return EXT_DOWN;
   if (str == "upX")   return EXT_UP;
-  Rcpp::stop("Invalid 'extendInt' argument; must be one of 'no','yes','downX','upX'.");
-  return EXT_NO; // default fallback; not reached
+  if (str == "right") return EXT_RIGHT;
+  if (str == "left")  return EXT_LEFT;
+  if (str == "upper") return EXT_RIGHT;  // Safe catching of popular mis-spellings
+  if (str == "lower") return EXT_LEFT;
+  Rcpp::stop("Invalid 'extendInt' argument; must be one of 'no', 'yes', 'downX', 'upX', 'right', 'left'.");
+  return EXT_NO; // not reached
 }
 
 // Clamp to machine max
@@ -259,20 +265,19 @@ void doExtendInterval(
   // If mode = yes (EXT_YES), do expansions if fLoTrunc*fHiTrunc > 0
   // If mode = no (EXT_NO), skip expansions
   // If mode = downX => sign(...) * fLoTrunc>0 or sign(...) * fHiTrunc<0
-  // If mode = upX   => similarly
+  // If mode = upX => similarly
+  // If mode = left/right => extend only that side if no sign change yet
   bool doX = false;
   if (mode == EXT_YES) {
-    if (fLoTrunc * fHiTrunc > 0) {
-      doX = true;
-    }
+    if (fLoTrunc * fHiTrunc > 0) doX = true;
   } else if (mode == EXT_NO) {
     doX = false;
+  } else if (mode == EXT_LEFT || mode == EXT_RIGHT) {
+    if (fLoTrunc * fHiTrunc > 0) doX = true; // Only if we still need a sign change
   } else {
     // mode is EXT_DOWN or EXT_UP => Sig = -1 or +1
     double Sig = (mode == EXT_DOWN ? -1.0 : 1.0);
-    if (Sig * fLoTrunc > 0 || Sig * fHiTrunc < 0) {
-      doX = true;
-    }
+    if (Sig * fLoTrunc > 0 || Sig * fHiTrunc < 0) doX = true;
   }
 
   if (!doX) {
@@ -345,8 +350,7 @@ void doExtendInterval(
       d[0] *= 2.0;
       d[1] *= 2.0;
     }
-  }
-  else if (mode == EXT_DOWN || mode == EXT_UP) {
+  } else if (mode == EXT_DOWN || mode == EXT_UP) {
     // Sig is -1 or +1
     double Sig = (mode == EXT_DOWN ? -1.0 : 1.0);
 
@@ -405,12 +409,75 @@ void doExtendInterval(
       }
       dd *= 2.0;
     }
+  } else if (mode == EXT_LEFT) {
+    // Extend lower (left) end only until sign change or we hit maxSteps
+    double dd = Delta(lo);
+    while ((fLo * fHi > 0.0)) {
+      initSteps++;
+      if (initSteps > maxSteps) {
+        Rcpp::warning("Left-only extension step limit hit after %d steps (soft stop).\n", initSteps-1);
+        // Best current endpoint (smaller |f|)
+        if (std::fabs(fLo) <= std::fabs(fHi)) { candX = lo; candFX = fLo; }
+        else { candX = hi; candFX = fHi; }
+        softFail = true;
+        return;
+      }
+      // Try to move lower further left
+      double oldLo = lo;
+      double oldf  = fLo;
+      lo = lo - dd;
+      double tmp = fn(lo);
+      if (Rcpp::NumericVector::is_na(tmp)) {
+        // revert and shrink step
+        lo  = oldLo;
+        fLo = oldf;
+        dd  = dd / 4.0;
+      } else {
+        fLo = tmp;
+      }
+      if (trace >= 2) {
+        Rcpp::Rcout << " .. left-only step " << initSteps << " => lo=" << lo << ", f(lo)=" << fLo << "\n";
+      }
+      // stop early if sign change achieved
+      if (getsign(fLo) * getsign(fHi) <= 0.0) break;
+      dd *= 2.0;
+    }
+  }   else if (mode == EXT_RIGHT) {
+    // Extend upper (right) end only until sign change or we hit maxSteps
+    double dd = Delta(hi);
+    while ((fLo * fHi > 0.0)) {
+      initSteps++;
+      if (initSteps > maxSteps) {
+        Rcpp::warning("Right-only extension step limit hit after %d steps (soft stop).\n", initSteps-1);
+        if (std::fabs(fLo) <= std::fabs(fHi)) { candX = lo; candFX = fLo; }
+        else { candX = hi; candFX = fHi; }
+        softFail = true;
+        return;
+      }
+      // Try to move upper further right
+      double oldHi = hi;
+      double oldf  = fHi;
+      hi = hi + dd;
+      double tmp = fn(hi);
+      if (Rcpp::NumericVector::is_na(tmp)) {
+        // revert and shrink step
+        hi  = oldHi;
+        fHi = oldf;
+        dd  = dd / 4.0;
+      } else {
+        fHi = tmp;
+      }
+      if (trace >= 2) {
+        Rcpp::Rcout << " .. right-only step " << initSteps << " => hi=" << hi << ", f(hi)=" << fHi << "\n";
+      }
+      if (getsign(fLo) * getsign(fHi) <= 0.0) break;
+      dd *= 2.0;
+    }
   }
 
   // Possibly a short message
-  if (trace && trace < 2 && initSteps > 0) {
-    Rcpp::Rcout << "Extended to [" << lo << "," << hi << "] in "
-    << initSteps << " steps\n";
+  if (trace > 0 && initSteps > 0) {
+    Rcpp::Rcout << "Extended to [" << lo << "," << hi << "] in " << initSteps << " steps\n";
   }
 
   // If still no sign change, soft stop with best endpoint

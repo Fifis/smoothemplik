@@ -2,7 +2,7 @@
 % Please edit documentation in R/brent.R
 \name{brentZero}
 \alias{brentZero}
-\title{Brent's local root search}
+\title{Brent's local root search with extended capabilities}
 \usage{
 brentZero(
   f,
@@ -36,6 +36,8 @@ brentZero(
   \item{\code{"yes"}}{Attempt to extend both ends until a sign change is found.}
   \item{\code{"upX"}}{Assumes the function is increasing around the root and extends upward if needed.}
   \item{\code{"downX"}}{Assumes the function is decreasing around the root and extends downward if needed.}
+  \item{\code{"right"}}{Attempt to extend the upper (right) end until a sign change is found.}
+  \item{\code{"left"}}{Attempt to extend the lower (left) end until a sign change is found.}
 }
 This behavior mirrors that of [uniroot()].}
 
@@ -60,12 +62,19 @@ A list with the following elements:
 }
 }
 \description{
-Brent's local root search
+Brent's local root search with extended capabilities
 }
 \examples{
 f <- function (x, a) x - a
 str(uniroot(f, c(0, 1), tol = 0.0001, a = 1/3))
 uniroot(function(x) cos(x) - x, lower = -pi, upper = pi, tol = 1e-9)$root
+
+# New capabilities: extending only one end of the interval
+f <- function(x) x^2 - 1  # The roots are -1 and 1
+brentZero(f, c(2, 3), extendInt = "left")
+brentZero(f, c(2, 3), extendInt = "yes")
+brentZero(f, c(2, 3), extendInt = "upX")
+brentZero(f, c(0, 0.5), extendInt = "downX")  # This one finds the left crossing
 
 # This function is faster than the base R uniroot, and this is the primary
 # reason why it was written in C++
