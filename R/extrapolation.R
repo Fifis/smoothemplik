@@ -80,7 +80,7 @@ ExEL1 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
   ell <- list(z = z, ...)
   ct <- ell$ct
-  n <- length(z)
+  n <- NROW(z)
   if (is.null(ct)) ct <- ell$ct <- rep(1, n)
   # Cleaning the dots from undesirable user arguments
   ell$mu <- NULL
@@ -100,7 +100,7 @@ ExEL1 <- function(z, mu, type = c("auto", "EL0", "EL1"),
               EL0 = function(m) do.call(EL0, c(list(mu = m, deriv = FALSE), ell))$logelr,
               EL1 = function(m) do.call(EL1, c(list(mu = m, deriv = FALSE), ell))$logelr)
 
-  wm <- if (d == 1) stats::weighted.mean(z, ct) else as.numeric(colSums(ct * z) / sum(ct))
+  wm <- if (d == 1) stats::weighted.mean(z, ct) else drop(crossprod(ct, z)) / sum(ct)
 
   if (d > 1) {
     if (!identical(exel.control$xlim, "auto")) stop("ExEL1 (multivariate): only xlim='auto' is supported.")
@@ -121,9 +121,9 @@ ExEL1 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
       # Find tmax with Brent
       tzero <- function(t) -2*f(wm + t*v) - fmax
-      tmax <- tryCatch(brentZero(tzero, c(0, max(t, 1e-6)), extendInt = "upX")$root, error = function(e) NA_real_)
-      # tseq <- seq(0, tmax*1.1, length.out = 51)
-      # plot(tseq, sapply(tseq, function(t) -2*f(wm + t*v))); abline(h = fmax)
+      tmax <- tryCatch(brentZero(tzero, c(0, max(t, 1e-6)), extendInt = "right", maxiter = 100)$root, error = function(e) NA_real_)
+      # tseq <- seq(0, 4, length.out = 51)
+      # plot(tseq, sapply(tseq, tzero)); abline(h = 0, lty = 2)
 
       if (!is.finite(tmax)) stop("ExEL1: could not find the desired cut-off point. Report this bug to GitHub.")
 
@@ -148,7 +148,7 @@ ExEL1 <- function(z, mu, type = c("auto", "EL0", "EL1"),
     if (nu >= 10) {
       rgap <- stats::median(dzu)
     } else if (nu >= 5) {
-      rgap <- stats::median(dzu) * ((n-4.5)/5)  # Starting at 0.1 median, ending at 0.9 median
+      rgap <- stats::median(dzu) * ((nu-4.5)/5)  # Starting at 0.1 median, ending at 0.9 median
     } else if (nu == 2) {
       rgap <- dzu*0.05  # Same as 0.05 median
     } else if (nu == 3) {
@@ -223,7 +223,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
   ell <- list(z = z, ...)
   ct <- ell$ct
-  if (is.null(ct)) ct <- ell$ct <- rep(1, length(z))
+  if (is.null(ct)) ct <- ell$ct <- rep(1, NROW(z))
   ell$mu <- NULL
   ell$return.weights <- FALSE  # To save memory
   ell$renormalise <- FALSE
@@ -274,27 +274,27 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
       v <- as.numeric(v / sqrt(sum(v^2)))
       a <- nc / drop(t(v) %*% Sig %*% v)
 
-      # Robust scale & reach along the ray (from data)
+      # Robust scale & reach alona1g the ray (from data)
       proj   <- drop(Zc %*% v)                 # weighted projections
       sd_v   <- sqrt(sum(ct * proj^2) / nc)    # SD of projection (weights ct)
-      iqr_v  <- stats::IQR(proj) / (stats::qnorm(0.75) * 2)
-      t_hi0  <- mean(sd_v, iqr_v)
+      iqr_v  <- stats::mad(proj)
+      t_hi0  <- max(0.01*sd_v, min(sd_v, iqr_v))
 
-      # tseq <- seq(0, 2.1, length.out = 101)
+      # tseq <- seq(0, 55, length.out = 101)
       # fseq <- sapply(tseq, function(t) f(wm + t * v))
       # plot(tseq, fseq)
       # lines(tseq, -0.5*a*tseq^2, col = 2)
       # abline(h = -0.5*qchisq(0.999, 2), lty = 2)
+      #
+      # linfun <- function(x) f1 + fp1*(x-t1)
+      # lines(tseq, linfun(tseq), col = 3)
 
       # (1) cut radius t1 : solve -2 f(wm + t v) = fmax
       g  <- function(t) -2 * f(wm + t * v) - fmax
       # curve(g(x), 0, t_hi0)
-      t1 <- tryCatch(
-        brentZero(g, c(0, t_hi0), extendInt = "right")$root,
-        error = function(e) NA_real_
-      )
-      if (!is.finite(t1))
-        stop("ExEL2 splice: could not locate cut t1 (root of -2*f = fmax). Try a different fmax or check EL convergence.")
+      # Add trace=2 here because this is one of the most error-prone parts
+      t1 <- tryCatch(brentZero(g, c(0, t_hi0), extendInt = "right", maxiter = 100)$root, error = function(e) NA_real_)
+      if (!is.finite(t1)) stop("ExEL2 splice: could not locate cut t1 (root of -2*f = fmax). Try a different fmax or check EL convergence.")
 
       f1 <- f(wm + t1 * v)
       fp1 <- fl(wm + t1 * v)$deriv[1]  # Directional derivative f'_v at the cut (ELCPP returns it already)
@@ -316,9 +316,6 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
         }
       } else {
         # h(t) = a0 + a1*t + a2*exp(-(t - t1))
-        # closed form for A1 at t2=t1+tau:
-        # let e = exp(-tau), d = 1-e
-        # a1 = (W'(t2)-fp1*e)/d ; value match => G_neg(tau)=0
         G <- function(tau) {
           t2 <- t1 + tau
           e  <- exp(-tau)
@@ -331,12 +328,23 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
       }
 
       # bracket tau robustly to the right
-      # tseq <- seq(0, sd_v, length.out = 51)
+      # tseq <- seq(0, t_hi0, length.out = 51)
       # gseq <- sapply(tseq, G)
       # plot(tseq, gseq)
-      tau <- tryCatch(brentZero(G, c(1e-6, max(1e-2, 0.1*t_hi0)), extendInt = "right")$root, error = function(e) NA_real_)
-      if (!is.finite(tau) || tau <= 0)
-        stop("ExEL2 splice: root for tau failed after bracketing (this should not happen).")
+      tau <- tryCatch(suppressWarnings(brentZero(G, c(1e-6, max(1e-2, 0.1*t_hi0)), extendInt = "right", maxiter = 100)$root), error = function(e) NA_real_)
+      if (!is.finite(tau) || tau <= 1.01e-6) {
+        for (i in 1:30) {
+          # warning("ExEL2 splice: root for tau failed after bracketing. Starting extrapolating earlier by 80%.")
+          t1 <- t1 * 0.8
+          f1 <- f(wm + t1 * v)
+          fp1 <- fl(wm + t1 * v)$deriv[1]  # Directional derivative f'_v at the cut (ELCPP returns it already)
+          W1 <- Wv(t1, a)
+          tau <- tryCatch(suppressWarnings(brentZero(G, c(1e-6, max(1e-2, 0.1*t_hi0)), extendInt = "right", maxiter = 100)$root), error = function(e) NA_real_)
+          if (is.finite(tau) && tau >= 1.01e-6) break
+        }
+        if (i == 50) stop("Could not find an appropriate configuration.")
+      }
+
       t2 <- t1 + tau
 
       if (use_pos_exp) {
@@ -346,12 +354,12 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
         a0 <- f1 - a1 * t1 - a2
       } else {
         e  <- exp(-tau)
-        D  <- 1 - e
-        a1 <- (Wpv(t2, a) - fp1 * e) / D
+        d  <- 1 - e
+        a1 <- (Wpv(t2, a) - fp1 * e) / d
         a2 <- a1 - fp1
         a0 <- f1 - a1 * t1 - a2
       }
-      cat(sprintf("ray: a=%.6g, t1=%.6g, t2=%.6g, f1=%.6g, fp1=%.6g\n", a, t1, t2, f1, fp1))
+      # cat(sprintf("ray: a=%.6g, t1=%.6g, t2=%.6g, f1=%.6g, fp1=%.6g\n", a, t1, t2, f1, fp1))
       list(a = a, v = v, t1 = t1, t2 = t2, f1 = f1, fp1 = fp1, a0 = a0, a1 = a1, a2 = a2, bridge = if (use_pos_exp) "pos" else "neg")
     }
 
@@ -381,7 +389,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
         if (t <= sp$t2) {
           if (sp$bridge == "pos") {
             return(sp$a0 + sp$a1 * t + sp$a2 * exp(t - sp$t1))
-          } else {
+          } else if (sp$bridge == "neg") {
             return(sp$a0 + sp$a1 * t + sp$a2 * exp(-(t - sp$t1)))
           }
         }
@@ -389,7 +397,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
       }
 
       out <- vapply(tlen, eval_on_ray, numeric(1))
-      cat(sprintf("same-ray: t in [%.6g, %.6g]; t1=%.6g, t2=%.6g\n", min(tlen), max(tlen), sp$t1, sp$t2))
+      # cat(sprintf("same-ray: t in [%.6g, %.6g]; t1=%.6g, t2=%.6g\n", min(tlen), max(tlen), sp$t1, sp$t2))
       return(as.numeric(out))
     }
 
@@ -423,7 +431,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
     if (nu >= 10) {
       rgap <- stats::median(dzu)
     } else if (nu >= 5) {
-      rgap <- stats::median(dzu) * ((n-4.5)/5)  # Starting at 0.1 median, ending at 0.9 median
+      rgap <- stats::median(dzu) * ((nu-4.5)/5)  # Starting at 0.1 median, ending at 0.9 median
     } else if (nu == 2) {
       rgap <- dzu*0.05  # Same as 0.05 median
     } else if (nu == 3) {
@@ -444,6 +452,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
     # xseq <- seq(min(z) , max(z), length.out = 101)
     # plot(xseq, sapply(xseq, f))
     # lines(xseq, sapply(xseq, W), col = 2)
+    # abline(v = c(xmin0, xmax0), lty = 2)
     # plot(xseq, sapply(xseq, f) - sapply(xseq, W))
 
     if (identical(exel.control$xlim, "auto") && is.na(exel.control$fmax)) {
@@ -472,18 +481,20 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
       fp1*t + a2 * (et-t-1) - (W2 - f1)
     }
     # Transition to a higher function
-    Gnegexp <- function(x1, x2) {
+    Gnegexp <- function(x1, t) {
       ffd <- fl(x1)
-      f1  <- ffd$logelr
+      f1 <- ffd$logelr
       fp1 <- ffd$deriv[1]
-      W2  <- W(x2)
-      Wp2 <- Wp(x2)
-      a2  <- (Wp2 - fp1) / (exp(-x1) - exp(-x2))
-      fp1*(x2 - x1) + a2*(-exp(-x1)*(x1 + 1 - x2) + exp(-x2)) - (W2 - f1)
+      x2  <- x1 + t
+      W2  <- W(x2);  Wp2 <- Wp(x2)
+      e   <- exp(-t)
+      d   <- 1 - e
+      a1  <- (Wp2 - fp1*e) / d
+      a1*(t - d) + fp1*d - (W2 - f1)   # = 0 at the solution
     }
     # Bridges
-    hposexp  <- function(x, x1, a) a[1] + a[2]*x + a[3]*exp(x - x1)
-    hnegexp <- function(x, a) a[1] + a[2]*x + a[3]*exp(-x)
+    hposexp <- function(x, x1, a) a[1] + a[2]*x + a[3]*exp(x - x1)
+    hnegexp <- function(x, x1, a) a[1] + a[2]*x + a[3]*exp(-(x - x1))
 
     i.left  <- mu < xmin
     i.right <- mu > xmax
@@ -501,34 +512,69 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
     if (any(i.right)) {
       x1 <- xmax
-      ffpright <- fl(x1)
-      f1   <- ffpright$logelr      # f(x1)
-      fp1  <- ffpright$deriv[1]      # f'(x1)
-      if (type == "EL1") fp1 <- sign(x1 - wm) * fp1
-      if (W(x1) > f1) {  # Type-1 bridge with exp(x)
-        tr       <- wm - x1 - fp1/a
-        tmax     <- min(tr - 1e-6, tspan)
-        tpos     <- brentZero(function(t) Gposexp(t = t, x1 = x1), c(1e-6, tmax), extendInt = "right")$root
-        x2  <- x1 + tpos
-        et  <- exp(tpos)
-        a2  <- (Wp(x2) - fp1) / (et - 1)
-        a1  <- fp1 - a2
-        a0  <- f1 - a1*x1 - a2
-        h  <- function(x) hposexp(x, x1 = x1, a = c(a0, a1, a2))
-      } else {  # Type-2 bridge with exp(-x)
-        # Wald below EL (transition to "higher"); search x2 > x1 for the root of Gnegexp
-        H <- function(t) Gnegexp(x1 = x1, x2 = t)
-        x2   <- brentZero(H, max(wm, x1) + c(1e-6, max(1e-3, tspan)), extendInt = "right")$root
-        a2 <- (Wp(x2) - fp1) / (exp(-x1) - exp(-x2))
-        a1 <- fp1 + a2*exp(-x1)
-        a0 <- f1 - a1*x1 - a2*exp(-x1)
-        h  <- function(x) hnegexp(x, a = c(a0, a1, a2))
+      for (i in 1:20) {  # Fail-safe
+        ffpright <- fl(x1)
+        f1   <- ffpright$logelr      # f(x1)
+        fp1  <- ffpright$deriv[1]      # f'(x1)
+        if (type == "EL1") fp1 <- sign(x1 - wm) * fp1
+        if (W(x1) > f1) {  # Type-1 bridge with exp(x)
+          tr       <- wm - x1 - fp1/a
+          tmax     <- min(tr - 1e-6, tspan)
+          H <- function(t) Gposexp(t = t, x1 = x1)
+          # xseq <- seq(0, 3, length.out = 101)
+          # gseq <- sapply(xseq, H)
+          # plot(xseq, gseq)
+          troot <- tryCatch(suppressWarnings(brentZero(H, c(1e-6, tmax), extendInt = "right", maxiter = 100)), error = function(e) NULL)
+          if (is.null(troot) || troot$iter >= 100) {
+            a2 <- Inf  # For failure
+            if (is.null(troot)) tspan <- tspan * 0.8
+          } else {
+            tpos <- troot$root
+            x2  <- x1 + tpos
+            et  <- exp(tpos)
+            a2  <- (Wp(x2) - fp1) / (et - 1)
+            a1  <- fp1 - a2
+            a0  <- f1 - a1*x1 - a2
+            h  <- function(x) hposexp(x, x1 = x1, a = c(a0, a1, a2))
+          }
+        } else {  # Type-2 bridge with exp(-x)
+          # Wald below EL (transition to "higher"); search x2 > x1 for the root of Gnegexp
+          H <- function(t) Gnegexp(x1 = x1, t = t)
+          # xseq <- seq(x1, x1+2, length.out = 101)
+          # plot(xseq, H(xseq))
+          troot <- tryCatch(suppressWarnings(brentZero(H, c(1e-6, tmax), extendInt = "right", maxiter = 100)), error = function(e) NULL)
+          if (is.null(troot) || troot$iter >= 100) {
+            a2 <- Inf
+            if (is.null(troot)) tspan <- tspan * 0.8
+          } else {
+            x2   <- x1 + troot$root
+            emt  <- exp(-troot$root)
+            a2 <- (Wp(x2) - fp1) / (1 - emt)
+            a1 <- fp1 + a2
+            a0 <- f1 - a1*x1 - a2
+            h  <- function(x) hnegexp(x, x1 = x1, a = c(a0, a1, a2))
+          }
+        }
+        # xseq <- seq(min(0, min(z)), max(0, 0.2, max(z)), length.out = 301)
+        # plot(xseq, sapply(xseq, f), ylim = c(-250, 0))
+        # lines(xseq, sapply(xseq, W), col = 2)
+        # lines(xseq, h(xseq), col = 4)
+        # abline(v = c(x1, x2), lty = 2)
+        if (a2 < 0) {
+          break
+        } else {
+          # message("Wrong exponent coefficient sign, bridge lost concavity; attempt ", i, " to shift x1 20% closer to the mean.")
+          x1 <- 0.8*x1 + 0.2*wm
+          x2 <- x1
+          a0 <- a1 <- a2 <- NA
+        }
       }
-      if (a2 > 0) warning("Wrong exponent coefficient sign")
-      if (a1 > 0) warning("Wrong slope sign")
+      failure <- i >= 20
+
       i.buf  <- i.right & (mu <= x2)
       i.wald <- i.right & (mu > x2)
       fexright <- numeric(length(mu))
+      # if (failure) warning("Could not find a suitable bridge (possible with severe outliers). Returning the usual Wald.")
       if (any(i.buf))  fexright[i.buf]  <- h(mu[i.buf])
       if (any(i.wald)) fexright[i.wald] <- W(mu[i.wald])
       fexright <- fexright[i.right]
@@ -537,38 +583,65 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
     if (any(i.left)) {
       x1 <- xmin
-      ffpleft <- fl(x1)
-      f1   <- ffpleft$logelr
-      fp1  <- ffpleft$deriv[1]
-      if (type == "EL1") fp1 <- sign(x1 - wm) * fp1
+      for (i in 1:20) {  # Fail-safe
+        ffpleft <- fl(x1)
+        f1   <- ffpleft$logelr
+        fp1  <- ffpleft$deriv[1]
+        if (type == "EL1") fp1 <- sign(x1 - wm) * fp1
 
-      if (W(x1) > f1) {
-        # Type-2 bridge with exp(-x)
-        # Wald below EL (transition to "higher")
-        # search x2 < x1 for the root of Gnegexp
-        H <- function(t) Gnegexp(x1 = x1, x2 = t)
-        # xseq <- seq(-5, 0.5, 0.1)
-        # plot(xseq, H(xseq))
-        x2   <- brentZero(H, min(x1, wm) - c(max(1e-3, tspan), 1e-6), extendInt = "left")$root
-        a2 <- (Wp(x2) - fp1) / (exp(-x1) - exp(-x2))
-        a1 <- fp1 + a2*exp(-x1)
-        a0 <- f1 - a1*x1 - a2*exp(-x1)
-        h  <- function(x) hnegexp(x, a = c(a0, a1, a2))
-      } else {  # Type-1 bridge with a0 + a1*x + a2*exp(x-x1)
-        tl      <- wm - x1 - fp1/a
-        tmin    <- max(-tspan, tl + 1e-6)
-        tneg    <- brentZero(function(t) Gposexp(t = t, x1 = x1), c(tmin, -1e-6), extendInt = "left")$root
-
-        x2  <- x1 + tneg
-        et  <- exp(tneg)
-        a2  <- (Wp(x2) - fp1) / (et - 1)
-        a1  <- fp1 - a2
-        a0  <- f1 - a1*x1 - a2
-        h  <- function(x) hposexp(x, x1 = x1, a = c(a0, a1, a2))
+        if (W(x1) > f1) {
+          # Type-2 bridge with exp(-x)
+          # Wald below EL (transition to "higher")
+          # search x2 < x1 for the root of Gnegexp
+          H <- function(t) Gnegexp(x1 = x1, x2 = t)
+          # xseq <- seq(-100, 500, length.out = 101)
+          # plot(xseq, H(xseq))
+          troot <- tryCatch(suppressWarnings(brentZero(H, c(1e-6, tmax), extendInt = "right", maxiter = 100)), error = function(e) NULL)
+          if (is.null(troot) || troot$iter >= 100) {
+            a2 <- Inf
+            x2 <- x1
+            if (is.null(troot)) tspan <- tspan * 0.8  # The only possible error is 'large span, infinite H'
+          } else {
+            x2   <- x1 + troot$root
+            emt  <- exp(-troot$root)
+            a2 <- (Wp(x2) - fp1) / (1 - emt)
+            a1 <- fp1 + a2
+            a0 <- f1 - a1*x1 - a2
+            h  <- function(x) hnegexp(x, x1 = x1, a = c(a0, a1, a2))
+          }
+        } else {  # Type-1 bridge with a0 + a1*x + a2*exp(x-x1)
+          tl      <- wm - x1 - fp1/a
+          tmin    <- max(-tspan, tl + 1e-6)
+          H <- function(t) Gposexp(t = t, x1 = x1)
+          troot <- tryCatch(suppressWarnings(brentZero(H, c(tmin, -1e-6), extendInt = "left", maxiter = 100)), error = function(e) NULL)
+          if (is.null(troot) || troot$iter >= 100) {
+            a2 <- Inf
+            if (is.null(troot)) tspan <- tspan * 0.8
+          } else {
+            tneg    <- troot$root
+            x2  <- x1 + tneg
+            et  <- exp(tneg)
+            a2  <- (Wp(x2) - fp1) / (et - 1)
+            a1  <- fp1 - a2
+            a0  <- f1 - a1*x1 - a2
+            h  <- function(x) hposexp(x, x1 = x1, a = c(a0, a1, a2))
+          }
+        }
+        if (a2 < 0) {
+          break
+        } else {
+          # message("Wrong exponent coefficient sign, bridge lost concavity; attempt ", i, " to shift x1 20% closer to the mean.")
+          x1 <- 0.8*x1 + 0.2*wm
+          x2 <- x1
+          a0 <- a1 <- a2 <- NA
+        }
       }
+      failure <- i >= 20
+
       i.buf  <- i.left & (mu >= x2)
       i.wald <- i.left & (mu < x2)
       fexleft <- numeric(length(mu))
+      # if (failure) warning("Could not find a suitable left bridge (possible with severe outliers). Returning the usual Wald.")
       if (any(i.buf))  fexleft[i.buf]  <- h(mu[i.buf])
       if (any(i.wald)) fexleft[i.wald] <- W(mu[i.wald])
       fexleft <- fexleft[i.left]
