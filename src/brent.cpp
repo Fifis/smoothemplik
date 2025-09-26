@@ -412,40 +412,83 @@ void doExtendInterval(
   } else if (mode == EXT_LEFT) {
     // Extend lower (left) end only until sign change or we hit maxSteps
     double dd = Delta(lo);
-    while ((fLo * fHi > 0.0)) {
+    bool   seen_bad = false;
+    double bad = NA_REAL;             // first non-finite to the left
+    double good = lo;                 // last finite to the left
+    double fgood = fLo;
+
+    while ((getsign(fLo) * getsign(fHi) > 0.0)) {
       initSteps++;
       if (initSteps > maxSteps) {
         Rcpp::warning("Left-only extension step limit hit after %d steps (soft stop).\n", initSteps-1);
-        // Best current endpoint (smaller |f|)
         if (std::fabs(fLo) <= std::fabs(fHi)) { candX = lo; candFX = fLo; }
         else { candX = hi; candFX = fHi; }
         softFail = true;
         return;
       }
-      // Try to move lower further left
-      double oldLo = lo;
-      double oldf  = fLo;
-      lo = lo - dd;
-      double tmp = fn(lo);
-      if (Rcpp::NumericVector::is_na(tmp)) {
-        // revert and shrink step
-        lo  = oldLo;
-        fLo = oldf;
-        dd  = dd / 4.0;
+
+      double trial = lo - dd;
+      double tmp = fn(trial);
+
+      if (!R_finite(tmp)) {
+        // --- Hit a non-finite barrier on the left; remember it and backtrack once.
+        if (!seen_bad) { seen_bad = true; bad = trial; }
+        if (trace >= 2) Rcpp::Rcout << " .. left-only backtrack from non-finite\n";
+
+        // Binary search in (trial,best_finite) to get the closest finite "good" below the barrier
+        double right = good,  f_right = fgood;  // finite
+        double left  = trial;                   // non-finite
+        int    tries = 0;
+        while (tries++ < maxSteps) {
+          double mid  = 0.5*(left + right);
+          double fmid = fn(mid);
+          if (!R_finite(fmid)) {
+            left = mid;           // still non-finite
+          } else {
+            right = mid; f_right = fmid;  // finite, move toward barrier
+          }
+          if (std::fabs(right - left) <= 2.0*DBL_EPSILON*std::fabs(right)) break;
+        }
+        lo = right; fLo = f_right; good = lo; fgood = fLo;
+
+        // From now on, stay inside (good,bad): shrink step to the gap
+        dd = 0.5 * (std::fabs(bad - good));
+        if (!(dd > 0.0)) dd = Delta(lo);
+
       } else {
-        fLo = tmp;
+        // finite step
+        lo = trial; fLo = tmp; good = lo; fgood = fLo;
+        if (!seen_bad) dd *= 2.0;     // still exploring
+        else {
+          dd = 0.5 * (std::fabs(bad - good));   // approach barrier from inside
+          if (!(dd > 0.0)) dd = Delta(lo);
+        }
       }
+
       if (trace >= 2) {
-        Rcpp::Rcout << " .. left-only step " << initSteps << " => lo=" << lo << ", f(lo)=" << fLo << "\n";
+        Rcpp::Rcout << " .. left-only step " << initSteps
+                    << " => lo=" << lo << ", f(lo)=" << fLo << "\n";
       }
-      // stop early if sign change achieved
-      if (getsign(fLo) * getsign(fHi) <= 0.0) break;
-      dd *= 2.0;
+
+      if (getsign(fLo) * getsign(fHi) <= 0.0) break; // got a sign change
+
+      // If we know the barrier and the window collapsed, stop with soft fail
+      if (seen_bad && std::fabs(bad - good) <= 2.0*DBL_EPSILON*std::fabs(good)) {
+        candX  = (std::fabs(fLo) <= std::fabs(fHi)) ? lo : hi;
+        candFX = (candX == lo) ? fLo : fHi;
+        softFail = true; return;
+      }
     }
-  }   else if (mode == EXT_RIGHT) {
+
+  } else if (mode == EXT_RIGHT) {
     // Extend upper (right) end only until sign change or we hit maxSteps
     double dd = Delta(hi);
-    while ((fLo * fHi > 0.0)) {
+    bool   seen_bad = false;
+    double bad = NA_REAL;             // first non-finite to the right
+    double good = hi;                 // last finite to the right
+    double fgood = fHi;
+
+    while ((getsign(fLo) * getsign(fHi) > 0.0)) {
       initSteps++;
       if (initSteps > maxSteps) {
         Rcpp::warning("Right-only extension step limit hit after %d steps (soft stop).\n", initSteps-1);
@@ -454,24 +497,57 @@ void doExtendInterval(
         softFail = true;
         return;
       }
-      // Try to move upper further right
-      double oldHi = hi;
-      double oldf  = fHi;
-      hi = hi + dd;
-      double tmp = fn(hi);
-      if (Rcpp::NumericVector::is_na(tmp)) {
-        // revert and shrink step
-        hi  = oldHi;
-        fHi = oldf;
-        dd  = dd / 4.0;
+
+      double trial = hi + dd;
+      double tmp   = fn(trial);
+
+      if (!R_finite(tmp)) {
+        // --- Hit a non-finite barrier on the right; remember it and backtrack once.
+        if (!seen_bad) { seen_bad = true; bad = trial; }
+        if (trace >= 2) Rcpp::Rcout << " .. right-only backtrack from non-finite\n";
+
+        // Binary search in (best_finite, trial) to get the closest finite "good" below the barrier
+        double left  = good,  f_left = fgood;   // finite
+        double right = trial;                   // non-finite
+        int    tries = 0;
+        while (tries++ < maxSteps) {
+          double mid  = 0.5*(left + right);
+          double fmid = fn(mid);
+          if (!R_finite(fmid)) {
+            right = mid;          // still non-finite
+          } else {
+            left = mid; f_left = fmid;  // finite, move toward barrier
+          }
+          if (std::fabs(right - left) <= 2.0*DBL_EPSILON*std::fabs(left)) break;
+        }
+        hi = left; fHi = f_left; good = hi; fgood = fHi;
+
+        // From now on, stay inside (good,bad): shrink step to the gap
+        dd = 0.5 * (std::fabs(bad - good));
+        if (!(dd > 0.0)) dd = Delta(hi);
       } else {
-        fHi = tmp;
+        // finite step
+        hi = trial; fHi = tmp; good = hi; fgood = fHi;
+        if (!seen_bad) dd *= 2.0;     // still exploring
+        else {
+          dd = 0.5 * (std::fabs(bad - good));   // approach barrier from inside
+          if (!(dd > 0.0)) dd = Delta(hi);
+        }
       }
+
       if (trace >= 2) {
-        Rcpp::Rcout << " .. right-only step " << initSteps << " => hi=" << hi << ", f(hi)=" << fHi << "\n";
+        Rcpp::Rcout << " .. right-only step " << initSteps
+                    << " => hi=" << hi << ", f(hi)=" << fHi << "\n";
       }
-      if (getsign(fLo) * getsign(fHi) <= 0.0) break;
-      dd *= 2.0;
+
+      if (getsign(fLo) * getsign(fHi) <= 0.0) break; // got a sign change
+
+      // If we know the barrier and the window collapsed, stop with soft fail
+      if (seen_bad && std::fabs(bad - good) <= 2.0*DBL_EPSILON*std::fabs(good)) {
+        candX  = (std::fabs(fLo) <= std::fabs(fHi)) ? lo : hi;
+        candFX = (candX == lo) ? fLo : fHi;
+        softFail = true; return;
+      }
     }
   }
 
@@ -514,6 +590,15 @@ List brentZeroCPP(
   int maxiter = 500,
   int trace = 0
 ) {
+
+  // Count all function evaluations (nfeval) and use a single wrapper
+  long long nfeval = 0;
+  auto eval = [&](double x)->double {
+    double y = as<double>(f(x));
+    ++nfeval;
+    return y;
+  };
+
   // If the user gave an interval, replicate "if (!missing(interval) && length(interval)==2)"
   if (interval.size() == 2) {
     lower = std::min(interval[0], interval[1]);
@@ -532,14 +617,14 @@ List brentZeroCPP(
     if (tmp.size() < 1) stop("f.lower invalid");
     fa = tmp[0];
   } else {
-    fa = as<double>(f(lower));
+    fa = eval(lower);
   }
   if (f_upper.isNotNull()) {
     NumericVector tmp(f_upper);
     if (tmp.size() < 1) stop("f.upper invalid");
     fb = tmp[0];
   } else {
-    fb = as<double>(f(upper));
+    fb = eval(upper);
   }
 
   if (ISNAN(fa)) stop("f.lower = f(lower) is NA");
@@ -553,14 +638,8 @@ List brentZeroCPP(
   double candX = NA_REAL, candFX = NA_REAL;
 
   doExtendInterval(
-    [&](double xx){
-      double val = as<double>(f(xx));
-      // (Turning non-finite into NA/0 breaks bracketing.)
-      // return (R_finite(val) ? val : NA_REAL);
-      return val;
-    },
-    lower, upper, fa, fb,
-    initSteps, maxiter, mode, trace, softFail, candX, candFX
+    [&](double xx){ return eval(xx); },
+    lower, upper, fa, fb, initSteps, maxiter, mode, trace, softFail, candX, candFX
   );
 
   if (softFail) {  // Soft stop: return the current best endpoint
@@ -589,6 +668,96 @@ List brentZeroCPP(
     );
   }
 
+  // Ensure BOTH end-points are finite; if one end is not, shrink it inward
+  // Ensure BOTH end-points are finite; if one end is not, shrink it inward
+  auto shrink_right_to_finite = [&]() {
+    int tries = 0;
+    if (trace >= 1 && !R_finite(fb))
+      Rcpp::Rcout << "Shrinking right endpoint to obtain finite f(upper) ...\n";
+    while (!R_finite(fb) && tries < maxiter) {
+      upper = 0.5 * (upper + lower);     // move inward
+      fb = eval(upper)  ;
+      tries++;
+      if (trace >= 2)
+        Rcpp::Rcout << " .. right => upper=" << upper << ", f(upper)=" << fb << "\n";
+      double tol1 = 2.0*DBL_EPSILON*std::fabs(upper) + tol;
+      if (std::fabs(upper - lower) <= tol1) break;
+    }
+  };
+
+  auto shrink_left_to_finite = [&]() {
+    int tries = 0;
+    if (trace >= 1 && !R_finite(fa))
+      Rcpp::Rcout << "Shrinking left endpoint to obtain finite f(lower) ...\n";
+    while (!R_finite(fa) && tries < maxiter) {
+      lower = 0.5 * (lower + upper);     // move inward
+      fa = eval(lower);
+      tries++;
+      if (trace >= 2)
+        Rcpp::Rcout << " .. left => lower=" << lower << ", f(lower)=" << fa << "\n";
+      double tol1 = 2.0*DBL_EPSILON*std::fabs(lower) + tol;
+      if (std::fabs(upper - lower) <= tol1) break;
+    }
+  };
+
+  // Apply shrinkers when appropriate
+  if (R_finite(fa) && !R_finite(fb)) {
+    if (mode == EXT_UP || mode == EXT_RIGHT || mode == EXT_YES || mode == EXT_NO) shrink_right_to_finite();
+  } else if (!R_finite(fa) && R_finite(fb)) {
+    if (mode == EXT_DOWN || mode == EXT_LEFT || mode == EXT_YES || mode == EXT_NO) shrink_left_to_finite();
+  }
+
+  // After shrinking, if we STILL do not have opposite signs, try to (re)extend
+  // on the allowed side to create a valid bracket before entering Brent.
+  if (getsign(fa) * getsign(fb) > 0) {
+    int addInit = 0; bool sf2 = false; double cx = NA_REAL, cfx = NA_REAL;
+    double lo2 = lower, hi2 = upper, fLo2 = fa, fHi2 = fb;
+
+    // Choose which way to re-extend
+    ExtendIntMode reMode = mode;
+    if (mode == EXT_RIGHT || mode == EXT_UP)      reMode = EXT_RIGHT;
+    else if (mode == EXT_LEFT || mode == EXT_DOWN) reMode = EXT_LEFT;
+    else if (mode == EXT_NO)                       reMode = EXT_YES;  // allow either side
+    // EXT_YES stays EXT_YES
+
+    doExtendInterval(
+      [&](double xx){ return eval(xx); },
+      lo2, hi2, fLo2, fHi2, addInit, maxiter, reMode, trace, sf2, cx, cfx
+    );
+
+    if (sf2) {
+      // Could not recover a bracket: return best endpoint
+      return List::create(
+        _["root"]       = cx,
+        _["f.root"]     = cfx,
+        _["iter"]       = initSteps + addInit,
+        _["init.it"]    = (initSteps + addInit > 0 ? initSteps + addInit : R_NaInt),
+        _["estim.prec"] = NA_REAL,
+        _["exitcode"]   = 1
+      );
+    }
+
+    // Adopt the recovered bracket
+    lower = lo2; upper = hi2; fa = fLo2; fb = fHi2;
+    initSteps += addInit;
+  }
+
+  // Final safety: if still same sign, bail with best endpoint
+  if (getsign(fa) * getsign(fb) > 0) {
+    double root = (std::fabs(fa) <= std::fabs(fb)) ? lower : upper;
+    double froot = (root == lower) ? fa : fb;
+    return List::create(
+      _["root"]       = root,
+      _["f.root"]     = froot,
+      _["iter"]       = initSteps,
+      _["init.it"]    = (initSteps ? initSteps : R_NaInt),
+      _["estim.prec"] = NA_REAL,
+      _["exitcode"]   = 1
+    );
+  }
+
+
+  //////////////////////////////////////////////////////////////////////////////
   // Standard Brent iteration. 'iter' is tracked in local code.
   double sa = lower;
   double sb = upper;
@@ -630,9 +799,10 @@ List brentZeroCPP(
 
   for (; iterCount < maxiter; iterCount++) {
     if (trace >= 2) {
+      double bl = std::min(sb, c), br = std::max(sb, c);
       Rcpp::Rcout << "   Iter " << iterCount
-      << ": bracket=[" << sa << ", " << sb << "], fa=" << fsa
-      << ", fb=" << fsb << "\n";
+                  << ": bracket=[" << bl << ", " << br << "], fb=" << fsb
+                  << ", fc=" << fc << "\n";
     }
     // If fc is smaller in magnitude than fb, swap roles
     if (std::fabs(fc) < std::fabs(fsb)) {
@@ -685,7 +855,7 @@ List brentZeroCPP(
     } else {
       sb -= tol1;
     }
-    fsb = as<double>(f(sb));
+    fsb = eval(sb);
     // if (!R_finite(fsb)) fsb=0.0; // or handle NA as 0, etc.
     // Reject non-finite trial points; bisect inside the bracket
     if (!R_finite(fsb)) {
@@ -693,7 +863,7 @@ List brentZeroCPP(
       // (sb and c carry opposite signs by construction)
       do {
         sb = 0.5 * (sb + c);
-        fsb = as<double>(f(sb));
+        fsb = eval(fsb);
         tol1 = 2.0*DBL_EPSILON*std::fabs(sb) + tol;
       } while (!R_finite(fsb) && std::fabs(c - sb) > tol1);
 
