@@ -440,11 +440,13 @@ EL1 <- function(z, mu = NULL, ct = NULL, shift = NULL, lambda.init = NULL, renor
   }
   if (sum(ct) <= 0) stop("Total weight must be positive.")
 
-  ELCPP(z = z, ct = ct, mu = mu, shift = shift, lambda_init = lambda.init,
-        return_weights = return.weights, lower = lower, upper = upper,
-        order = order, weight_tolerance = weight.tolerance, deriv = deriv,
-        thresh = thresh, itermax = itermax, verbose = verbose,
-        alpha = alpha, beta = beta, backeps = backeps)
+  ret <- ELCPP(z = z, ct = ct, mu = mu, shift = shift, lambda_init = lambda.init,
+               return_weights = return.weights, lower = lower, upper = upper,
+               order = order, weight_tolerance = weight.tolerance, deriv = deriv,
+               thresh = thresh, itermax = itermax, verbose = verbose,
+               alpha = alpha, beta = beta, backeps = backeps)
+  if (ret$exitcode > 0) ret$logelr <- -Inf
+  return(ret)
 }
 
 #' Compute empirical likelihood on a trajectory
