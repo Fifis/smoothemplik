@@ -66,13 +66,14 @@ plot(xseq, -2*ExEL1(z, xseq, ct = 1:6, exel.control = ctrl0), bty = "n")
 lines(xseq, -2*ExEL1(z, xseq, ct = 1:6, type = "EL0"), col = 3)
 lines(xseq, -2*ExEL1(z, xseq, ct = 1:6, type = "EL1"), col = 2, lty = 2, lwd = 2)
 
-# Compating ExEL2 vs ExEL1
+# Comparing ExEL2 vs ExEL1 with bridges containing exp(x)
+z <- -4:4
+ct <- 9:1
 xseq <- seq(-7, 10.5, 0.1)
 xl <- range(xseq)
-# No extrapolation
-a0 <- ExEL1(-4:4, mu = xseq, ct = 1:9, exel.control = list(xlim = xl))
-a1 <- ExEL1(-4:4, mu = xseq, ct = 1:9)
-a2 <- ExEL2(-4:4, mu = xseq, ct = 1:9)
+a0 <- ExEL1(z, mu = xseq, ct = ct, exel.control = list(xlim = c(-11, 11)))
+a1 <- ExEL1(z, mu = xseq, ct = ct)
+a2 <- ExEL2(z, mu = xseq, ct = ct)
 v1 <- attr(a1, "xlim")
 v2 <- c(attr(a2, "bridge.left")[c("x1", "x2")], attr(a2, "bridge.right")[c("x1", "x2")])
 
