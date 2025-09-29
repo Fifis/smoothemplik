@@ -97,10 +97,6 @@ bartlettFactor <- function(x, centre = TRUE, bias.adj = TRUE) {
       a3_2t <- a3t^2 - (a6 - a3t^2)/n
       a2_3t <- a2t^3
       b1 <- a4t / a2_2t / 2 - a3_2t / a2_3t / 3
-      if (b1 <= 0) {
-        warning("The Bartlett correction cannot be negative; removing the adjustment.")
-        b1 <- b0
-      }
       attr(b1, "unadjusted") <- b0
       b0 <- b1
     }
@@ -214,18 +210,11 @@ bartlettFactor <- function(x, centre = TRUE, bias.adj = TRUE) {
       b1t <- (a1t/2 - a2t/3 + a3t/2 - a4t/2) / q
       b2t <- (a5t/2 + 2*a6t) / q
       if (b1t < 0 || b2t < 0) {
-        warning("The Bartlett components cannot be negative; removing the adjustment.")
+        warning("The Bartlett sums b1 and b2 cannot be negative; removing the adjustment.")
         b1t <- b1
         b2t <- b2
       }
       bdt <- b1t - b2t
-      if (bdt < 0) {
-        warning("The Bartlett correction cannot be negative; removing the adjustment.")
-        b1t <- b1
-        b2t <- b2
-        bdt <- b1t - b2t
-      }
-      if (bdt < 0) stop("Bug in bartlettFactor: the correction cannot be negative.")
       attr(bdt, "components") <- c(b1t, b2t)
       attr(bdt, "unadjusted") <- as.numeric(bd)
       attr(bdt, "unadjusted.components") <- c(b1, b2)
