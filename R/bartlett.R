@@ -73,7 +73,7 @@ bartlettFactor <- function(x, centre = TRUE, bias.adj = TRUE) {
     bias.adj <- FALSE
   }
 
-  v <- var(x) * (n-1) / n
+  v <- stats::var(x) * (n-1) / n
   e <- eigen(v)
   P <- e$vectors
   xi <- e$values

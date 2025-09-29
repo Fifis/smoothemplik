@@ -83,7 +83,8 @@ lines(xseq, a1, col = 2, lwd = 2)
 lines(xseq, a2, col = 4, lwd = 2)
 abline(v = v2, lty = 3)
 lines(xseq, attr(a2, "parabola.coef") * (xseq - attr(a2, "parabola.centre"))^2, lty = 2)
-legend("topright", c("Taylor", "Wald", "ax^2"), col = c(2, 4, 1), lwd = c(2, 2, 1), lty = c(1, 1, 2))
+legend("topright", c("Taylor", "Wald", "ax^2"),
+       col = c(2, 4, 1), lwd = c(2, 2, 1), lty = c(1, 1, 2))
 
 dx <- diff(xseq[1:2])
 plot(xseq[-1], diff(a1)/dx, col = 2, type = "l", lwd = 2,

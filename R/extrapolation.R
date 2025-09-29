@@ -54,7 +54,8 @@
 #' lines(xseq, a2, col = 4, lwd = 2)
 #' abline(v = v2, lty = 3)
 #' lines(xseq, attr(a2, "parabola.coef") * (xseq - attr(a2, "parabola.centre"))^2, lty = 2)
-#' legend("topright", c("Taylor", "Wald", "ax^2"), col = c(2, 4, 1), lwd = c(2, 2, 1), lty = c(1, 1, 2))
+#' legend("topright", c("Taylor", "Wald", "ax^2"),
+#'        col = c(2, 4, 1), lwd = c(2, 2, 1), lty = c(1, 1, 2))
 #'
 #' dx <- diff(xseq[1:2])
 #' plot(xseq[-1], diff(a1)/dx, col = 2, type = "l", lwd = 2,
@@ -513,7 +514,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
     # Robust span for initial brackets
     # TODO: revise
-    tspan <- max(stats::IQR(z)/(qnorm(0.75)*2), stats::sd(z))
+    tspan <- max(stats::IQR(z)/(stats::qnorm(0.75)*2), stats::sd(z))
 
     fexleft <- fmid <- fexright <- aleft <- aright <- NULL
 

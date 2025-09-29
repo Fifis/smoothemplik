@@ -399,7 +399,7 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, r
 #'   resid * x
 #' }
 #' minusEL <- function(par) -EL1(foc.lm(par, xmat, yvec), itermax = 10)$logelr
-#' coef.el <- optim(c(mean(yvec), 0, 0), minusEL)$par
+#' coef.el <- optim(c(26, -0.06, 5.3), minusEL, control = list(maxit = 100))$par
 #' abs(coef.el - coef.lm) / coef.lm  # Relative difference
 #'
 #' # Likelihood ratio testing without any variance estimation
