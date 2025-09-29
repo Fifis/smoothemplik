@@ -122,10 +122,21 @@ ExEL1 <- function(z, mu, type = c("auto", "EL0", "EL1"),
       # Find tmax with Brent
       tzero <- function(t) -2*f(wm + t*v) - fmax
       tmax <- tryCatch(brentZero(tzero, c(0, max(t, 1e-6)), extendInt = "right", maxiter = 100)$root, error = function(e) NA_real_)
-      # tseq <- seq(0, 4, length.out = 51)
+      # tseq <- seq(0, t, length.out = 51)
       # plot(tseq, sapply(tseq, tzero)); abline(h = 0, lty = 2)
 
-      if (!is.finite(tmax)) stop("ExEL1: could not find the desired cut-off point. Report this bug to GitHub.")
+      if (!is.finite(tmax)) {
+        warning("ExEL1: could not find the desired cut-off point. Trying shrinkage to find at least a rough finite value.")
+        for (i in 1:20) {
+          tzero.safe <- tzero(t)
+          if (is.finite(tzero.safe)) {
+            tmax <- t
+            break
+          }
+          t <- t * 0.5
+        }
+        if (i == 20) stop("ExEL1: could not find the desired cut-off point. Report this bug to GitHub.")
+      }
 
       if (t <= tmax) return(f(murow))  # No extrapolation, true EL
 
