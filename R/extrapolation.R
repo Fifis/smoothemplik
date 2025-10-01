@@ -128,13 +128,14 @@ ExEL1 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
       if (!is.finite(tmax)) {
         warning("ExEL1: could not find the desired cut-off point. Trying shrinkage to find at least a rough finite value.")
+        tmax <- t
         for (i in 1:20) {
-          tzero.safe <- tzero(t)
+          tmax <- tmax * 0.5
+          tzero.safe <- tryCatch(tzero(tmax), error = function(e) return(NA_real_))
           if (is.finite(tzero.safe)) {
-            tmax <- t
-            break
+            tmax <- tryCatch(brentZero(tzero, c(0, tmax), extendInt = "right", maxiter = 100)$root, error = function(e) NA_real_)
+            if (is.finite(tmax)) break  # Else shrink again and retry
           }
-          t <- t * 0.5
         }
         if (i == 20) stop("ExEL1: could not find the desired cut-off point. Report this bug to GitHub.")
       }
