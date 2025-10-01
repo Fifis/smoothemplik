@@ -168,27 +168,6 @@ dampedNewton <- function(fn, par, thresh  = 1e-30, itermax = 100,
                   alpha = alpha, beta = beta, backeps = backeps)
 }
 
-# Bartlett correction factor for the 1-dimensional Adjusted EL
-computeBartlett <- function(x, ct = NULL) {
-  # Expressions from Liu & Chen (2011, Annals of Statistic, p.1347)
-  n <- length(x)
-  if (is.null(ct)) ct <- rep(1, n)
-  alpha1 <- stats::weighted.mean(x, ct)
-  zc <- x - alpha1
-  alpha2hat <- stats::weighted.mean(zc^2, ct)
-  alpha3hat <- stats::weighted.mean(zc^3, ct)
-  alpha4hat <- stats::weighted.mean(zc^4, ct)
-  alpha6hat <- stats::weighted.mean(zc^6, ct)
-  alpha2 <- n/(n-1) * alpha2hat
-  alpha4 <- n/(n-4)*alpha4hat - 6/(n-4)*alpha2^2
-  alpha22 <- alpha2^2 - alpha4/n
-  alpha3 <- n/(n-3)*alpha3hat
-  alpha33 <- alpha3^2 - (alpha6hat - alpha3^2)/n
-  alpha222 <- alpha2^3
-  b <- 0.5*alpha4/alpha22 - alpha33/alpha222/3
-  return(b)
-}
-
 
 #' Weighted trimmed mean
 #'
