@@ -12,8 +12,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // ELCPP
-List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift, NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper, int order, double weight_tolerance, bool deriv, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps);
-RcppExport SEXP _smoothemplik_ELCPP(SEXP zSEXP, SEXP ctSEXP, SEXP muSEXP, SEXP shiftSEXP, SEXP lambda_initSEXP, SEXP return_weightsSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP orderSEXP, SEXP weight_toleranceSEXP, SEXP derivSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP) {
+List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift, NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper, int order, double weight_tolerance, bool deriv, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps, double grad_tol, double step_tol, double f_tol, int stallmax);
+RcppExport SEXP _smoothemplik_ELCPP(SEXP zSEXP, SEXP ctSEXP, SEXP muSEXP, SEXP shiftSEXP, SEXP lambda_initSEXP, SEXP return_weightsSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP orderSEXP, SEXP weight_toleranceSEXP, SEXP derivSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP, SEXP grad_tolSEXP, SEXP step_tolSEXP, SEXP f_tolSEXP, SEXP stallmaxSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -34,7 +34,11 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< double >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< double >::type backeps(backepsSEXP);
-    rcpp_result_gen = Rcpp::wrap(ELCPP(z, ct, mu, shift, lambda_init, return_weights, lower, upper, order, weight_tolerance, deriv, thresh, itermax, verbose, alpha, beta, backeps));
+    Rcpp::traits::input_parameter< double >::type grad_tol(grad_tolSEXP);
+    Rcpp::traits::input_parameter< double >::type step_tol(step_tolSEXP);
+    Rcpp::traits::input_parameter< double >::type f_tol(f_tolSEXP);
+    Rcpp::traits::input_parameter< int >::type stallmax(stallmaxSEXP);
+    rcpp_result_gen = Rcpp::wrap(ELCPP(z, ct, mu, shift, lambda_init, return_weights, lower, upper, order, weight_tolerance, deriv, thresh, itermax, verbose, alpha, beta, backeps, grad_tol, step_tol, f_tol, stallmax));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -97,8 +101,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // dampedNewtonCPP
-List dampedNewtonCPP(Function fn, NumericVector par, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps);
-RcppExport SEXP _smoothemplik_dampedNewtonCPP(SEXP fnSEXP, SEXP parSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP) {
+List dampedNewtonCPP(Function fn, NumericVector par, double thresh, int itermax, bool verbose, double alpha, double beta, double backeps, double grad_tol, double step_tol, double f_tol, int stallmax);
+RcppExport SEXP _smoothemplik_dampedNewtonCPP(SEXP fnSEXP, SEXP parSEXP, SEXP threshSEXP, SEXP itermaxSEXP, SEXP verboseSEXP, SEXP alphaSEXP, SEXP betaSEXP, SEXP backepsSEXP, SEXP grad_tolSEXP, SEXP step_tolSEXP, SEXP f_tolSEXP, SEXP stallmaxSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -110,7 +114,11 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type alpha(alphaSEXP);
     Rcpp::traits::input_parameter< double >::type beta(betaSEXP);
     Rcpp::traits::input_parameter< double >::type backeps(backepsSEXP);
-    rcpp_result_gen = Rcpp::wrap(dampedNewtonCPP(fn, par, thresh, itermax, verbose, alpha, beta, backeps));
+    Rcpp::traits::input_parameter< double >::type grad_tol(grad_tolSEXP);
+    Rcpp::traits::input_parameter< double >::type step_tol(step_tolSEXP);
+    Rcpp::traits::input_parameter< double >::type f_tol(f_tolSEXP);
+    Rcpp::traits::input_parameter< int >::type stallmax(stallmaxSEXP);
+    rcpp_result_gen = Rcpp::wrap(dampedNewtonCPP(fn, par, thresh, itermax, verbose, alpha, beta, backeps, grad_tol, step_tol, f_tol, stallmax));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -315,11 +323,11 @@ END_RCPP
 RcppExport SEXP run_testthat_tests(SEXP);
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_smoothemplik_ELCPP", (DL_FUNC) &_smoothemplik_ELCPP, 17},
+    {"_smoothemplik_ELCPP", (DL_FUNC) &_smoothemplik_ELCPP, 21},
     {"_smoothemplik_EuLCPP", (DL_FUNC) &_smoothemplik_EuLCPP, 11},
     {"_smoothemplik_brentMinCPP", (DL_FUNC) &_smoothemplik_brentMinCPP, 7},
     {"_smoothemplik_brentZeroCPP", (DL_FUNC) &_smoothemplik_brentZeroCPP, 10},
-    {"_smoothemplik_dampedNewtonCPP", (DL_FUNC) &_smoothemplik_dampedNewtonCPP, 8},
+    {"_smoothemplik_dampedNewtonCPP", (DL_FUNC) &_smoothemplik_dampedNewtonCPP, 12},
     {"_smoothemplik_kernelFunCPP", (DL_FUNC) &_smoothemplik_kernelFunCPP, 4},
     {"_smoothemplik_kernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_kernelWeightsOneCPP, 6},
     {"_smoothemplik_sparseKernelWeightsOneCPP", (DL_FUNC) &_smoothemplik_sparseKernelWeightsOneCPP, 6},

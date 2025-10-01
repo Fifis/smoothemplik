@@ -2,25 +2,28 @@
 #'
 #' Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
 #' Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}.
-#' The names of the elements in the returned list are consistent with the original R code in \insertCite{owen2017weighted}{smoothemplik}.
+#' The names of the elements in the returned list are consistent with the original R code
+#' in \insertCite{owen2017weighted}{smoothemplik}.
 #'
-#' @param z Numeric data vector.
-#' @param mu Hypothesized mean of \code{z} in the moment condition.
+#' @param z A numeric vector containing the observations.
+#' @param mu Hypothesised mean of \code{z} in the moment condition.
 #' @param ct Numeric count variable with non-negative values that indicates the multiplicity of observations.
 #'   Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.
-#' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
-#' @param return.weights Logical: if TRUE, individual EL weights are computed and returned.
-#'   Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.
-#' @param renormalise If \code{FALSE}, then uses the total sum of counts as the number of observations, like in vanilla empirical likelihood,
-#' due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise re-normalises the counts to 1
-#' according to Cosma et al. (2019, p. 170, the topmost formula).
+#' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers):
+#'   \eqn{1 + \lambda'Z + shift}{1 + lambda'Z + shift.}.
+#' @param renormalise If \code{FALSE}, then uses the total sum of counts as the number of observations,
+#'   like in vanilla empirical likelihood, due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik},
+#'   otherwise re-normalises the counts to 1 according to \insertCite{cosma2019inference}{smoothemplik}
+#'   (see p. 170, the topmost formula).
+#' @param return.weights Logical: if \code{TRUE}, returns the empirical probabilities.
+#'   Default is memory-saving (\code{FALSE}).
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
-#'   (similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).
-#' @param boundary.tolerance Relative tolerance for determining when the lambda is not an interior
-#'   solution because it is too close to the boundary. Corresponds to a fraction of the
-#'   interval range length.
+#'   (defaults to \code{sqrt(.Machine$double.eps)} times the maximum weight).
+#' @param boundary.tolerance Relative tolerance for determining when lambda is not an interior
+#'   solution because it is too close to the boundary. Unit: fraction of the feasble bracket length.
 #' @param trunc.to Counts under \code{weight.tolerance} will be set to this value.
-#'   In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.
+#'   In most cases, setting this to \code{0} (default) or \code{weight.tolerance}
+#'   is a viable solution for the zero-denominator problem.
 #' @param deriv Logical: if \code{TRUE}, computes and returns the first two derivatives of log-ELR w.r.t. \code{mu}.
 #' @param log.control List of arguments passed to [logTaylor()].
 #' @param verbose Logical: if \code{TRUE}, prints warnings.
@@ -115,7 +118,7 @@
 #' # aarch64-apple-darwin20          -1.5631313957?????  -1.5631313955?????
 #' # Windows, Ubuntu, Arch           -1.563131395492627  -1.563131395492627
 #' @export
-EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, renormalise = FALSE,
+EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, renormalise = FALSE, return.weights = FALSE,
                 weight.tolerance = NULL, boundary.tolerance = 1e-9, trunc.to = 0, deriv = FALSE,
                 log.control = list(order = NULL, lower = NULL, upper = NULL), verbose = FALSE
 ) {
@@ -236,11 +239,11 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, r
     # Wishing the strictest convergence in the uniroot-like control
     if (spanning) {
       # Search with strict boundaries
-      lam.list <- tryCatch(brentZero(dllik, interval = int, tol = .Machine$double.eps, extendInt = "no", maxiter = 100, trace = 0),
+      lam.list <- tryCatch(brentZero(dllik, interval = int, tol = .Machine$double.eps, extendInt = "no", maxiter = 100, trace = verbose*2),
                            error = function(e) return(NULL))
     } else {
       # Search with flexible boundaries
-      lam.list <- tryCatch(brentZero(dllik, interval = int, tol = .Machine$double.eps, extendInt = "yes", maxiter = 100, trace = 0),
+      lam.list <- tryCatch(brentZero(dllik, interval = int, tol = .Machine$double.eps, extendInt = "yes", maxiter = 100, trace = verbose*2),
                            error = function(e) return(e))
       exitcode <- 10L
       # The sum of weights is likely to be less than 1
@@ -335,35 +338,51 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, r
 #' convergence owing to the fact that the log-likelihood is replaced by its Taylor approximation
 #' of any desired order (default: 4, the minimum value that ensures self-concordance).
 #'
+#' Implementation note: the EL solver also guarantees a descent direction; if the Newton step is non-descent or non-finite,
+#' it falls back to steepest descent (negative gradient), which keeps the line search well-behaved.
+#'
 #' Tweak \code{alpha} and \code{beta} with extreme caution. See \insertCite{boyd2004convex}{smoothemplik},
 #' pp. 464--466 for details. It is necessary that \code{0 < alpha < 1/2} and \code{0 < beta < 1}.
 #' \code{alpha = 0.3} seems better than 0.01 on some 2-dimensional test data (sometimes fewer iterations).
 #'
 #' The argument names, except for \code{lambda.init}, are matching the original names in Art B. Owen's implementation.
-#' The highly optimised one-dimensional counterpart, \code{EL0}, is designed to return a faster
+#' The highly optimised one-dimensional counterpart, [EL0()], is designed to return a faster
 #' and a more accurate solution in the one-dimensional case.
 #'
 #' @param z A numeric vector or a matrix with one data vector per column.
-#' @param ct A numeric vector of non-negative counts.
-#' @param mu Hypothesised mean, default (0 ... 0) in R^ncol(z)
-#' @param shift The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.
-#' @param lambda.init Starting lambda, default (0 ... 0)
-#' @param renormalise If \code{FALSE}, the default weight tolerance is \code{MachEps^(1/3)}, otherwise
-#'   it is \code{MachEps^(1/2)} of the maximum count.
-#' @param return.weights Logical: if \code{TRUE}, returns the empirical probabilities. Default is memory-saving (\code{FALSE}).
-#' @param lower Lower cut-off for [logTaylor()], default \code{1/nrow(z)}
-#' @param upper Upper cutoff for [logTaylor()], default \code{Inf}
-#' @param order Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].
+#' @param mu Hypothesised mean, default \code{(0 ... 0)} in \eqn{R^{\mathrm{ncol}(z)}{R^ncol(z)}.
+#' @param ct Numeric count variable with non-negative values that indicates the multiplicity of observations.
+#' @param shift The value to add in the denominator (useful in case there are extra
+#'   Lagrange multipliers): \eqn{1 + \lambda'Z + shift}{1 + lambda'Z + shift}.
+#' @param lambda.init Starting lambda, default \code{(0 ... 0)}. Improves speed and accuracy
+#'   in sequential problems if supplied from the previous iteration.
+#' @param renormalise If \code{FALSE}, then uses the total sum of counts as the number of observations,
+#'   like in vanilla empirical likelihood, due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik},
+#'   otherwise re-normalises the counts to 1 according to \insertCite{cosma2019inference}{smoothemplik}
+#'   (p. 170, the topmost formula).
+#' @param return.weights Logical: if \code{TRUE}, returns the empirical probabilities.
+#'   Default is memory-saving (\code{FALSE}).
+#' @param lower Lower cut-off for [logTaylor()], default \code{1/NROW(z)}.
+#' @param upper Upper cut-off for [logTaylor()], default \code{Inf}.
+#' @param order Positive even integer such that the Taylor approximation of this order to
+#'   \eqn{\log x}{log(x)} is self-concordant; usually 4 or 2. Passed to [logTaylor()].
 #' @param weight.tolerance Weight tolerance for counts to improve numerical stability
-#' @param deriv Logical: if \code{TRUE}, computes and returns the first two derivatives of log-ELR w.r.t. \code{mu}.
-#' @param thresh Convergence threshold for log-likelihood (the default is aggressive)
-#' @param itermax Upper bound on number of Newton steps (seems ample)
-#' @param alpha Backtracking line search parameter: acceptance of a decrease in function value by ALPHA*f of the prediction
-#'   based on the linear extrapolation.
-#' @param beta Backtracking line search reduction factor. 0.1 corresponds to a very crude search, 0.8 corresponds
-#'   to a less crude search.
-#' @param backeps Backtrack threshold: the search can miss by this much. Consider setting it to 1e-10
-#'   if backtracking seems to be failing due to round-off.
+#'   (defaults to \code{sqrt(.Machine$double.eps)} times the maximum weight).
+#' @param deriv Logical: if \code{TRUE}, computes and returns the first two directional derivatives
+#'   of log-ELR w.r.t. \code{mu} in the direction of the hypothesised value.
+#' @param thresh Target tolerance on the squared Newton decrement: loop stops when \code{decr^2 <= thresh}.
+#'   (If \code{verbose} is \code{TRUE}, decrement itself is printed.)
+#' @param itermax Maximum number of outer iterations of the damped Newton method (seems ample).
+#' @param alpha Backtracking line search Armijo parameter: acceptance of a decrease in function value
+#'   by \eqn{\alpha f}{ALPHA*f} of the prediction based on the linear extrapolation. Smaller makes acceptance easier.
+#' @param beta Backtracking step shrinkage factor in \code{[0, 1]}. 0.1 corresponds to a very crude search,
+#'   0.8 corresponds to a less crude search.
+#' @param backeps Backtrack threshold, a small slack added to Armijo RHS: the search can miss by this much.
+#'   Accept if \eqn{f(x+tp) \le f(x)+\alpha t g'p + \mathrm{backeps}}{f(x+tp) <= f(x) + alpha\*t\*g'p + backeps}.
+#'   Consider setting it to \code{1e-10} if backtracking seems to be failing due to round-off.
+#' @param gradtol Gradient tolerance: stop if \code{||g|| <= gradtol}.
+#' @param steptol Step tolerance: stop if the relative size is tiny: \code{||x2-x1||/max(1, ||x2||) < ftol}.
+#' @param stallmax Stop if both \code{rel_step <= steptol} and \code{rel_f <= ftol} hold for this many consecutive iterations.
 #' @param verbose Logical: print output diagnostics?
 #'
 #' @return A list with the following values:
@@ -371,11 +390,13 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, r
 #'     \item{logelr}{Log of empirical likelihood ratio (equal to 0 if the hypothesised mean is equal to the sample mean)}
 #'     \item{lam}{Vector of Lagrange multipliers}
 #'     \item{wts}{Observation weights/probabilities (vector of length n)}
+#'     \item{deriv}{Length-2 vector: directional first and second derivatives along the ray toward mu (if \code{deriv = TRUE})}
 #'     \item{converged}{\code{TRUE} if algorithm converged. \code{FALSE} usually means that mu is not in the convex hull of the data. Then, a very small likelihood is returned (instead of zero).}
 #'     \item{iter}{Number of iterations taken.}
 #'     \item{ndec}{Newton decrement (see Boyd & Vandenberghe).}
 #'     \item{gradnorm}{Norm of the gradient of log empirical likelihood.}
 #' }
+#'
 #'
 #'
 #' @references
@@ -412,10 +433,11 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, return.weights = FALSE, r
 #' # Exceeds the critical value qchisq(0.95, df = 1)
 #' @export
 EL1 <- function(z, mu = NULL, ct = NULL, shift = NULL, lambda.init = NULL, renormalise = FALSE,
-                       return.weights = FALSE, lower = NULL, upper = NULL,
-                       order = NA, weight.tolerance = NULL, deriv = FALSE,
-                       thresh = 1e-16, itermax = 100L, verbose = FALSE,
-                       alpha = 0.3, beta = 0.8, backeps = 0) {
+                return.weights = FALSE, lower = NULL, upper = NULL,
+                order = NA, weight.tolerance = NULL, deriv = FALSE,
+                thresh = 1e-30, itermax = 100L, verbose = FALSE,
+                alpha = 0.3, beta = 0.8, backeps = 0,
+                gradtol = 1e-12, steptol = 1e-12, ftol = 1e-14, stallmax = 5) {
   if (is.null(dim(z))) z <- matrix(z, ncol = 1)
   n <- nrow(z)
   d <- ncol(z)
@@ -444,7 +466,8 @@ EL1 <- function(z, mu = NULL, ct = NULL, shift = NULL, lambda.init = NULL, renor
                return_weights = return.weights, lower = lower, upper = upper,
                order = order, weight_tolerance = weight.tolerance, deriv = deriv,
                thresh = thresh, itermax = itermax, verbose = verbose,
-               alpha = alpha, beta = beta, backeps = backeps)
+               alpha = alpha, beta = beta, backeps = backeps, grad_tol = gradtol,
+               step_tol = steptol, f_tol = ftol, stallmax = stallmax)
   if (ret$exitcode > 0) ret$logelr <- -Inf
   return(ret)
 }
@@ -563,5 +586,161 @@ EuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
                 return_weights = return.weights, verbose = verbose)
   if (return.weights && !is.null(nz <- rownames(z))) names(ret$wts) <- nz
   return(ret)
+}
+
+
+#' Unified empirical likelihood wrapper
+#'
+#' @description
+#' Call \code{EL0()}, \code{EL1()}, or \code{EuL()} through a single interface.
+#' If extrapolation is requested, switch to dedicated functions.
+#' Anything method-specific goes into \code{EL.args}.
+#'
+#' @param type Character: one of \code{c("auto", "EL1", "EL0", "EuL")}. If \code{"auto"},
+#'   uses \code{"EL1"} for multi-variate data and \code{"EL0"} for uni-variate.
+#' @inheritParams EL1
+#' @param ... Named extra arguments passed to the selected back-end (e.g. \code{order},
+#'   \code{itermax}, \code{lambda.init}, \code{vt}, \code{trunc.to}, \code{boundary.tolerance}, ...).
+#'
+#' @return A list with either the return value of the selected back-end  or (for extrapolation
+#'   methods) at least the \code{logelr} list value and extrapolation attributes.
+#'
+#' @examples
+#' # EL0 with extras:
+#' EL(type = "EL0", z = 1:9, mu = 4, boundary.tolerance = 1e-8)
+#' # EL1 with a custom order and iteration cap:
+#' set.seed(1)
+#' x <- cbind(rnorm(30), runif(30)-0.5)
+#' EL(type = "EL1", z = x, mu = c(0, 0), order = 4, itermax = 50, return.weights = TRUE)
+#' # EuL with vt and truncation:
+#' set.seed(1)
+#' EL(type = "EuL", z = x, vt = runif(NROW(x)), weight.tolerance = 0.1, trunc.to = 0.1)
+#'
+#' # Extrapolated variants
+#' set.seed(1)
+#' EL(type = "EL0", z = 1:9, mu = 12, chull.fail = "taylor", exel.control = list(xlim = c(2, 8)))
+#' EL(type = "EL1", z = 1:9, mu = 12, chull.fail = "wald", exel.control = list(fmax = 10))
+#' x <- matrix(runif(20), ncol = 2)
+#' EL(x, mu = c(0, 0), chull.fail = "adjusted")
+#' EL(x, mu = c(0, 0), chull.fail = "adjusted2")
+#' EL(x, mu = c(0, 0), chull.fail = "balanced")
+#'
+#' @export
+EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
+               type = c("auto", "EL1", "EL0", "EuL"),
+               chull.fail = c("none", "taylor", "wald", "adjusted", "adjusted2", "balanced"),
+               renormalise = FALSE, return.weights = FALSE, weight.tolerance = NULL,
+               verbose = FALSE, ...) {
+
+  type <- match.arg(type)
+  if (type == "auto") type <- if (NCOL(z) == 1) "EL0" else "EL1"
+  chull.fail <-  match.arg(chull.fail)
+  chull.fail <- tolower(chull.fail)  # Preventing Wald and Taylor
+
+  if (type == "EuL" & !renormalise) renormalise <- TRUE
+
+  # Common args shared by all back-ends, without the NULLs
+  base_args <- list(z = z, ct = ct, mu = mu, shift = shift, renormalise = renormalise,
+    return.weights = return.weights, weight.tolerance = weight.tolerance, verbose = verbose)
+  base_args <- base_args[!vapply(base_args, is.null, logical(1))]
+
+  # Collect method-specific extras from the ellipsis
+  dots <- list(...)
+  if (length(dots) > 0) {
+    if (is.null(names(dots)) || any(names(dots) == "")) stop("All extra arguments in `...` must be named.")
+  }
+  call.args <- c(base_args, dots)
+
+
+  if (chull.fail == "none") {
+    res <- switch(
+      type,
+      EL1 = do.call(EL1, call.args),
+      EL0 = do.call(EL0, call.args),
+      EuL = do.call(EuL, call.args)
+    )
+  } else if (chull.fail == "taylor") {
+    call.args$type <- type
+    res <- switch(
+      type,
+      EL1 = do.call(ExEL1, call.args),
+      EL0 = do.call(ExEL1, call.args),
+      EuL = stop("Euclidean likelihood needs no extrapolation. Call it without the 'chull.fail' argument.")
+    )
+    res <- list(logelr = res)
+  } else if (chull.fail == "wald") {
+    call.args$type <- type
+    res <- switch(
+      type,
+      EL1 = do.call(ExEL2, call.args),
+      EL0 = do.call(ExEL2, call.args),
+      EuL = stop("Euclidean likelihood needs no extrapolation. Call it without the 'chull.fail' argument.")
+    )
+    res <- list(logelr = res)
+  } else if (chull.fail == "adjusted") {
+    if (is.null(dim(z))) z <- as.matrix(z)
+    an <- max(1, log(n)/2)
+    zm <- colMeans(z)
+    point1 <- -zm * an
+    z <- rbind(z, point1)
+    call.args$z <- z
+    res <- switch(
+      type,
+      EL1 = do.call(EL1, call.args),
+      EL0 = do.call(EL0, call.args),
+      EuL = stop("Euclidean likelihood needs no extrapolation. Call it without the 'chull.fail' argument.")
+    )
+    attr(res, "point1") <- point1
+  } else if (chull.fail == "adjusted2") {
+    if (is.null(dim(z))) z <- as.matrix(z)
+    b  <- bartlettFactor(z)
+    b1 <- attr(b, "components")[1]
+    b2 <- attr(b, "components")[2]
+    zm <- colMeans(z)
+    if (NCOL(z) == 1) {
+      point1 <- -zm*b/2
+      point2 <- NULL
+    } else {
+      point1 <- -zm*b1/2
+      point2 <-  zm*b2/2
+    }
+    z <- rbind(z, point1, point2)
+    call.args$z <- z
+    res <- switch(
+      type,
+      EL1 = do.call(EL1, call.args),
+      EL0 = do.call(EL0, call.args),
+      EuL = stop("Euclidean likelihood needs no extrapolation. Call it without the 'chull.fail' argument.")
+    )
+    attr(res, "point1") <- point1
+    attr(res, "point2") <- point2
+  } else if (chull.fail == "balanced") {  # Emerson & Owen 2009
+    # TODO: NOT TESTED
+    if (is.null(dim(z))) z <- as.matrix(z)
+    zbar <- apply(z, 2, mean, trim = 0.05)
+    zm <- colMeans(z)
+    zl <- sqrt(sum(zm^2))  # Length of the mean of z
+    V <- var(z)
+    u <- zm / zl
+    cu <- 1 / drop(sqrt(t(u) %*% solve(V) %*% u))
+    s <- 1.6  # From Emerson & Owen (2009)
+    delta <- s*cu / zl
+    point1 <- -zbar * delta
+    point2 <- (2+delta)*zbar
+    z <- rbind(z, point1, point2)
+    call.args$z <- z
+    res <- switch(
+      type,
+      EL1 = do.call(EL1, call.args),
+      EL0 = do.call(EL0, call.args),
+      EuL = stop("Euclidean likelihood needs no extrapolation. Call it without the 'chull.fail' argument.")
+    )
+    attr(res, "point1") <- point1
+    attr(res, "point2") <- point2
+  }
+
+
+  attr(res, "method") <- type
+  res
 }
 

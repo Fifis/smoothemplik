@@ -9,7 +9,8 @@ SEXP logTaylorCPP(const NumericVector& x, NumericVector lower, NumericVector upp
 NumericVector svdlmCPP(const arma::mat& X, const arma::vec& y, double rel_tol = 1e-9, double abs_tol = 1e-100);
 
 List dampedNewtonCPP(Function fn, NumericVector par, double thresh, int itermax,
-                     bool verbose, double alpha, double beta, double backeps);
+                     bool verbose, double alpha, double beta, double backeps,
+                     double grad_tol, double step_tol, double f_tol, int stallmax);
 
 // Taylor-expanded log-likelihood and its derivatives
 List wEL(const arma::vec& lambda,
@@ -62,7 +63,9 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
            NumericVector lambda_init, bool return_weights, NumericVector lower, NumericVector upper,
            int order, double weight_tolerance, bool deriv = false,
            double thresh = 1e-16, int itermax = 100, bool verbose = false,
-           double alpha = 0.3, double beta = 0.8, double backeps = 0.0) {
+           double alpha = 0.3, double beta = 0.8, double backeps = 0.0,
+           double grad_tol = 1e-12, double step_tol = 1e-12,
+           double f_tol = 1e-14, int stallmax = 5) {
   const int n = z.nrow();
   const int d = z.ncol();
 
@@ -141,7 +144,8 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
   Rcpp::InternalFunction objFunInternal(&wELlambda);
   Rcpp::Function objFun( (SEXP)objFunInternal );
   List opt = dampedNewtonCPP(objFun, NumericVector(lam.begin(), lam.end()), thresh,
-                             itermax, verbose, alpha, beta, backeps);
+                             itermax, verbose, alpha, beta, backeps,
+                             grad_tol, step_tol, f_tol, stallmax);
 
   // Rcpp::Rcout << "Found lambda" << std::endl;
 

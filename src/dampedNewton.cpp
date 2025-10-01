@@ -12,7 +12,9 @@ inline bool finite_all(const arma::mat& M) { return M.is_finite(); }
 // [[Rcpp::export]]
 List dampedNewtonCPP(Function fn, NumericVector par,
                   double thresh = 1e-16, int itermax = 100, bool verbose = false,
-                  double alpha = 0.3, double beta = 0.8, double backeps = 0.0) {
+                  double alpha = 0.3, double beta = 0.8, double backeps = 0.0,
+                  double grad_tol = 1e-12, double step_tol = 1e-12,
+                  double f_tol = 1e-14, int stallmax = 5) {
   const int d = par.size();
   arma::vec x(par.begin(), d);
 
@@ -36,12 +38,6 @@ List dampedNewtonCPP(Function fn, NumericVector par,
   int iter = 0;
   double ndec = NA_REAL;
   double gradnorm = norm(g, 2);
-
-  // Extra robust stopping thresholds & stall book-keeping
-  const double grad_tol  = 1e-12;
-  const double step_tol  = 1e-12;
-  const double f_tol     = 1e-14;
-  const int    max_stall = 5;
 
   double f_prev = f;
   arma::vec x_prev = x;
@@ -125,7 +121,7 @@ List dampedNewtonCPP(Function fn, NumericVector par,
 
     // Multiple stop criteria
     converged = (ndec * ndec <= thresh) || (gradnorm <= grad_tol)  || (rel_step  <= step_tol) ||
-      (rel_f     <= f_tol)    || (stall     >= max_stall);
+      (rel_f     <= f_tol)    || (stall     >= stallmax);
 
   }
 
