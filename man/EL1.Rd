@@ -90,6 +90,8 @@ Consider setting it to \code{1e-10} if backtracking seems to be failing due to r
 
 \item{steptol}{Step tolerance: stop if the relative size is tiny: \code{||x2-x1||/max(1, ||x2||) < ftol}.}
 
+\item{ftol}{Function change tolerance: stop if the relative function-value change is less than \code{ftol}.}
+
 \item{stallmax}{Stop if both \code{rel_step <= steptol} and \code{rel_f <= ftol} hold for this many consecutive iterations.}
 }
 \value{

@@ -3,7 +3,7 @@ test_that("input validation for EL0", {
   expect_error(EL0(c(a, NA)), "Non-finite observations")
   expect_error(EL0(z = a, ct = 1/a), "Non-finite weights")
   expect_error(EL0(z = cbind(-4:4, 1:9)), "Only one-dimensional")
-  expect_warning(EL0(z = 1:10, mu = pi, ct = c(9:1, 1e-12), verbose = TRUE),
+  expect_warning(capture.output(EL0(z = 1:10, mu = pi, ct = c(9:1, 1e-12), verbose = TRUE)),
                  "Counts closer to 0")
   expect_error(EL0(a, ct = abs(a) * 1e-9), "Total weights")
 })

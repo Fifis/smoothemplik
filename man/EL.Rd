@@ -31,6 +31,14 @@ Lagrange multipliers): \eqn{1 + \lambda'Z + shift}{1 + lambda'Z + shift}.}
 \item{type}{Character: one of \code{c("auto", "EL1", "EL0", "EuL")}. If \code{"auto"},
 uses \code{"EL1"} for multi-variate data and \code{"EL0"} for uni-variate.}
 
+\item{chull.fail}{Character: \code{"none"} calls the original EL (which may return
+\code{-Inf} in case of a convex-hull violation), \code{"taylor"} calls [ExEL1()],
+\code{"wald"} calls [ExEL2()], \code{"adjusted"} adds one pseudo-observation as in
+\insertCite{chen2008adjusted}{smoothemplik}, \code{"adjusted2"} adds one (in 1D) or
+two (2D+) pseudo-observations with improved coverage rate according to
+\insertCite{liu2010adjusted}{smoothemplik}, and \code{"balanced"} adds two
+pseudo-observations according to \insertCite{emerson2009calibration}{smoothemplik}.}
+
 \item{renormalise}{If \code{FALSE}, then uses the total sum of counts as the number of observations,
 like in vanilla empirical likelihood, due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik},
 otherwise re-normalises the counts to 1 according to \insertCite{cosma2019inference}{smoothemplik}
@@ -76,4 +84,7 @@ EL(x, mu = c(0, 0), chull.fail = "adjusted")
 EL(x, mu = c(0, 0), chull.fail = "adjusted2")
 EL(x, mu = c(0, 0), chull.fail = "balanced")
 
+}
+\references{
+\insertAllCited{}
 }

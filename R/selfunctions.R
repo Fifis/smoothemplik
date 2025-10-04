@@ -12,7 +12,8 @@
 #'   for convex hull failure.
 #' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 #'   or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.
-#' @param EL.args A list of arguments passed to \code{EL()}, \code{EL0()}, or \code{EuL()}.
+#' @param weight.tolerance Passed to [EL()].
+#' @param chull.fail Passed to [EL()].
 #' @param kernel.args A list of arguments passed to \code{kernelWeights()} if
 #'   \code{sel.weights} is a function.
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).

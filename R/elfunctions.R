@@ -382,6 +382,7 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, renormalise = FALSE, retu
 #'   Consider setting it to \code{1e-10} if backtracking seems to be failing due to round-off.
 #' @param gradtol Gradient tolerance: stop if \code{||g|| <= gradtol}.
 #' @param steptol Step tolerance: stop if the relative size is tiny: \code{||x2-x1||/max(1, ||x2||) < ftol}.
+#' @param ftol Function change tolerance: stop if the relative function-value change is less than \code{ftol}.
 #' @param stallmax Stop if both \code{rel_step <= steptol} and \code{rel_f <= ftol} hold for this many consecutive iterations.
 #' @param verbose Logical: print output diagnostics?
 #'
@@ -599,11 +600,21 @@ EuL <- function(z, mu = NULL, ct = NULL, vt = NULL, shift = NULL,
 #' @param type Character: one of \code{c("auto", "EL1", "EL0", "EuL")}. If \code{"auto"},
 #'   uses \code{"EL1"} for multi-variate data and \code{"EL0"} for uni-variate.
 #' @inheritParams EL1
+#' @param chull.fail Character: \code{"none"} calls the original EL (which may return
+#'   \code{-Inf} in case of a convex-hull violation), \code{"taylor"} calls [ExEL1()],
+#'   \code{"wald"} calls [ExEL2()], \code{"adjusted"} adds one pseudo-observation as in
+#'   \insertCite{chen2008adjusted}{smoothemplik}, \code{"adjusted2"} adds one (in 1D) or
+#'   two (2D+) pseudo-observations with improved coverage rate according to
+#'   \insertCite{liu2010adjusted}{smoothemplik}, and \code{"balanced"} adds two
+#'   pseudo-observations according to \insertCite{emerson2009calibration}{smoothemplik}.
 #' @param ... Named extra arguments passed to the selected back-end (e.g. \code{order},
 #'   \code{itermax}, \code{lambda.init}, \code{vt}, \code{trunc.to}, \code{boundary.tolerance}, ...).
 #'
 #' @return A list with either the return value of the selected back-end  or (for extrapolation
 #'   methods) at least the \code{logelr} list value and extrapolation attributes.
+#'
+#' @references
+#' \insertAllCited{}
 #'
 #' @examples
 #' # EL0 with extras:
@@ -688,7 +699,7 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
   } else if (chull.fail == "adjusted") {
     if (is.null(dim(z))) z <- as.matrix(z)
     an <- max(1, log(nrow(z))/2)
-    zm <- apply(z, 2, weighted.mean, w = ct)
+    zm <- apply(z, 2, stats::weighted.mean, w = ct)
     point1 <- -zm * an
     call.args$z <- rbind(z, point1)
     call.args$ct <- c(ct, mean(ct))
@@ -704,7 +715,7 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
     b  <- bartlettFactor(z)
     b1 <- attr(b, "components")[1]
     b2 <- attr(b, "components")[2]
-    zm <- apply(z, 2, weighted.mean, w = ct)
+    zm <- apply(z, 2, stats::weighted.mean, w = ct)
     if (NCOL(z) == 1) {
       point1 <- -zm*b/2
       point2 <- NULL
@@ -728,7 +739,7 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
     zbar <- apply(z, 2, mean, trim = 0.05)
     zm <- colMeans(z)
     zl <- sqrt(sum(zm^2))  # Length of the mean of z
-    V <- var(z)
+    V <- stats::var(z)
     u <- zm / zl
     cu <- 1 / drop(sqrt(t(u) %*% solve(V) %*% u))
     s <- 1.6  # From Emerson & Owen (2009)

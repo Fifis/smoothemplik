@@ -35,11 +35,15 @@ smoothEmplik(
 \item{sel.weights}{Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.}
 
+\item{weight.tolerance}{Passed to [EL()].}
+
 \item{type}{Character: \code{"auto"} for empirical likelihood, \code{"EuL"} for Euclidean likelihood,
 \code{"EL0"} for one-dimensional empirical likelihood. \code{"EL0"} is *strongly*
 recommended for 1-dimensional moment functions because it is faster and more robust:
 it searches for the Lagrange multiplier directly and has nice fail-safe options
 for convex hull failure.}
+
+\item{chull.fail}{Passed to [EL()].}
 
 \item{kernel.args}{A list of arguments passed to \code{kernelWeights()} if
 \code{sel.weights} is a function.}
@@ -72,8 +76,6 @@ otherwise, attaches certain attributes for diagnostics:
 \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).}
 
 \item{...}{Passed to \code{rho}.}
-
-\item{EL.args}{A list of arguments passed to \code{EL()}, \code{EL0()}, or \code{EuL()}.}
 }
 \value{
 A scalar with the SEL value and, if requested, attributes containing the diagnostic information attached to it.

@@ -1,5 +1,6 @@
 test_that("Balanced EL preserves the sample mean", {
   set.seed(1)
+  x <- cbind(1:5, c(4, 7, 3, 9, 1))
   a <- EL(x, mu = c(0, 0), chull.fail = "balanced")
   x1 <- attr(a, "point1")
   x2 <- attr(a, "point2")
