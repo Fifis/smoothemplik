@@ -5,9 +5,10 @@
 #' @param rho The moment function depending on parameters and data (and potentially other parameters). Must return a numeric vector.
 #' @param theta A parameter at which the moment function is evaluated.
 #' @param data A data object on which the moment function is computed.
-#' @param type Character: \code{"EL"} for empirical likelihood, \code{"EuL"} for Euclidean likelihood, \code{"EL0"} for one-dimensional
-#'   empirical likelihood. \code{"EL0"} is *strongly* recommended for 1-dimensional moment functions because it is
-#'   faster and more robust: it searches for the Lagrange multiplier directly and has nice fail-safe options
+#' @param type Character: \code{"auto"} for empirical likelihood, \code{"EuL"} for Euclidean likelihood,
+#'   \code{"EL0"} for one-dimensional empirical likelihood. \code{"EL0"} is *strongly*
+#'   recommended for 1-dimensional moment functions because it is faster and more robust:
+#'   it searches for the Lagrange multiplier directly and has nice fail-safe options
 #'   for convex hull failure.
 #' @param sel.weights Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 #'   or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.
@@ -15,13 +16,12 @@
 #' @param kernel.args A list of arguments passed to \code{kernelWeights()} if
 #'   \code{sel.weights} is a function.
 #' @param minus If TRUE, returns SEL times -1 (for optimisation via minimisation).
-#' @param parallel If TRUE, uses \code{parallel::mclapply} to speed up the computation.
-#' @param cores The number of cores used by \code{parallel::mclapply}.
+#' @param cores The number of cores used by \code{parallel::mclapply} to speed up the computation.
 #' @param chunks The number of chunks into which the weight matrix is split for memory saving.
 #' One chunk is good for sample sizes 2000 and below. If equal to the number of observations, then,
 #' the smoothed likelihoods are computed in series, which saves memory but computes kernel weights at
 #' every step of a loop, increasing CPU time.
-#' If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.
+#' If \code{cores} is greater than 1, parallelisation occurs within each chunk.
 #' @param sparse Logical: convert the weight matrix to a sparse one?
 #' @param verbose If \code{TRUE}, a progress bar is made to display the evaluation progress in case partial or full memory saving is in place.
 #' @param bad.value Replace non-finite individual SEL values with this value.
@@ -72,12 +72,16 @@
 #' abline(b.SEuL$par, col = 3)
 #' cbind(SEL = b.SEL$par, SEuL = b.SEuL$par)
 #'
-#' # Now we start from (0, 0), for which the Taylor expansion is necessary
+#' # Now we start from (0, 0), for which an extension is necessary
 #' # because all residuals at this starting value are positive and the
 #' # unmodified EL ratio for the test of equality to 0 is -Inf
 #' if (FALSE) {
-#' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
-#' smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
+#' SEL(c(0, 0))
+#' SEL(c(0, 0), chull.fail = "taylor")
+#' SEL(c(0, 0), chull.fail = "wald")
+#' SEL(c(0, 0), chull.fail = "adjusted")
+#' SEL(c(0, 0), chull.fail = "adjusted2")
+#' SEL(c(0, 0), chull.fail = "balanced")
 #'
 #' # The next example is very slow; approx. 1 minute
 #' \donttest{
@@ -86,9 +90,9 @@
 #' w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
 #' w <- w / rowSums(w)
 #' # The first option is faster but it may sometimes fails
-#' b.SELt <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "taylor"),
+#' b.SELt <- optim(c(0, 0), SEL, chull.fail = "taylor",
 #'                 method = "BFGS", control = ctl)
-#' b.SELw <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "wald"),
+#' b.SELw <- optim(c(0, 0), SEL, chull.fail = "wald",
 #'                 method = "BFGS", control = ctl)
 #' }
 #' w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
@@ -132,20 +136,27 @@
 #' image(b0grid, b1grid, log1p(seulgrid2))
 #' par(oldpar)
 #' }
-smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
-                         type = c("EL0", "EL1", "EuL"),
+smoothEmplik <- function(rho, theta, data, sel.weights = NULL, weight.tolerance = 0,
+                         type = c("auto", "EL0", "EL1", "EuL"),
+                         chull.fail = c("none", "taylor", "wald", "adjusted", "adjusted2", "balanced"),
                          kernel.args = list(bw = NULL, kernel = "epanechnikov", order = 2, PIT = TRUE, sparse = TRUE),
-                         EL.args = list(chull.fail = "taylor", weight.tolerance = NULL),
                          minus = FALSE,
-                         parallel = FALSE, cores = 1,
-                         chunks = NULL, sparse = FALSE, verbose = FALSE,
+                         cores = 1, chunks = NULL, sparse = FALSE, verbose = FALSE,
                          bad.value = -Inf,
                          attach.attributes = c("none", "all", "ELRs", "residuals", "lam", "nabla", "converged", "exitcode", "probabilities"),
                          ...
 ) {
   type       <- match.arg(type)
+  chull.fail <- match.arg(chull.fail)
   # Constructing residuals
   rho.series <- rho(theta, data, ...)
+
+  # First-aid kit: abort if something is not finite
+  if (any(!is.finite(rho.series))) {
+    if (!minus) return(bad.value) else return(-bad.value)
+  }
+
+  if (type == "auto") type <- if (NCOL(rho.series) == 1) "EL0" else "EL1"
   n <- NROW(rho.series)  # length or nrow
   if (is.null(chunks)) chunks <- ceiling(n / 2000)
   if (any("none" %in% attach.attributes)) attach.attributes <- "none"
@@ -161,60 +172,87 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
   if (!is.function(sel.weights) && chunks > 1) {
     stop("smoothEmplik: When chunks > 1, 'sel.weights' must be a function returning weights for given indices (to avoid storing all weights at once).")
   }
-  if (!is.null(sel.weights) && !is.function(sel.weights) && !(is.list(sel.weights) ||
-        (is.matrix(sel.weights)) || class(sel.weights)[1] %in% c("dgCMatrix", "dgeMatrix")))
+  # Accept function, list, matrix, or sparse Matrix
+  if (!is.null(sel.weights) && !is.function(sel.weights) && !(is.list(sel.weights) || is.matrix(sel.weights) ||
+        inherits(sel.weights, "dgCMatrix") || inherits(sel.weights, "dgeMatrix"))) {
     stop("smoothEmplik: 'sel.weights' must be a function, a list, or a matrix of weights.")
+  }
 
   if (chunks == 1) {
     chunk.list <- list(1:n)
   } else if (chunks == n) {
     chunk.list <- as.list(1:n)
   } else {
-    group <- cut(1:n, breaks = chunks, labels = FALSE)
-    chunk.list <- split(1:n, group)
+    group <- cut(seq_len(n), breaks = chunks, labels = FALSE)
+    chunk.list <- split(seq_len(n), group)
   }
 
-  empliklist <- vector("list", n)
-  if (verbose) pb <- utils::txtProgressBar(min = 0, max = length(chunk.list), style = 3)
-
-  # Call the appropriate weighted likelihood function based on `type`
-  if (type == "EL1") {
-    calcOne <- function(i) return(EL1(z = rho.series, ct = w[i, ], mu = 0, renormalise = TRUE,
-                        weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
-  } else if (type == "EuL") {
-    calcOne <- function(i) return(EuL(z = rho.series, ct = w[i, ], mu = 0, renormalise = TRUE,
-                         weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
-  } else if (type == "EL0") {
-    calcOne <- function(i) return(EL0(z = rho.series, ct = w[i, ], mu = 0, renormalise = TRUE,
-                         weight.tolerance = EL.args$weight.tolerance, return.weights = attach.probs))
-  }  # match.arg makes sure that only the allowed options are processed
-
-
-  if ((is.matrix(sel.weights) || inherits(sel.weights, "dgeMatrix")) && sparse) {
+  # Optionally sparsify an already-supplied dense matrix
+  if ((is.matrix(sel.weights) || inherits(sel.weights, "dgeMatrix")) && isTRUE(sparse)) {
     sel.weights <- Matrix::Matrix(sel.weights, sparse = TRUE)
   }
 
+  # A single evaluator that works for:
+  # - weight row vectors (length n), including sparse Matrix rows extracted as numeric
+  # - weight list items with fields $idx and $ct
+  eval_one <- function(wrow) {
+    # Case 1: list with indices/values -> evaluate on the subset
+    if (is.list(wrow) && !is.null(wrow$idx) && !is.null(wrow$ct)) {
+      zi  <- rho.series[wrow$idx]
+      cti <- wrow$ct
+      res <- do.call(EL, list(z = zi, ct = cti, mu = 0, type = type, chull.fail = chull.fail, renormalise = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs))
+      return(res)
+    }
+    # Case 2: numeric row of length n (or coercible)
+    wr <- as.numeric(wrow)
+    if (length(wr) != n) stop("smoothEmplik: weight row has incompatible length (expected ", n, ").")
+    res <- do.call(EL, list(z = rho.series, ct = wr, mu = 0, type = type, chull.fail = chull.fail, renormalise = TRUE, weight.tolerance = weight.tolerance, return.weights = attach.probs))
+    return(res)
+  }
+
+  # Storage for per-point EL evaluations
+  empliklist <- vector("list", n)
+
+  # Loop over chunks
   for (k in seq_along(chunk.list)) {
     inds <- chunk.list[[k]]
-    # This is the memory-consuming operation
-    w <- if (!is.function(sel.weights)) sel.weights else suppressWarnings(sel.weights(inds, data))
-    if (is.null(dim(w))) w <- matrix(w, nrow = 1)
-    if (is.matrix(w) || class(w)[1] %in% c("dgCMatrix", "dgeMatrix")) {
-      # w is a weight matrix: row = observation in this batch, column = data point.
-      if (nrow(w) != length(inds) || ncol(w) != n)
+    # Build weights for this chunk
+    wobj <- if (!is.function(sel.weights)) {
+      sel.weights
+    } else {
+      # Expect: either a matrix (length(inds) x n) OR a list of length length(inds),
+      # where each element has $idx, $ct (as produced by getSELWeights()/sparseVectorToList()).
+      suppressWarnings(sel.weights(inds, data))
+    }
+    # Two supported shapes: matrix/sparseMatrix OR list
+    if (is.matrix(wobj) || inherits(wobj, "dgCMatrix") || inherits(wobj, "dgeMatrix")) {
+      if (nrow(wobj) != length(inds) || ncol(wobj) != n)
         stop("smoothEmplik: sel.weights returned a matrix with incompatible dimensions.")
-      # This non-pure function relies on the existence of 'w' in the memory
-      if (parallel && cores > 1) {
-        empliklist[inds] <- parallel::mclapply(X = seq_along(inds), FUN = calcOne, mc.cores = cores)
+      # Apply evaluator row-wise
+      if (cores > 1) {
+        empliklist[inds] <- parallel::mclapply(seq_len(nrow(wobj)), function(ii) eval_one(wobj[ii, ]), mc.cores = cores)
       } else {
-        empliklist[inds] <- lapply(seq_along(inds), calcOne)
+        empliklist[inds] <- lapply(seq_len(nrow(wobj)), function(ii) eval_one(wobj[ii, ]))
+      }
+    } else if (is.list(wobj)) {
+      # Either a single list (when length(inds) == 1) or a list per i in inds
+      if (length(inds) == 1 && !is.null(wobj$idx) && !is.null(wobj$ct)) {
+        empliklist[[inds]] <- eval_one(wobj)
+      } else {
+        if (length(wobj) != length(inds))
+          stop("smoothEmplik: sel.weights returned a list of wrong length for this chunk.")
+        if (cores > 1) {
+          empliklist[inds] <- parallel::mclapply(wobj, eval_one, mc.cores = cores)
+        } else {
+          empliklist[inds] <- lapply(wobj, eval_one)
+        }
       }
     } else {
       stop("smoothEmplik: sel.weights returned an unsupported type (must be function, list, or matrix).")
     }
-    if (verbose) utils::setTxtProgressBar(pb, k)
+
+    if (verbose) cat(sprintf("smoothEmplik: processed chunk %d/%d.\n", k, length(chunk.list)))
   }
-  if (verbose) close(pb)
 
   log.ELR.values <- unlist(lapply(empliklist, "[[", "logelr"))
   if (any(bad <- !is.finite(log.ELR.values))) log.ELR.values[bad] <- bad.value
@@ -223,6 +261,7 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
   ret <- log.SELR
   if (isTRUE(attach.attributes == "none")) return(ret)
   aa <- isTRUE(attach.attributes == "all")
+
   if ("ELRs" %in% attach.attributes || aa) attr(ret, "ELRs") <- log.ELR.values
   if ("residuals" %in% attach.attributes || aa) attr(ret, "residuals") <- rho.series
   if ("lam" %in% attach.attributes || aa) attr(ret, "lam") <- unlist(lapply(empliklist, "[[", "lam"))
@@ -232,6 +271,7 @@ smoothEmplik <- function(rho, theta, data, sel.weights = NULL,
     attr(ret, "converged") <- if (type == "EL0") unlist(lapply(empliklist, "[[", "converged")) else unlist(lapply(empliklist, "[[", "exitcode")) == 0
   if ("exitcode" %in% attach.attributes || aa) attr(ret, "exitcode") <- unlist(lapply(empliklist, "[[", "exitcode"))
   if (attach.probs) attr(ret, "probabilities") <- lapply(empliklist, "[[", "wts")
+
   return(ret)
 }
 
