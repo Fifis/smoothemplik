@@ -9,8 +9,8 @@ EL0(
   mu = NULL,
   ct = NULL,
   shift = NULL,
-  return.weights = FALSE,
   renormalise = FALSE,
+  return.weights = FALSE,
   weight.tolerance = NULL,
   boundary.tolerance = 1e-09,
   trunc.to = 0,
@@ -20,31 +20,33 @@ EL0(
 )
 }
 \arguments{
-\item{z}{Numeric data vector.}
+\item{z}{A numeric vector containing the observations.}
 
-\item{mu}{Hypothesized mean of \code{z} in the moment condition.}
+\item{mu}{Hypothesised mean of \code{z} in the moment condition.}
 
 \item{ct}{Numeric count variable with non-negative values that indicates the multiplicity of observations.
 Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.}
 
-\item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
+\item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers):
+\eqn{1 + \lambda'Z + shift}{1 + lambda'Z + shift.}.}
 
-\item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned.
-Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
+\item{renormalise}{If \code{FALSE}, then uses the total sum of counts as the number of observations,
+like in vanilla empirical likelihood, due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik},
+otherwise re-normalises the counts to 1 according to \insertCite{cosma2019inference}{smoothemplik}
+(see p. 170, the topmost formula).}
 
-\item{renormalise}{If \code{FALSE}, then uses the total sum of counts as the number of observations, like in vanilla empirical likelihood,
-due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise re-normalises the counts to 1
-according to Cosma et al. (2019, p. 170, the topmost formula).}
+\item{return.weights}{Logical: if \code{TRUE}, returns the empirical probabilities.
+Default is memory-saving (\code{FALSE}).}
 
 \item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
-(similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+(defaults to \code{sqrt(.Machine$double.eps)} times the maximum weight).}
 
-\item{boundary.tolerance}{Relative tolerance for determining when the lambda is not an interior
-solution because it is too close to the boundary. Corresponds to a fraction of the
-interval range length.}
+\item{boundary.tolerance}{Relative tolerance for determining when lambda is not an interior
+solution because it is too close to the boundary. Unit: fraction of the feasble bracket length.}
 
 \item{trunc.to}{Counts under \code{weight.tolerance} will be set to this value.
-In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
+In most cases, setting this to \code{0} (default) or \code{weight.tolerance}
+is a viable solution for the zero-denominator problem.}
 
 \item{deriv}{Logical: if \code{TRUE}, computes and returns the first two derivatives of log-ELR w.r.t. \code{mu}.}
 
@@ -72,7 +74,8 @@ A list with the following elements:
 \description{
 Empirical likelihood with counts to solve one-dimensional problems efficiently with Brent's root search algorithm.
 Conducts an empirical likelihood ratio test of the hypothesis that the mean of \code{z} is \code{mu}.
-The names of the elements in the returned list are consistent with the original R code in \insertCite{owen2017weighted}{smoothemplik}.
+The names of the elements in the returned list are consistent with the original R code
+in \insertCite{owen2017weighted}{smoothemplik}.
 }
 \details{
 This function provides the core functionality for univariate empirical likelihood.

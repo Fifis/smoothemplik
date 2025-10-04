@@ -20,7 +20,7 @@ EuL(
 \arguments{
 \item{z}{Numeric data vector.}
 
-\item{mu}{Hypothesized mean of \code{z} in the moment condition.}
+\item{mu}{Hypothesised mean of \code{z} in the moment condition.}
 
 \item{ct}{Numeric count variable with non-negative values that indicates the multiplicity of observations.
 Can be fractional. Very small counts below the threshold \code{weight.tolerance} are zeroed.}
@@ -28,20 +28,23 @@ Can be fractional. Very small counts below the threshold \code{weight.tolerance}
 \item{vt}{Numeric vector: non-negative variance weights for estimating the conditional
 variance of \code{z}. Probabilities are returned only for the observations where \code{vt > 0}.}
 
-\item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
+\item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers):
+\eqn{1 + \lambda'Z + shift}{1 + lambda'Z + shift.}.}
 
 \item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
-(similar to the ones in Art B. Owen's 2017 code, but adapting to the sample size).}
+(defaults to \code{sqrt(.Machine$double.eps)} times the maximum weight).}
 
 \item{trunc.to}{Counts under \code{weight.tolerance} will be set to this value.
-In most cases, setting this to \code{0} or \code{weight.tolerance} is a viable solution of the zero-denominator problem.}
+In most cases, setting this to \code{0} (default) or \code{weight.tolerance}
+is a viable solution for the zero-denominator problem.}
 
-\item{renormalise}{If \code{FALSE}, then uses the total sum of counts as the number of observations, like in vanilla empirical likelihood,
-due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik}, otherwise re-normalises the counts to 1
-according to Cosma et al. (2019, p. 170, the topmost formula).}
+\item{renormalise}{If \code{FALSE}, then uses the total sum of counts as the number of observations,
+like in vanilla empirical likelihood, due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik},
+otherwise re-normalises the counts to 1 according to \insertCite{cosma2019inference}{smoothemplik}
+(see p. 170, the topmost formula).}
 
-\item{return.weights}{Logical: if TRUE, individual EL weights are computed and returned.
-Setting this to FALSE gives huge memory savings in large data sets, especially when smoothing is used.}
+\item{return.weights}{Logical: if \code{TRUE}, returns the empirical probabilities.
+Default is memory-saving (\code{FALSE}).}
 
 \item{verbose}{Logical: if \code{TRUE}, prints warnings.}
 }

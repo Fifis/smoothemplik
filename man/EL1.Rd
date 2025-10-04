@@ -23,54 +23,74 @@ EL1(
   order = NA,
   weight.tolerance = NULL,
   deriv = FALSE,
-  thresh = 1e-16,
+  thresh = 1e-30,
   itermax = 100L,
   verbose = FALSE,
   alpha = 0.3,
   beta = 0.8,
-  backeps = 0
+  backeps = 0,
+  gradtol = 1e-12,
+  steptol = 1e-12,
+  ftol = 1e-14,
+  stallmax = 5
 )
 }
 \arguments{
 \item{z}{A numeric vector or a matrix with one data vector per column.}
 
-\item{mu}{Hypothesised mean, default (0 ... 0) in R^ncol(z)}
+\item{mu}{Hypothesised mean, default \code{(0 ... 0)} in \eqn{R^{\mathrm{ncol}(z)}}{R^ncol(z)}.}
 
-\item{ct}{A numeric vector of non-negative counts.}
+\item{ct}{Numeric count variable with non-negative values that indicates the multiplicity of observations.}
 
-\item{shift}{The value to add in the denominator (useful in case there are extra Lagrange multipliers): 1 + lambda'Z + shift.}
+\item{shift}{The value to add in the denominator (useful in case there are extra
+Lagrange multipliers): \eqn{1 + \lambda'Z + shift}{1 + lambda'Z + shift}.}
 
-\item{lambda.init}{Starting lambda, default (0 ... 0)}
+\item{lambda.init}{Starting lambda, default \code{(0 ... 0)}. Improves speed and accuracy
+in sequential problems if supplied from the previous iteration.}
 
-\item{renormalise}{If \code{FALSE}, the default weight tolerance is \code{MachEps^(1/3)}, otherwise
-it is \code{MachEps^(1/2)} of the maximum count.}
+\item{renormalise}{If \code{FALSE}, then uses the total sum of counts as the number of observations,
+like in vanilla empirical likelihood, due to formula (2.9) in \insertCite{owen2001empirical}{smoothemplik},
+otherwise re-normalises the counts to 1 according to \insertCite{cosma2019inference}{smoothemplik}
+(p. 170, the topmost formula).}
 
-\item{return.weights}{Logical: if \code{TRUE}, returns the empirical probabilities. Default is memory-saving (\code{FALSE}).}
+\item{return.weights}{Logical: if \code{TRUE}, returns the empirical probabilities.
+Default is memory-saving (\code{FALSE}).}
 
-\item{lower}{Lower cut-off for [logTaylor()], default \code{1/nrow(z)}}
+\item{lower}{Lower cut-off for [logTaylor()], default \code{1/NROW(z)}.}
 
-\item{upper}{Upper cutoff for [logTaylor()], default \code{Inf}}
+\item{upper}{Upper cut-off for [logTaylor()], default \code{Inf}.}
 
-\item{order}{Positive integer such that the Taylor approximation of this order to log(x) is self-concordant; usually 4 or higher. Passed to [logTaylor()].}
+\item{order}{Positive even integer such that the Taylor approximation of this order to
+\eqn{\log x}{log(x)} is self-concordant; usually 4 or 2. Passed to [logTaylor()].}
 
-\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability}
+\item{weight.tolerance}{Weight tolerance for counts to improve numerical stability
+(defaults to \code{sqrt(.Machine$double.eps)} times the maximum weight).}
 
-\item{deriv}{Logical: if \code{TRUE}, computes and returns the first two derivatives of log-ELR w.r.t. \code{mu}.}
+\item{deriv}{Logical: if \code{TRUE}, computes and returns the first two directional derivatives
+of log-ELR w.r.t. \code{mu} in the direction of the hypothesised value.}
 
-\item{thresh}{Convergence threshold for log-likelihood (the default is aggressive)}
+\item{thresh}{Target tolerance on the squared Newton decrement: loop stops when \code{decr^2 <= thresh}.
+(If \code{verbose} is \code{TRUE}, decrement itself is printed.)}
 
-\item{itermax}{Upper bound on number of Newton steps (seems ample)}
+\item{itermax}{Maximum number of outer iterations of the damped Newton method (seems ample).}
 
 \item{verbose}{Logical: print output diagnostics?}
 
-\item{alpha}{Backtracking line search parameter: acceptance of a decrease in function value by ALPHA*f of the prediction
-based on the linear extrapolation.}
+\item{alpha}{Backtracking line search Armijo parameter: acceptance of a decrease in function value
+by \eqn{\alpha f}{ALPHA*f} of the prediction based on the linear extrapolation. Smaller makes acceptance easier.}
 
-\item{beta}{Backtracking line search reduction factor. 0.1 corresponds to a very crude search, 0.8 corresponds
-to a less crude search.}
+\item{beta}{Backtracking step shrinkage factor in \code{[0, 1]}. 0.1 corresponds to a very crude search,
+0.8 corresponds to a less crude search.}
 
-\item{backeps}{Backtrack threshold: the search can miss by this much. Consider setting it to 1e-10
-if backtracking seems to be failing due to round-off.}
+\item{backeps}{Backtrack threshold, a small slack added to Armijo RHS: the search can miss by this much.
+Accept if \eqn{f(x+tp) \le f(x)+\alpha t g'p + \mathrm{backeps}}{f(x+tp) <= f(x) + alpha\*t\*g'p + backeps}.
+Consider setting it to \code{1e-10} if backtracking seems to be failing due to round-off.}
+
+\item{gradtol}{Gradient tolerance: stop if \code{||g|| <= gradtol}.}
+
+\item{steptol}{Step tolerance: stop if the relative size is tiny: \code{||x2-x1||/max(1, ||x2||) < ftol}.}
+
+\item{stallmax}{Stop if both \code{rel_step <= steptol} and \code{rel_f <= ftol} hold for this many consecutive iterations.}
 }
 \value{
 A list with the following values:
@@ -78,6 +98,7 @@ A list with the following values:
     \item{logelr}{Log of empirical likelihood ratio (equal to 0 if the hypothesised mean is equal to the sample mean)}
     \item{lam}{Vector of Lagrange multipliers}
     \item{wts}{Observation weights/probabilities (vector of length n)}
+    \item{deriv}{Length-2 vector: directional first and second derivatives along the ray toward mu (if \code{deriv = TRUE})}
     \item{converged}{\code{TRUE} if algorithm converged. \code{FALSE} usually means that mu is not in the convex hull of the data. Then, a very small likelihood is returned (instead of zero).}
     \item{iter}{Number of iterations taken.}
     \item{ndec}{Newton decrement (see Boyd & Vandenberghe).}
@@ -98,12 +119,15 @@ The search of the lambda multipliers is carried out via a dampened Newton method
 convergence owing to the fact that the log-likelihood is replaced by its Taylor approximation
 of any desired order (default: 4, the minimum value that ensures self-concordance).
 
+Implementation note: the EL solver also guarantees a descent direction; if the Newton step is non-descent or non-finite,
+it falls back to steepest descent (negative gradient), which keeps the line search well-behaved.
+
 Tweak \code{alpha} and \code{beta} with extreme caution. See \insertCite{boyd2004convex}{smoothemplik},
 pp. 464--466 for details. It is necessary that \code{0 < alpha < 1/2} and \code{0 < beta < 1}.
 \code{alpha = 0.3} seems better than 0.01 on some 2-dimensional test data (sometimes fewer iterations).
 
 The argument names, except for \code{lambda.init}, are matching the original names in Art B. Owen's implementation.
-The highly optimised one-dimensional counterpart, \code{EL0}, is designed to return a faster
+The highly optimised one-dimensional counterpart, [EL0()], is designed to return a faster
 and a more accurate solution in the one-dimensional case.
 }
 \examples{

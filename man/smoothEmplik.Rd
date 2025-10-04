@@ -9,12 +9,12 @@ smoothEmplik(
   theta,
   data,
   sel.weights = NULL,
-  type = c("EL0", "EL1", "EuL"),
+  weight.tolerance = 0,
+  type = c("auto", "EL0", "EL1", "EuL"),
+  chull.fail = c("none", "taylor", "wald", "adjusted", "adjusted2", "balanced"),
   kernel.args = list(bw = NULL, kernel = "epanechnikov", order = 2, PIT = TRUE, sparse =
     TRUE),
-  EL.args = list(chull.fail = "taylor", weight.tolerance = NULL),
   minus = FALSE,
-  parallel = FALSE,
   cores = 1,
   chunks = NULL,
   sparse = FALSE,
@@ -35,27 +35,24 @@ smoothEmplik(
 \item{sel.weights}{Either a matrix with valid kernel smoothing weights with rows adding up to 1,
 or a function that computes the kernel weights based on the \code{data} argument passed to \code{...}.}
 
-\item{type}{Character: \code{"EL"} for empirical likelihood, \code{"EuL"} for Euclidean likelihood, \code{"EL0"} for one-dimensional
-empirical likelihood. \code{"EL0"} is *strongly* recommended for 1-dimensional moment functions because it is
-faster and more robust: it searches for the Lagrange multiplier directly and has nice fail-safe options
+\item{type}{Character: \code{"auto"} for empirical likelihood, \code{"EuL"} for Euclidean likelihood,
+\code{"EL0"} for one-dimensional empirical likelihood. \code{"EL0"} is *strongly*
+recommended for 1-dimensional moment functions because it is faster and more robust:
+it searches for the Lagrange multiplier directly and has nice fail-safe options
 for convex hull failure.}
 
 \item{kernel.args}{A list of arguments passed to \code{kernelWeights()} if
 \code{sel.weights} is a function.}
 
-\item{EL.args}{A list of arguments passed to \code{EL()}, \code{EL0()}, or \code{EuL()}.}
-
 \item{minus}{If TRUE, returns SEL times -1 (for optimisation via minimisation).}
 
-\item{parallel}{If TRUE, uses \code{parallel::mclapply} to speed up the computation.}
-
-\item{cores}{The number of cores used by \code{parallel::mclapply}.}
+\item{cores}{The number of cores used by \code{parallel::mclapply} to speed up the computation.}
 
 \item{chunks}{The number of chunks into which the weight matrix is split for memory saving.
 One chunk is good for sample sizes 2000 and below. If equal to the number of observations, then,
 the smoothed likelihoods are computed in series, which saves memory but computes kernel weights at
 every step of a loop, increasing CPU time.
-If \code{parallel} is \code{TRUE}, parallelisation occurs within each chunk.}
+If \code{cores} is greater than 1, parallelisation occurs within each chunk.}
 
 \item{sparse}{Logical: convert the weight matrix to a sparse one?}
 
@@ -75,6 +72,8 @@ otherwise, attaches certain attributes for diagnostics:
 \code{"probabilities"} for the matrix of weights (very large, not recommended for sample sizes larger than 2000).}
 
 \item{...}{Passed to \code{rho}.}
+
+\item{EL.args}{A list of arguments passed to \code{EL()}, \code{EL0()}, or \code{EuL()}.}
 }
 \value{
 A scalar with the SEL value and, if requested, attributes containing the diagnostic information attached to it.
@@ -114,12 +113,16 @@ b.SEuL <- optim(coef(mod.OLS), SEuL, method = "BFGS", control = ctl)
 abline(b.SEuL$par, col = 3)
 cbind(SEL = b.SEL$par, SEuL = b.SEuL$par)
 
-# Now we start from (0, 0), for which the Taylor expansion is necessary
+# Now we start from (0, 0), for which an extension is necessary
 # because all residuals at this starting value are positive and the
 # unmodified EL ratio for the test of equality to 0 is -Inf
 if (FALSE) {
-smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
-smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
+SEL(c(0, 0))
+SEL(c(0, 0), chull.fail = "taylor")
+SEL(c(0, 0), chull.fail = "wald")
+SEL(c(0, 0), chull.fail = "adjusted")
+SEL(c(0, 0), chull.fail = "adjusted2")
+SEL(c(0, 0), chull.fail = "balanced")
 
 # The next example is very slow; approx. 1 minute
 \donttest{
@@ -128,9 +131,9 @@ smoothEmplik(rho=rho, theta=c(0, 0), sel.weights = w)
 w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
 w <- w / rowSums(w)
 # The first option is faster but it may sometimes fails
-b.SELt <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "taylor"),
+b.SELt <- optim(c(0, 0), SEL, chull.fail = "taylor",
                 method = "BFGS", control = ctl)
-b.SELw <- optim(c(0, 0), SEL, EL.args = list(chull.fail = "wald"),
+b.SELw <- optim(c(0, 0), SEL, chull.fail = "wald",
                 method = "BFGS", control = ctl)
 }
 w <- kernelWeights(x, PIT = TRUE, bw = 0.15, kernel = "epanechnikov")
