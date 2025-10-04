@@ -350,7 +350,7 @@ EL0 <- function(z, mu = NULL, ct = NULL, shift = NULL, renormalise = FALSE, retu
 #' and a more accurate solution in the one-dimensional case.
 #'
 #' @param z A numeric vector or a matrix with one data vector per column.
-#' @param mu Hypothesised mean, default \code{(0 ... 0)} in \eqn{R^{\mathrm{ncol}(z)}{R^ncol(z)}.
+#' @param mu Hypothesised mean, default \code{(0 ... 0)} in \eqn{R^{\mathrm{ncol}(z)}}{R^ncol(z)}.
 #' @param ct Numeric count variable with non-negative values that indicates the multiplicity of observations.
 #' @param shift The value to add in the denominator (useful in case there are extra
 #'   Lagrange multipliers): \eqn{1 + \lambda'Z + shift}{1 + lambda'Z + shift}.
@@ -639,6 +639,14 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
 
   if (type == "EuL" & !renormalise) renormalise <- TRUE
 
+  if (is.null(ct)) ct <- rep(1, NROW(z))
+  zct <- ct == 0
+  if (any(zct)) {
+    z <- if (!is.null(dim(z))) z[!zct, , drop = FALSE] else z[!zct]
+    ct <- ct[!zct]
+    if (!is.null(shift)) shift <- shift[!zct]
+  }
+
   # Common args shared by all back-ends, without the NULLs
   base_args <- list(z = z, ct = ct, mu = mu, shift = shift, renormalise = renormalise,
     return.weights = return.weights, weight.tolerance = weight.tolerance, verbose = verbose)
@@ -679,11 +687,11 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
     res <- list(logelr = res)
   } else if (chull.fail == "adjusted") {
     if (is.null(dim(z))) z <- as.matrix(z)
-    an <- max(1, log(n)/2)
-    zm <- colMeans(z)
+    an <- max(1, log(nrow(z))/2)
+    zm <- apply(z, 2, weighted.mean, w = ct)
     point1 <- -zm * an
-    z <- rbind(z, point1)
-    call.args$z <- z
+    call.args$z <- rbind(z, point1)
+    call.args$ct <- c(ct, mean(ct))
     res <- switch(
       type,
       EL1 = do.call(EL1, call.args),
@@ -696,7 +704,7 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
     b  <- bartlettFactor(z)
     b1 <- attr(b, "components")[1]
     b2 <- attr(b, "components")[2]
-    zm <- colMeans(z)
+    zm <- apply(z, 2, weighted.mean, w = ct)
     if (NCOL(z) == 1) {
       point1 <- -zm*b/2
       point2 <- NULL
@@ -704,8 +712,8 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
       point1 <- -zm*b1/2
       point2 <-  zm*b2/2
     }
-    z <- rbind(z, point1, point2)
-    call.args$z <- z
+    call.args$z <- rbind(z, point1, point2)
+    call.args$ct <- if (NCOL(z) == 1) c(ct, mean(ct)) else c(ct, rep(mean(ct), 2))
     res <- switch(
       type,
       EL1 = do.call(EL1, call.args),
@@ -727,8 +735,8 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
     delta <- s*cu / zl
     point1 <- -zbar * delta
     point2 <- (2+delta)*zbar
-    z <- rbind(z, point1, point2)
-    call.args$z <- z
+    call.args$z <- rbind(z, point1, point2)
+    call.args$ct <- c(ct, rep(mean(ct), 2))
     res <- switch(
       type,
       EL1 = do.call(EL1, call.args),
