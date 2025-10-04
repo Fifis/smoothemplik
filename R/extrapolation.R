@@ -83,16 +83,20 @@ ExEL1 <- function(z, mu, type = c("auto", "EL0", "EL1"),
   ct <- ell$ct
   n <- NROW(z)
   if (is.null(ct)) ct <- ell$ct <- rep(1, n)
+  z <- if (d == 1) z[ct != 0] else z[ct != 0, , drop = FALSE]
+  ct <- ct[ct != 0]
   # Cleaning the dots from undesirable user arguments
   ell$mu <- NULL
   ell$return.weights <- FALSE  # To save memory
   ell$renormalise <- FALSE
   ell$deriv <- NULL
 
-  fmax <- if (is.numeric(exel.control$fmax)) exel.control$fmax else NA
-  p    <- if (is.numeric(exel.control$p))    exel.control$p else 0.999
-  df   <- if (is.numeric(exel.control$df))   exel.control$df else d
-  if (!is.finite(fmax)) fmax <- stats::qchisq(p, df = d)
+  def.ctl <- list(xlim = "auto", fmax = NA_real_, p = 0.999, df = NA_integer_)
+  exel.control <- if (is.null(exel.control)) def.ctl else utils::modifyList(def.ctl, exel.control)
+  fmax   <- exel.control$fmax
+  p  <- if (is.na(exel.control$p))  0.999 else exel.control$p
+  df <- if (is.na(exel.control$df)) d else exel.control$df
+  if (!is.finite(fmax)) fmax <- stats::qchisq(p = p, df = df)  # exel.control may still hold the NA
 
   fl <- switch(type, # f value + derivatives in a list; ct is already inside ell
                EL0 = function(m) do.call(EL0, c(list(mu = m, deriv = TRUE), ell))[c("logelr", "deriv")],
@@ -237,6 +241,8 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
   ell <- list(z = z, ...)
   ct <- ell$ct
   if (is.null(ct)) ct <- ell$ct <- rep(1, NROW(z))
+  z <- if (d == 1) z[ct != 0] else z[ct != 0, , drop = FALSE]
+  ct <- ct[ct != 0]
   ell$mu <- NULL
   ell$return.weights <- FALSE  # To save memory
   ell$renormalise <- FALSE
@@ -251,10 +257,12 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
                 EL1 = function(m) do.call(EL1, c(list(mu = m, deriv = TRUE), ell))[c("logelr", "deriv")]
                 )
 
-  fmax <- if (is.numeric(exel.control$fmax)) exel.control$fmax else NA
-  p    <- if (is.numeric(exel.control$p))    exel.control$p else 0.999
-  df   <- if (is.numeric(exel.control$df))   exel.control$df else d
-  if (!is.finite(fmax)) fmax <- stats::qchisq(p, df = d)
+  def.ctl <- list(xlim = "auto", fmax = NA_real_, p = 0.999, df = NA_integer_)
+  exel.control <- if (is.null(exel.control)) def.ctl else utils::modifyList(def.ctl, exel.control)
+  fmax   <- exel.control$fmax
+  p  <- if (is.na(exel.control$p))  0.999 else exel.control$p
+  df <- if (is.na(exel.control$df)) d else exel.control$df
+  if (!is.finite(fmax)) fmax <- stats::qchisq(p = p, df = df)  # exel.control may still hold the NA
 
   if (d > 1) {
     if (!identical(exel.control$xlim, "auto")) stop("ExEL2 (multivariate): only xlim='auto' is supported.")
@@ -355,7 +363,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
           tau <- tryCatch(suppressWarnings(brentZero(G, c(1e-6, max(1e-2, 0.1*t_hi0)), extendInt = "right", maxiter = 100)$root), error = function(e) NA_real_)
           if (is.finite(tau) && tau >= 1.01e-6) break
         }
-        if (i == 50) stop("Could not find an appropriate configuration.")
+        if (i == 30) stop("Could not find an appropriate configuration.")
       }
 
       t2 <- t1 + tau
@@ -555,6 +563,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
           H <- function(t) Gnegexp(x1 = x1, t = t)
           # xseq <- seq(x1, x1+2, length.out = 101)
           # plot(xseq, H(xseq))
+          tmax <- max(1e-2, 0.1*tspan)
           troot <- tryCatch(suppressWarnings(brentZero(H, c(1e-6, tmax), extendInt = "right", maxiter = 100)), error = function(e) NULL)
           if (is.null(troot) || troot$iter >= 100) {
             a2 <- Inf
@@ -609,6 +618,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
           H <- function(t) Gnegexp(x1 = x1, x2 = t)
           # xseq <- seq(-100, 500, length.out = 101)
           # plot(xseq, H(xseq))
+          tmax <- max(1e-2, 0.1*tspan)
           troot <- tryCatch(suppressWarnings(brentZero(H, c(1e-6, tmax), extendInt = "right", maxiter = 100)), error = function(e) NULL)
           if (is.null(troot) || troot$iter >= 100) {
             a2 <- Inf
