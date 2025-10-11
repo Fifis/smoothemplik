@@ -541,8 +541,8 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
         if (W(x1) > f1) {  # Type-1 bridge with exp(x)
           tr       <- wm - x1 - fp1/a
           tmax     <- min(tr - 1e-6, tspan)
-          H <- function(t) Gposexp(t = t, x1 = x1)
-          # xseq <- seq(0, 3, length.out = 101)
+          H <- function(t) Gposexp(x1 = x1, t = t)
+          # xseq <- seq(0, 20, length.out = 101)
           # gseq <- sapply(xseq, H)
           # plot(xseq, gseq)
           troot <- tryCatch(suppressWarnings(brentZero(H, c(1e-6, tmax), extendInt = "right", maxiter = 100)), error = function(e) NULL)
@@ -578,7 +578,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
           }
         }
         # xseq <- seq(min(0, min(z)), max(0, 0.2, max(z)), length.out = 301)
-        # plot(xseq, sapply(xseq, f), ylim = c(-250, 0))
+        # plot(xseq, sapply(xseq, f), ylim = c(-120, 0))
         # lines(xseq, sapply(xseq, W), col = 2)
         # lines(xseq, h(xseq), col = 4)
         # abline(v = c(x1, x2), lty = 2)
@@ -613,29 +613,32 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
 
         if (W(x1) > f1) {
           # Type-2 bridge with exp(-x)
-          # Wald below EL (transition to "higher")
-          # search x2 < x1 for the root of Gnegexp
-          H <- function(t) Gnegexp(x1 = x1, x2 = t)
-          # xseq <- seq(-100, 500, length.out = 101)
+          # Wald below EL (transition to higher) -- search x2 < x1 for the root of Gnegexp
+          H <- function(t) Gnegexp(x1 = x1, t = t)
+          # xseq <- seq(-10, 0, length.out = 101)
           # plot(xseq, H(xseq))
-          tmax <- max(1e-2, 0.1*tspan)
-          troot <- tryCatch(suppressWarnings(brentZero(H, c(1e-6, tmax), extendInt = "right", maxiter = 100)), error = function(e) NULL)
+          tmin <- min(-1e-6, -0.1*tspan)
+          troot <- tryCatch(suppressWarnings(brentZero(H, c(tmin, -1e-6), extendInt = "left", maxiter = 100)), error = function(e) NULL)
           if (is.null(troot) || troot$iter >= 100) {
             a2 <- Inf
             x2 <- x1
             if (is.null(troot)) tspan <- tspan * 0.8  # The only possible error is 'large span, infinite H'
           } else {
-            x2   <- x1 + troot$root
-            emt  <- exp(-troot$root)
-            a2 <- (Wp(x2) - fp1) / (1 - emt)
-            a1 <- fp1 + a2
-            a0 <- f1 - a1*x1 - a2
+            tneg <- troot$root
+            x2   <- x1 + tneg
+            emt  <- exp(tneg)
+            a1   <- (Wp(x2)*emt - fp1) / (emt - 1)
+            a2 <- a1 - fp1
+            a0 <- f1 - a1 * x1 - a2
             h  <- function(x) hnegexp(x, x1 = x1, a = c(a0, a1, a2))
           }
         } else {  # Type-1 bridge with a0 + a1*x + a2*exp(x-x1)
           tl      <- wm - x1 - fp1/a
           tmin    <- max(-tspan, tl + 1e-6)
-          H <- function(t) Gposexp(t = t, x1 = x1)
+          H <- function(t) Gposexp(x1 = x1, t = t)
+          # xseq <- seq(-10, 0, length.out = 101)
+          # hseq <- sapply(xseq, H)
+          # plot(xseq, hseq)
           troot <- tryCatch(suppressWarnings(brentZero(H, c(tmin, -1e-6), extendInt = "left", maxiter = 100)), error = function(e) NULL)
           if (is.null(troot) || troot$iter >= 100) {
             a2 <- Inf
@@ -650,6 +653,11 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
             h  <- function(x) hposexp(x, x1 = x1, a = c(a0, a1, a2))
           }
         }
+        # xseq <- seq(min(0, min(z)), max(0, 0.2, max(z)), length.out = 301)
+        # plot(xseq, sapply(xseq, f), ylim = c(-20, 0))
+        # lines(xseq, sapply(xseq, W), col = 2)
+        # lines(xseq, h(xseq), col = 4)
+        # abline(v = c(x1, x2), lty = 2)
         if (a2 < 0) {
           break
         } else {
