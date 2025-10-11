@@ -658,6 +658,9 @@ EL <- function(z, ct = NULL, mu = NULL, shift = NULL,
     if (!is.null(shift)) shift <- shift[!zct]
   }
 
+  # Extrapolated EL requires a default mu -- providing 0
+  if (chull.fail %in% c("taylor", "wald") && is.null(mu)) mu <- rep(0, NCOL(z))
+
   # Common args shared by all back-ends, without the NULLs
   base_args <- list(z = z, ct = ct, mu = mu, shift = shift, renormalise = renormalise,
     return.weights = return.weights, weight.tolerance = weight.tolerance, verbose = verbose)
