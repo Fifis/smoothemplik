@@ -1,7 +1,7 @@
 Package: smoothemplik
 Type: Package
 Title: Smoothed Empirical Likelihood
-Version: 0.0.15
+Version: 0.0.16
 Authors@R: person(given=c("Andreï", "Victorovitch"), family="Kostyrka",
         role=c("aut", "cre"), email="andrei.kostyrka@gmail.com")
 Maintainer: Andreï Victorovitch Kostyrka <andrei.kostyrka@gmail.com>
