@@ -116,11 +116,12 @@ pickMinBW <- function(X, d = 2 / sqrt(NROW(X)), tol = 1e-12) {
   k <- ceiling(d * n)
   k <- max(1, min(k, n - 1))
 
-  has.ms <- requireNamespace("matrixStats", quietly = TRUE)
+  # has.ms <- requireNamespace("matrixStats", quietly = TRUE)
   b <- sapply(seq_len(n), function(i) {
     # L_inf distances from X_i
     A  <- abs(sweep(X, 2, X[i, ], "-", check.margin = FALSE))
-    Di <- if (has.ms) matrixStats::rowMaxs(A) else do.call(pmax, as.data.frame(A))
+    # Di <- if (has.ms) matrixStats::rowMaxs(A) else do.call(pmax, as.data.frame(A))
+    Di <- do.call(pmax, as.data.frame(A))
     Di[i] <- Inf  # Exclude self
     if (k < n - 1) {
       return(sort(Di, partial = k + 1)[k + 1])
