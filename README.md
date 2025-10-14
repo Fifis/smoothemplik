@@ -3,7 +3,7 @@
 [![R-CMD-check](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml)
 [![codecov](https://codecov.io/gh/Fifis/smoothemplik/graph/badge.svg?token=LYXLUYWY5X)](https://app.codecov.io/gh/Fifis/smoothemplik)
 <!-- badges: end -->
-w
+
 # smoothemplik
 
 R package for estimation via Smoothed Empirical Likelihood (SEL).
