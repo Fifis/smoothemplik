@@ -3,12 +3,12 @@
 [![R-CMD-check](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/Fifis/smoothemplik/actions/workflows/R-CMD-check.yaml)
 [![codecov](https://codecov.io/gh/Fifis/smoothemplik/graph/badge.svg?token=LYXLUYWY5X)](https://app.codecov.io/gh/Fifis/smoothemplik)
 <!-- badges: end -->
-
+w
 # smoothemplik
 
 R package for estimation via Smoothed Empirical Likelihood (SEL).
 
-<img src="https://kostyrka.lu/user/pages/05.programming/10.smoothemplik-package/smoothed-empirical-likelihood-r-package.png" alt="Smoothed Empirical Likelihood" width="640"/>
+<img src="https://kostyrka.lu/user/pages/50.programming/10.smoothemplik-package/smoothed-empirical-likelihood-r-package.png" alt="Smoothed Empirical Likelihood" width="640"/>
 
 Smoothed Empirical Likelihood (SEL), also known as Conditional Empirical Likelihood (CEL) or Local Empirical Likelihood (LEL), is a powerful statistical method for estimation and hypothesis testing.
 It shares the competitive advantages of Generalised Empirical Likelihood (GEL) and can estimate models defined by conditional moment restrictions (CMR).
@@ -94,7 +94,7 @@ This software is released under the free/open-source [EUPL 1.2 licence](https://
 - **The behaviour of R is hardware-dependent.** Different compilers on different
   architectures can produce R binaries that yield different outputs for the same R script.
   This variability particularly affects numerical searches for lambda in functions
-  `weightedEL0()` or `weightedEL()` for one-dimensional data. This is not a bug in
+  `EL0()` or `EL1()` for one-dimensional data. This is not a bug in
   `smoothemplik`, but a consequence of the differences in machine code. Testing showed that
   running these two functions for Figure 2.4 from Owen (2001) on R compiled for
   `aarch64-apple-darwin20` produced slightly different results compared to running the same
