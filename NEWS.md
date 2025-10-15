@@ -41,7 +41,14 @@ These bug fixes and features are scheduled for the upcoming releases.
 - DEV: Add tests reproducing simple hard-coded examples
 - DEV: Check the release with `todor::todor_package()`, `lintr::lint_package()`, `R CMD check --as-cran`, and `goodpractice::gp()`
 
-# smoothemplik 0.0.16 (2025-08-05)
+# smoothemplik 0.0.16 (2025-11-11)
+
+- Defined `EL0()` as the univariate and `EL1()` as the multi-variate wrapper, subsumed by `EL()`
+- Added Extrapolated EL for applications where the convex hull must be violated
+- Re-implemented adjusted (2 variants) and balanced EL
+- Added Bartlett factor computation
+- Improved `brentZero()` root search, added two new extensions rules: `"left"` and `"right"`
+- Improved the damped Newton search, added several stopping criteria to prevent stalling
 
 # smoothemplik 0.0.15 (2025-08-05)
 
