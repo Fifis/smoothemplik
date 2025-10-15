@@ -164,35 +164,35 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
   // Derivatives in the direction of mu if asked for (log-ELR scale)
   SEXP derivs = R_NilValue;
   if (deriv) {
-    if (arma::norm(v, 2) == 0.0) {  // mu == wm: zero direction
-      derivs = NumericVector::create(0.0, 0.0);
-    } else {
-      arma::vec u      = 1.0 + g_Z * lambda + g_shift; // n x 1
-      arma::vec invu   = 1.0 / u;
-      arma::vec invu2  = invu % invu;
-      arma::vec winvu2 = g_ct % invu2;  // weights / u^2
+    // Rcpp::Rcout << "v direction" << v << std::endl;
+    arma::vec u      = 1.0 + g_Z * lambda + g_shift; // n x 1
+    arma::vec invu   = 1.0 / u;
+    arma::vec invu2  = invu % invu;
+    arma::vec winvu2 = g_ct % invu2;  // weights / u^2
 
-      const double S0 = arma::dot(g_ct, invu);
-      const double S1 = arma::dot(g_ct, invu2);
-      arma::vec  T1  = g_Z.t() * winvu2;                      // d x 1
-      arma::mat  T2   = g_Z.t() * (g_Z.each_col() % winvu2);  // d x d
+    const double S0 = arma::dot(g_ct, invu);
+    const double S1 = arma::dot(g_ct, invu2);
+    arma::vec  T1  = g_Z.t() * winvu2;                      // d x 1
+    arma::mat  T2   = g_Z.t() * (g_Z.each_col() % winvu2);  // d x d
 
-      arma::mat T2inv;  // Stable inverse
-      bool ok = false;
-      try { T2inv = arma::inv_sympd(T2); ok = true; } catch(...) { ok = false; }
-      if (!ok) T2inv = arma::pinv(T2);
+    arma::mat T2inv;  // Stable inverse
+    bool ok = false;
+    try { T2inv = arma::inv_sympd(T2); ok = true; } catch(...) { ok = false; }
+    if (!ok) T2inv = arma::pinv(T2);
 
-      const double lamv = arma::dot(lambda, v);
-      arma::vec wv = S0 * v - lamv * T1;
+    const double lamv = arma::dot(lambda, v);
+    arma::vec wv = S0 * v - lamv * T1;
 
-      // log-ELR directional derivatives:
-      // f'_v  =  S0 * (lambda' v)
-      // f''_v = (wv' T2^{-1} wv) - (lambda' v)^2 S1
-      double first  = S0 * lamv;
-      double second = -(arma::as_scalar( wv.t() * T2inv * wv )) + (lamv * lamv) * S1;
-
-      derivs = NumericVector::create(first, second);
+    // log-ELR directional derivatives:
+    // f'_v  =  S0 * (lambda' v)
+    // f''_v = (wv' T2^{-1} wv) - (lambda' v)^2 S1
+    double first = 0.0;
+    if (arma::norm(v, 2) != 0.0) {  // mu == wm: zero direction
+      first  = S0 * lamv;
     }
+    double second = -(arma::as_scalar( wv.t() * T2inv * wv )) + (lamv * lamv) * S1;
+
+    derivs = NumericVector::create(first, second);
   }
 
   return List::create(
