@@ -1,3 +1,11 @@
+test_that("prepareKernel can handle bad inputs", {
+  x <- data.frame(1:10)
+  expect_error(prepareKernel(x, order = 3), "kernel order")
+  expect_error(prepareKernel(x, order = 4, convolution = TRUE), "convolution kernels have been implemented")
+  expect_error(prepareKernel(x, weights = 1:9), "length of 'weights'")
+  expect_error(prepareKernel(x, y = matrix(1:20, ncol = 2)), "must be a numeric vector")
+})
+
 test_that("de-duplication in kernel preparation works correctly", {
   set.seed(1)
   n.uniq <- 1000

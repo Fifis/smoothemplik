@@ -238,7 +238,7 @@ prepareKernel <- function(x,
                            PIT = FALSE
 ) {
   kernel <- kernel[1]
-  if (!(order %in% c(2, 4, 6))) stop("The kernel order muse be 2, 4, or 6.")
+  if (!(order %in% c(2, 4, 6))) stop("The kernel order must be 2, 4, or 6.")
   if (convolution && order > 2) stop("At this moment, convolution kernels have been implemented for kernel order 2 only.")
   if (no.dedup) deduplicate.x <- deduplicate.xout <- FALSE
 

@@ -11,8 +11,7 @@ test_that("smoothEmplik works for a simple linear model", {
   expect_type(SEL(coef(mod.OLS)), "double")
   gradSEL <- function(b) c(SEL(b + c(1e-5, 0)) - SEL(b - c(1e-5, 0)),
                            SEL(b + c(0, 1e-5)) - SEL(b - c(0, 1e-5)))/2e-5
-  # Starting from a closer value to speed up estimation
-  b.SEL <- optim(c(1.430152, 0.968975), SEL, gr = gradSEL,
+  b.SEL <- optim(coef(mod.OLS), SEL, gr = gradSEL,
                  method = "BFGS", control = list(fnscale = -1, reltol = 1e-6))
   expect_equal(b.SEL$convergence, 0)
   expect_lt(b.SEL$value, 0)

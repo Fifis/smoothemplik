@@ -11,10 +11,12 @@ test_that("brentZero works well for good inputs", {
   expect_error(brentZero(f, c(-1, 1), extendInt = "something"), "Invalid 'extendInt' argument")
 
   f <- function (x) 1 - x
-  xroot1 <- brentZero(f, c(9, 10), extendInt = "downX")
-  xroot2 <- brentZero(f, c(9, 10), extendInt = "yes")
-  xroot3 <- brentZero(f, c(9, 10), extendInt = "left")
-  xroot4 <- brentZero(f, c(-10, -9), extendInt = "right")
+  sink(tempfile())
+  xroot1 <- brentZero(f, c(9, 10), extendInt = "downX", trace = 2)
+  xroot2 <- brentZero(f, c(9, 10), extendInt = "yes", trace = 2)
+  xroot3 <- brentZero(f, c(9, 10), extendInt = "left", trace = 2)
+  xroot4 <- brentZero(f, c(-10, -9), extendInt = "right", trace = 2)
+  sink()
   expect_equal(xroot1$root, xroot2$root, tolerance = 1e-12)
   expect_equal(xroot1$root, xroot3$root, tolerance = 1e-12)
   expect_equal(xroot1$root, xroot4$root, tolerance = 1e-12)
@@ -73,6 +75,7 @@ test_that("brentZero correctly handles bad functions", {
   expect_gt(xroot$init.it, 0)
   xroot <- brentZero(f, c(0.8, 0.95), maxiter = 100, extendInt = "yes")
   expect_gt(xroot$init.it, 0)
+
 
   # A zero function
   f <- function(x) return(0)

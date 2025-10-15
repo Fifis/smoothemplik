@@ -431,7 +431,7 @@ void doExtendInterval(
       double tmp = fn(trial);
 
       if (!R_finite(tmp)) {
-        // --- Hit a non-finite barrier on the left; remember it and backtrack once.
+        // Hit a non-finite barrier on the left; remember it and backtrack once.
         if (!seen_bad) { seen_bad = true; bad = trial; }
         if (trace >= 2) Rcpp::Rcout << " .. left-only backtrack from non-finite\n";
 
@@ -502,7 +502,7 @@ void doExtendInterval(
       double tmp   = fn(trial);
 
       if (!R_finite(tmp)) {
-        // --- Hit a non-finite barrier on the right; remember it and backtrack once.
+        // Hit a non-finite barrier on the right; remember it and backtrack once.
         if (!seen_bad) { seen_bad = true; bad = trial; }
         if (trace >= 2) Rcpp::Rcout << " .. right-only backtrack from non-finite\n";
 
@@ -668,7 +668,6 @@ List brentZeroCPP(
     );
   }
 
-  // Ensure BOTH end-points are finite; if one end is not, shrink it inward
   // Ensure BOTH end-points are finite; if one end is not, shrink it inward
   auto shrink_right_to_finite = [&]() {
     int tries = 0;
