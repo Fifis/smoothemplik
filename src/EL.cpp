@@ -195,6 +195,11 @@ List ELCPP(NumericMatrix z, NumericVector ct, NumericVector mu, double shift,
     derivs = NumericVector::create(first, second);
   }
 
+  // Final sanity check: if the convex-hull condition is violated, the procedure will never converge
+  if (it >= itermax) {
+    logelr = R_NegInf; // The exit code cannot be zero here
+  }
+
   return List::create(
     _["logelr"] = logelr, _["lam"] = par, _["wts"] = wts,
     _["deriv"] = derivs,
