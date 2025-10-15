@@ -203,7 +203,9 @@ bartlettFactor <- function(x, centre = TRUE, bias.adj = TRUE) {
 
     b1 <- (a1/2 - a2/3 + a3/2 - a4/2) / q
     b2 <- (a5/2 + 2*a6) / q
-    if (b1 < 0 || b2 < 0) stop("Bug in bartlettFactor: the sums b1 and b2 cannot be negative.")
+    if (!is.finite(b1) || !is.finite(b2))
+      stop("Bartlett factor cannot be computed for rank-deficient data sets with linearly dependent columns.")
+    if (b1 < 0 || b2 < 0) stop("Bug in bartlettFactor: the sums b1 and b2 cannot be negative. Please report it to GitHub.")
     bd <- b1 - b2
     attr(bd, "components") <- c(b1, b2)
     if (bias.adj) {
