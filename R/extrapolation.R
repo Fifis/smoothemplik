@@ -301,7 +301,7 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
       iqr_v  <- stats::mad(proj)
       t_hi0  <- max(0.01*sd_v, min(sd_v, iqr_v))
 
-      # tseq <- seq(0, 55, length.out = 101)
+      # tseq <- seq(0, 1, length.out = 101)
       # fseq <- sapply(tseq, function(t) f(wm + t * v))
       # plot(tseq, fseq)
       # lines(tseq, -0.5*a*tseq^2, col = 2)
@@ -363,7 +363,10 @@ ExEL2 <- function(z, mu, type = c("auto", "EL0", "EL1"),
           tau <- tryCatch(suppressWarnings(brentZero(G, c(1e-6, max(1e-2, 0.1*t_hi0)), extendInt = "right", maxiter = 100)$root), error = function(e) NA_real_)
           if (is.finite(tau) && tau >= 1.01e-6) break
         }
-        if (i == 30) stop("Could not find an appropriate configuration.")
+        if (i == 30) {
+          warning("Could not find an appropriate configuration -- returning an immediate Wald transition.")
+          tau <- 1e-8
+        }
       }
 
       t2 <- t1 + tau
