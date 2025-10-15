@@ -40,3 +40,4 @@ test_that("kernelFun preserves dimensions and names", {
   expect_equal(dim(x), dim(kernelFun(x)))
 })
 
+

@@ -1,3 +1,9 @@
+test_that("kernelDensityCPP correctly handled bad inputs", {
+  set.seed(1)
+  expect_error(kernelDensityCPP(x = matrix(rnorm(100), 10), xout = matrix(rnorm(100), 10),
+                               weights = 1:10, bw = matrix(1:9)), "bw and xout must have")
+})
+
 test_that("chunking for density works", {
   set.seed(1)
   x <- rnorm(1000)

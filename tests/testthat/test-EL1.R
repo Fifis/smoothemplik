@@ -14,3 +14,11 @@ test_that("EL0 and EL1 are almost identical, but platform-dependent", {
   expect_lt(diff.lam, 5e-10)
   expect_lt(diff.wts, 5e-10)
 })
+
+test_that("EL1 derivatives behave adequately", {
+  # The derivative is zero at the mean
+  set.seed(1)
+  X <- matrix(rnorm(20), ncol = 2)
+  Xbar <- colMeans(X)
+  expect_equal(EL1(X, mu = Xbar, deriv = TRUE)$deriv[1], 0, tolerance = 1e-12)
+})

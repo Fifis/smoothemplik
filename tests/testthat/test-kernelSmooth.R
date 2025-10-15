@@ -6,6 +6,12 @@ test_that("kernelSmooth correctly handles bad inputs", {
                  "Some smoothed values are NaN")
 })
 
+test_that("kernelSmoothCPP correctly handled bad inputs", {
+  set.seed(1)
+  expect_error(kernelSmoothCPP(x = matrix(rnorm(100), 10), y = 1:10, xout = matrix(rnorm(100), 10),
+                               weights = 1:10, bw = matrix(1:9)), "bw and xout must have")
+})
+
 test_that("kernelSmooth linear and higher-order smoothers address boundary bias", {
   set.seed(1)
   x <- sort(runif(300, -6, 6))

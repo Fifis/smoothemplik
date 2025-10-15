@@ -2,6 +2,13 @@ test_that("the rule-of-thumb bandwidth is invoked with a warning", {
   expect_warning(kernelWeights(1:10, PIT = TRUE), "No bandwidth supplied")
 })
 
+test_that("kernelWeightsOneCPP correctly handled bad inputs", {
+  set.seed(1)
+  expect_error(kernelWeightsOneCPP(x = 1:10, xout = 2:11, bw = 1:9), "bw and xout must have")
+
+  expect_error(kernelFun(1:5, kernel = "stuff"), "Invalid kernel type")
+})
+
 test_that("sparse matrices are identical to dense ones", {
   x   <- seq(-5, 5, 0.02)
   g   <- seq(-10, 10, 0.1)
